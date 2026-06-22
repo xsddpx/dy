@@ -1,0 +1,27 @@
+# dy auto 项目启动协议
+
+## 启动读取
+
+- 默认读取本文件和 `DOCS/PROJECT.md`，确认本项目只执行 `anna auto` 完整日更发布流程。
+- 需要处理提示词规则时读取 `DOCS/MODULES/MODULE_02_PROMPT.md`。
+- 需要阶段细节时，按 `DOCS/PROJECT.md` 的固定流程读取 `DOCS/MODULES/` 下对应模块文档。
+- 读取 `/Users/Shared/codex/Obsidian Vault/Askill/🎭AGENT须知.md`。
+
+## 固定边界
+
+- 本项目路径固定为 `/Users/Shared/codex/dy`。
+- 只保留 `anna` 单人路线和 `auto` 通道。
+- `auto` 表示：参考抽帧 -> 提示词 -> Dreamina 确认图 -> 人脸一致性门禁自动选图 -> Dreamina 视频生成 -> 抖音发布 -> 记录收尾。
+- 不支持 `direct`、`manual`、双人/`duo`、`swen`、TapNow 兜底。
+- 每次会话和每次自动化运行默认视为独立新任务；除非用户明确说继续/恢复并指定任务或产物，不读取或续接旧任务状态。
+- 不因 `TEMP/` 或 `OUTPUT/` 中存在候选产物而默认发布或续跑旧任务。
+
+## 文档边界
+
+- `DOCS/PROJECT.md` 是核心事实库，记录项目目标、资产、工具和长期边界。
+- `DOCS/MODULES/MODULE_02_PROMPT.md` 是提示词规则库。
+- 修改核心事实或提示词规则前必须先说明拟修改内容和原因；用户明确要求修改时，本次授权仅限其明确范围。
+
+## 本地提示
+
+- 默认使用中文，实事求是，不虚构未验证结果。

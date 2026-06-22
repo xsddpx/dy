@@ -1,0 +1,60 @@
+# 项目说明
+
+## 核心目标
+
+本项目是 `anna auto` 日更发布项目，目标是稳定生成并发布单人竖屏短视频。
+
+- 默认路线：`anna` 单人。
+- 固定通道：`auto`。
+- 视频规格：9:16、720p、5-6 秒。
+- 生成工具：Dreamina CLI。
+- 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`。
+
+## 内容边界
+
+- 只写可见画面、动作、镜头、场景、穿搭和画面质感。
+- 保持成熟、写实、生活化、平台可发布表达。
+- 严禁低俗、裸体、未成年感和不可发布内容。
+- 不支持 `direct`、`manual`、双人/`duo`、`swen`、TapNow。
+
+## 固定资产
+
+- 原始角色卡：`MATERIAL/fixed-role/anna.png`
+- Dreamina 上传代理图：`MATERIAL/fixed-role/anna-upload-2k.jpg`
+- 本地预览代理图：`MATERIAL/fixed-role/anna-proxy-1k.jpg`
+- 参考去重账本：`MATERIAL/reference-history.json`
+
+## 本地环境
+
+- 当前账户 CDP Chrome：`TOOLS/open_cdp_chrome.sh`，默认 `http://127.0.0.1:9222`。
+- Chrome 用户数据目录：`$HOME/Library/Application Support/Google/Chrome-Codex-CDP`。
+- Dreamina 确认图：`dreamina image2image --model_version 5.0 --ratio 9:16`。
+- Dreamina 视频：`dreamina multimodal2video --model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
+
+## 目录边界
+
+- `TEMP/`：过程文件，可清理，不作为默认续跑状态。
+- `OUTPUT/`：正式成片，扁平化保存为 `OUTPUT/RUN_ID.mp4`。
+- `DOCS/`：流程和规则。
+- `TOOLS/`：自动化脚本。
+- `MATERIAL/`：固定角色素材和去重账本。
+
+## 固定流程
+
+1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
+2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
+3. 参考宫格：用 `browser_reference_grid.py` 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`。
+4. 提示词：实际查看宫格或帧图后写可见画面语言；默认非 TNS 不运行 lint。
+5. 确认图：用 `anna-upload-2k.jpg` 和去身份参考图提交 Dreamina `image2image`，每批固定 `A-01/A-02/A-03` 三张。
+6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
+7. 视频生成：把正式 prompt 转写为 `@图1=选中确认图`，通过 `generation_gate.py --engine dreamina --route anna --channel auto` 后提交 Dreamina 视频。
+8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
+9. 记录收尾：成功生成正式视频后写入去重账本；发布后补充发布状态并刷新运行记录。
+
+## 硬阻断
+
+- 参考宫格未通过，不进入提示词或生成。
+- 确认图没有通过人脸一致性门禁，不进入视频生成。
+- 视频生成前未通过 `generation_gate.py`，不提交 Dreamina 视频。
+- 发布前未完成 `内容由AI生成` 声明，不得发布。
+- 登录失效、验证码、账号安全、平台风控、上传失败、发布按钮禁用等平台阻断时停止并报告。
