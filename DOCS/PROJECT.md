@@ -10,6 +10,8 @@
 - 生成工具：Dreamina CLI。
 - 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`。
 
+项目的两个关键生成节点是确认图和视频生成：确认图决定人物、构图和画面锚点是否可用，视频生成决定最终成片动作、节奏和发布质量。
+
 ## 内容边界
 
 - 只写可见画面、动作、镜头、场景、穿搭和画面质感。
@@ -44,11 +46,11 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
-3. 参考宫格：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`。
-4. 提示词：实际查看宫格或帧图后写可见画面语言；默认非 TNS 不运行 lint。
+3. 参考宫格与动画反推：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图推测整体动画并写入 `grid-prompt.txt`。
+4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
 5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Dreamina `image2image` 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02/A-03` 三张。
 6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
-7. 视频生成：把 vid prompt 转写为 `@图1=选中确认图` 后提交 Dreamina 视频。
+7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 9. 记录收尾：成功生成正式视频后写入去重账本；发布后补充发布状态并刷新运行记录。
 

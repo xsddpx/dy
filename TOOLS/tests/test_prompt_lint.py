@@ -55,6 +55,15 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "camera_mode_conflict" for f in result["findings"]), result["findings"])
 
+    def test_non_music_sound_terms_fail(self):
+        result = self.lint(GOOD_PROMPT + "背景有脚步声和环境声。")
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(any(f["code"] == "non_music_sound_terms" for f in result["findings"]), result["findings"])
+
+    def test_negated_non_music_sound_terms_pass(self):
+        result = self.lint(GOOD_PROMPT + "背景音乐为轻柔电子节拍，除背景音乐外，不出现环境声、人声、脚步声或音效。")
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
 
 if __name__ == "__main__":
     unittest.main()

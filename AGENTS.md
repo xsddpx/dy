@@ -3,7 +3,6 @@
 ## 启动读取
 
 - 默认读取本文件和 `DOCS/PROJECT.md`，确认本项目只执行 `anna auto` 完整日更发布流程。
-- 需要处理提示词规则时读取 `DOCS/MODULES/MODULE_02_PROMPT.md`。
 - 需要阶段细节时，按 `DOCS/PROJECT.md` 的固定流程读取 `DOCS/MODULES/` 下对应模块文档。
 - 读取 `/Users/Shared/codex/Obsidian Vault/Askill/🎭AGENT须知.md`。
 
@@ -19,7 +18,7 @@
 ## 文档边界
 
 - `DOCS/PROJECT.md` 是核心事实库，记录项目目标、资产、工具和长期边界。
-- `DOCS/MODULES/MODULE_02_PROMPT.md` 是提示词规则库。
+- 视频生成提示词规则集中在 `DOCS/MODULES/MODULE_03_DREAMINA_VIDEO.md`。
 - 修改核心事实或提示词规则前必须先说明拟修改内容和原因；用户明确要求修改时，本次授权仅限其明确范围。
 
 ## 本地提示
