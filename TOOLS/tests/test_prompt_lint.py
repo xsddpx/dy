@@ -31,18 +31,18 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue(any(f["code"] == "missing_confirmation_image" for f in result["findings"]), result["findings"])
 
     def test_non_anna_or_non_auto_fails(self):
-        self.assertEqual(self.lint(GOOD_PROMPT, route="duo")["decision"], "fail")
-        self.assertEqual(self.lint(GOOD_PROMPT, channel="manual")["decision"], "fail")
+        self.assertEqual(self.lint(GOOD_PROMPT, route="other")["decision"], "fail")
+        self.assertEqual(self.lint(GOOD_PROMPT, channel="other")["decision"], "fail")
 
     def test_unsupported_terms_fail(self):
-        result = self.lint(GOOD_PROMPT + " @图2 swen TapNow。")
+        result = self.lint(GOOD_PROMPT + " @图2 模型参数。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "unsupported_terms" for f in result["findings"]), result["findings"])
 
-    def test_direct_body_terms_fail(self):
+    def test_unsafe_body_terms_fail(self):
         result = self.lint(GOOD_PROMPT + " 大胸、屁股大。")
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "direct_body_terms" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "unsafe_body_terms" for f in result["findings"]), result["findings"])
 
     def test_missing_artistic_body_translation_fails(self):
         result = self.lint("画面人物以本次确认图为身份锚点，站在室内镜前自然移动。")

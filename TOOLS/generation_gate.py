@@ -14,8 +14,6 @@ from run_record import append_artifact, append_event, refresh_markdown
 FIXED_CAMERA_TERMS = ["固定手机机位", "固定手机支架", "固定机位", "稳定机位", "手机支架"]
 HANDHELD_CAMERA_TERMS = ["手持", "轻微手持", "手持自拍", "手持跟拍", "跟拍"]
 FORBIDDEN_PROMPT_TERMS = [
-    "TapNow",
-    "tapnow",
     "附件",
     "节点",
     "画布",
@@ -23,12 +21,7 @@ FORBIDDEN_PROMPT_TERMS = [
     "分辨率",
     "结果数",
     "@图2",
-    "@swen",
-    "swen",
-    "双人",
-    "duo",
-    "direct",
-    "manual",
+    "@图3",
 ]
 
 
@@ -79,7 +72,7 @@ def validate_grid_report(path, root, errors, warnings):
         add_error(errors, "Chrome JS 权限不可用时生成的宫格不能提交正式生成")
     if report.get("duration_sec", 0) <= 0:
         add_error(errors, "宫格报告视频时长为 0 或不可读")
-    if report.get("capture_mode") in {"manual-rect", "chrome-window"}:
+    if report.get("capture_mode") in {"custom-rect", "chrome-window"}:
         add_error(errors, f"宫格截图方式不允许进入正式生成：{report.get('capture_mode')}")
     if any(frame.get("mode") == "natural-playback" for frame in report.get("frames", [])):
         add_error(errors, "宫格使用自然播放间隔截图，不能提交正式生成")

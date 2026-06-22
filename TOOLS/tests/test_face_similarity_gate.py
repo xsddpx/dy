@@ -50,10 +50,10 @@ class FaceSimilarityGateTest(unittest.TestCase):
         self.assertEqual(args.threshold, 75.0)
         self.assertEqual(args.min_threshold, 0.0)
 
-    def test_parser_rejects_removed_duo_route(self):
+    def test_parser_rejects_unknown_route(self):
         parser = FACE_GATE.build_parser()
         with self.assertRaises(SystemExit):
-            parser.parse_args(["--manifest", "m.json", "--route", "duo", "--out", "out.json"])
+            parser.parse_args(["--manifest", "m.json", "--route", "other", "--out", "out.json"])
 
     def test_best_role_assignment_auto_passes_when_candidate_has_no_face(self):
         assignment, reason = FACE_GATE.best_role_assignment(

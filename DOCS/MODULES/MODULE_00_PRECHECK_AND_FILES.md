@@ -10,6 +10,7 @@
 
 - `TOOLS/open_cdp_chrome.sh` 可启动当前账户 CDP Chrome。
 - `TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 通过。
+- 需要接入 CDP 时优先使用 Playwright `connect_over_cdp`；非 Playwright 链路只用于人工排障或兼容兜底。
 - `dreamina user_credit` 可查询账户积分。
 - `MATERIAL/fixed-role/anna.png` 存在。
 - `MATERIAL/fixed-role/anna-upload-2k.jpg` 是 2048x2048 JPG。

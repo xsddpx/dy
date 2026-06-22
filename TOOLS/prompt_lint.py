@@ -13,7 +13,7 @@ def add(findings, severity, code, message):
     findings.append({"severity": severity, "code": code, "message": message})
 
 
-FORBIDDEN_DIRECT_TERMS = [
+FORBIDDEN_BODY_TERMS = [
     "大胸",
     "胸部大",
     "巨乳",
@@ -28,14 +28,11 @@ FORBIDDEN_DIRECT_TERMS = [
 
 UNSUPPORTED_TERMS = [
     "@图2",
-    "@swen",
-    "swen",
-    "双人",
-    "duo",
-    "direct",
-    "manual",
-    "TapNow",
-    "tapnow",
+    "@图3",
+    "附件",
+    "节点",
+    "模型参数",
+    "结果数",
 ]
 
 CHEST_ART_TERMS = [
@@ -70,10 +67,10 @@ def lint_text(text, path, route="anna", channel="auto"):
 
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
-        add(findings, "error", "unsupported_terms", f"prompt 含新项目不支持的路线或工具词：{', '.join(unsupported_hits)}")
-    forbidden_hits = [term for term in FORBIDDEN_DIRECT_TERMS if term in text]
+        add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
+    forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:
-        add(findings, "error", "direct_body_terms", f"正式 prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
+        add(findings, "error", "unsafe_body_terms", f"正式 prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
     if not any(term in text for term in CHEST_ART_TERMS):
         add(findings, "error", "missing_chest_artistic_expression", "缺少上身曲线的艺术化转译")
     if not any(term in text for term in HIP_ART_TERMS):

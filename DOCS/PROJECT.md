@@ -15,7 +15,7 @@
 - 只写可见画面、动作、镜头、场景、穿搭和画面质感。
 - 保持成熟、写实、生活化、平台可发布表达。
 - 严禁低俗、裸体、未成年感和不可发布内容。
-- 不支持 `direct`、`manual`、双人/`duo`、`swen`、TapNow。
+- 只执行 `anna auto` 完整发布链路，不接入其他生成路线、角色或兜底工具。
 
 ## 固定资产
 
@@ -28,6 +28,7 @@
 
 - 当前账户 CDP Chrome：`TOOLS/open_cdp_chrome.sh`，默认 `http://127.0.0.1:9222`。
 - Chrome 用户数据目录：`$HOME/Library/Application Support/Google/Chrome-Codex-CDP`。
+- CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - Dreamina 确认图：`dreamina image2image --model_version 5.0 --ratio 9:16`。
 - Dreamina 视频：`dreamina multimodal2video --model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 
@@ -43,9 +44,9 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
-3. 参考宫格：用 `browser_reference_grid.py` 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`。
+3. 参考宫格：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`。
 4. 提示词：实际查看宫格或帧图后写可见画面语言；默认非 TNS 不运行 lint。
-5. 确认图：用 `anna-upload-2k.jpg` 和去身份参考图提交 Dreamina `image2image`，每批固定 `A-01/A-02/A-03` 三张。
+5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Dreamina `image2image` 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02/A-03` 三张。
 6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
 7. 视频生成：把正式 prompt 转写为 `@图1=选中确认图`，通过 `generation_gate.py --engine dreamina --route anna --channel auto` 后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。

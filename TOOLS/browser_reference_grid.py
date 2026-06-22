@@ -268,7 +268,7 @@ def parse_rect(value):
 def choose_capture_rect(args, state):
     if args.rect:
         rect = parse_rect(args.rect)
-        rect["source"] = "manual-rect"
+        rect["source"] = "custom-rect"
         return rect
 
     bounds = chrome_bounds()
@@ -879,7 +879,7 @@ def validate_capture(frames, grid_path, report, args):
         errors.append("Chrome AppleScript JS 权限不可用，无法读取/控制真实 video 元素")
     if report.get("duration_sec", 0) <= 0:
         errors.append("视频时长为 0 或不可读，不能确认关键帧来自可控播放")
-    if report.get("capture_mode") == "manual-rect":
+    if report.get("capture_mode") == "custom-rect":
         errors.append("使用了手动固定裁剪区域；正式宫格必须由可验证的 video 元素区域自动确定")
     if report.get("capture_mode") == "chrome-window":
         errors.append("使用了整窗截图；整窗截图不得作为正式参考宫格")

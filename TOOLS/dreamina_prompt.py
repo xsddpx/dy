@@ -8,20 +8,13 @@ from pathlib import Path
 
 
 FORBIDDEN_TERMS = (
-    "TapNow",
-    "tapnow",
     "附件",
     "节点",
     "模型参数",
     "分辨率",
     "结果数",
     "@图2",
-    "@swen",
-    "swen",
-    "双人",
-    "duo",
-    "direct",
-    "manual",
+    "@图3",
 )
 
 

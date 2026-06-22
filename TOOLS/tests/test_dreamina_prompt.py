@@ -20,9 +20,9 @@ class DreaminaPromptTest(unittest.TestCase):
 
     def test_rejects_non_auto_route_or_channel(self):
         with self.assertRaises(ValueError):
-            DREAMINA_PROMPT.rewrite_prompt("x", "duo", "auto")
+            DREAMINA_PROMPT.rewrite_prompt("x", "other", "auto")
         with self.assertRaises(ValueError):
-            DREAMINA_PROMPT.rewrite_prompt("x", "anna", "direct")
+            DREAMINA_PROMPT.rewrite_prompt("x", "anna", "other")
 
     def test_validation_requires_graph1(self):
         errors = DREAMINA_PROMPT.validate_prompt("画面人物保持 anna 身份锚点。", "anna", "auto")

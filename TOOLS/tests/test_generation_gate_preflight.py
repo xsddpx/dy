@@ -72,7 +72,7 @@ class GenerationGatePreflightTest(unittest.TestCase):
         self.assertIn("缺少 @图1", proc.stdout)
 
     def test_rejects_unsupported_prompt_terms(self):
-        proc = self.run_gate(prompt_text="画面人物以 @图1 和 @图2 为身份锚点，使用 TapNow。")
+        proc = self.run_gate(prompt_text="画面人物以 @图1 和 @图2 为身份锚点，包含模型参数。")
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("不支持", proc.stdout)
 
@@ -85,12 +85,12 @@ class GenerationGatePreflightTest(unittest.TestCase):
         proc = self.run_gate("--tns-retry", "--prompt-lint-report", "TEMP/run/prompt-lint.json")
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
-    def test_parser_rejects_removed_channel(self):
+    def test_parser_rejects_unknown_channel(self):
         proc = subprocess.run([
             "python3", str(SCRIPT),
             "--engine", "dreamina",
             "--route", "anna",
-            "--channel", "direct",
+            "--channel", "other",
             "--reference-url", "https://www.douyin.com/video/1",
             "--grid-report", "TEMP/run/grid-report.json",
             "--prompt-file", "TEMP/run/dreamina-prompt.txt",

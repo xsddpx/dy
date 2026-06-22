@@ -11,7 +11,7 @@
 - 只支持 `anna auto`。
 - 正式视频 Dreamina prompt 只允许 `@图1`，含义为模块 03 自动选中的 Dreamina 原始确认图。
 - 不写模型参数、分辨率、结果数、流程说明或合规说明。
-- 不写 `direct`、`manual`、`duo`、`swen`、TapNow。
+- 不写内部流程词、非画面参数或额外图片锚点。
 - 默认非 TNS 不运行 `prompt_lint.py`；TNS/安全拦截后的收敛版本必须 lint 通过。
 
 ## 通过标准

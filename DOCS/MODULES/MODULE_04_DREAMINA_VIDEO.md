@@ -2,9 +2,16 @@
 
 ## 职责
 
-- 将正式 prompt 转写为 `@图1=选中确认图`。
+- 将正式视频 prompt 转写为 `@图1=选中确认图`。
 - 用 `generation_gate.py` 检查 Dreamina 视频提交前硬门。
 - 提交 Dreamina `multimodal2video` 并下载正式 MP4。
+
+## Prompt 边界
+
+- 确认图 prompt 和视频 prompt 是两个阶段的输入。
+- 确认图阶段使用 `@图1=角色上传图`、`@图2=强遮挡参考图`。
+- 视频阶段只上传模块 03 选中的 Dreamina 原始确认图，并在 prompt 中用 `@图1` 指代。
+- 视频 prompt 以选中确认图作为身份和画面锚点，再写动作、镜头、节奏和画面质感。
 
 ## 命令
 
