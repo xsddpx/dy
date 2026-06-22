@@ -10,8 +10,6 @@
 - 生成工具：Dreamina CLI。
 - 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`。
 
-项目的两个关键生成节点是确认图和视频生成：确认图决定人物、构图和画面锚点是否可用，视频生成决定最终成片动作、节奏和发布质量。
-
 ## 内容边界
 
 - 只写可见画面、动作、镜头、场景、穿搭和画面质感。
@@ -28,10 +26,10 @@
 
 ## 本地环境
 
-- 当前账户 CDP Chrome：`TOOLS/open_cdp_chrome.sh`，默认 `http://127.0.0.1:9222`。
-- Chrome 用户数据目录：`$HOME/Library/Application Support/Google/Chrome-Codex-CDP`。
+- 固定执行账户 `xsddpx` 的 CDP Chrome：`TOOLS/open_cdp_chrome.sh`，默认 `http://127.0.0.1:9222`。
+- Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
-- Dreamina 确认图：`dreamina image2image --model_version 5.0 --ratio 9:16`。
+- Dreamina 确认图：`dreamina image2image --model_version 5.0 --ratio 9:16 --resolution_type 2k`。
 - Dreamina 视频：`dreamina multimodal2video --model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 
 ## 目录边界
@@ -52,7 +50,7 @@
 6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
 7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
-9. 记录收尾：成功生成正式视频后写入去重账本；发布后补充发布状态并刷新运行记录。
+9. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录。
 
 ## 硬阻断
 

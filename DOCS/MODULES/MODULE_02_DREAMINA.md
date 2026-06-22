@@ -47,7 +47,7 @@ img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：
 
 ```bash
 python3 TOOLS/reference_mask.py TEMP/RUN_ID/frame-01.png --grid-report TEMP/RUN_ID/reference-grid-report.json --out TEMP/RUN_ID/reference-masked.png --report TEMP/RUN_ID/reference-masked-report.json
-dreamina image2image --images MATERIAL/fixed-role/anna-upload-2k.jpg,TEMP/RUN_ID/reference-masked.png --prompt "..." --model_version 5.0 --ratio 9:16
+dreamina image2image --images MATERIAL/fixed-role/anna-upload-2k.jpg,TEMP/RUN_ID/reference-masked.png --prompt "..." --model_version 5.0 --ratio 9:16 --resolution_type 2k
 python3 TOOLS/confirmation_manifest.py ...
 python3 TOOLS/face_similarity_gate.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --route anna --out TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
 python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --face-report TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json

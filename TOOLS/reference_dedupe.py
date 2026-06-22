@@ -265,7 +265,7 @@ def build_parser():
     record = subparsers.add_parser("record", help="记录本次进入流程的参考视频")
     record.add_argument("reference", help="抖音视频 URL、视频 ID，或其他可规范化 URL")
     record.add_argument("--route", required=True, choices=["anna"], help="路线；dy 项目只支持 anna")
-    record.add_argument("--status", default="used", help="参考状态，例如 used、published、blocked、abandoned")
+    record.add_argument("--status", default="used", help="参考状态，例如 used、blocked、abandoned")
     record.add_argument("--title", default=None, help="可选标题")
     record.add_argument("--author", default=None, help="可选作者")
     record.add_argument("--history", type=Path, default=default_history, help="历史账本路径")

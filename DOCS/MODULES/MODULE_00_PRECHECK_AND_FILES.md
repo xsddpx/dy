@@ -8,13 +8,17 @@
 
 ## 必查项
 
-- `TOOLS/open_cdp_chrome.sh` 可启动当前账户 CDP Chrome。
-- `TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 通过。
+- 固定执行账户的 CDP Chrome 可用。
+- 以固定执行账户环境运行 `TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 通过。
 - 需要接入 CDP 时优先使用 Playwright `connect_over_cdp`；非 Playwright 链路只用于人工排障或兼容兜底。
 - `dreamina user_credit` 可查询账户积分。
 - `MATERIAL/fixed-role/anna.png` 存在。
 - `MATERIAL/fixed-role/anna-upload-2k.jpg` 是 2048x2048 JPG。
 - `TEMP/`、`OUTPUT/` 可读写。
+
+## 固定执行账户
+
+`dy auto` 固定使用 macOS 账户 `xsddpx` 的运行环境，不以当前 Codex 所在账户为准；CDP Chrome 固定为 `http://127.0.0.1:9222`，用户目录应为 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`，Dreamina 与抖音创作者中心登录态也以 `xsddpx` 为准。跨账户执行 Dreamina、发布预检或相关自动化命令时必须使用 `sudo -H -u xsddpx ...`，确保 `HOME=/Users/xsddpx`；若 `9222` 已由 `xsddpx` 的 `Chrome-Codex-CDP` 占用且预检通过，直接复用，不关闭、不抢占、不改用当前账户环境。
 
 ## 命名
 

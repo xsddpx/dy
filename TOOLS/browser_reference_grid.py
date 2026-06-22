@@ -118,6 +118,8 @@ end tell
 def cleanup_chrome_tab(tab_session):
     if not tab_session:
         return None
+    if tab_session.get("mode") == "playwright-tab":
+        return {"cleanup": "handled-by-playwright"}
     if tab_session.get("keep_tab"):
         return {"cleanup": "kept", "reason": "--keep-tab"}
 
@@ -370,7 +372,18 @@ def capture_video_frames_cdp(url, out_dir, args, report):
     sync_playwright = load_sync_playwright()
     frames = []
     page = None
-    tab_session = open_in_chrome(url, keep_tab=args.keep_tab)
+    tab_session = None
+    open_error = None
+    try:
+        tab_session = open_in_chrome(url, keep_tab=args.keep_tab)
+    except Exception as exc:
+        open_error = str(exc)
+        tab_session = {
+            "mode": "playwright-tab",
+            "keep_tab": args.keep_tab,
+            "open_fallback_reason": open_error,
+        }
+        report.setdefault("warnings", []).append(f"AppleScript 打开参考标签失败，改用 Playwright CDP 新标签：{open_error}")
     report["chrome_tab"] = dict(tab_session)
     with sync_playwright() as p:
         try:
@@ -378,14 +391,18 @@ def capture_video_frames_cdp(url, out_dir, args, report):
             if not browser.contexts:
                 raise RuntimeError("当前账户本地 CDP Chrome 没有可用浏览器上下文")
             context = browser.contexts[0]
-            deadline = time.time() + max(8.0, args.initial_wait_sec)
-            while time.time() < deadline and page is None:
-                for candidate in context.pages:
-                    if candidate.url.split("?")[0] == url.split("?")[0]:
-                        page = candidate
-                        break
-                if page is None:
-                    time.sleep(0.5)
+            if open_error:
+                page = context.pages[0] if context.pages else context.new_page()
+                page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            else:
+                deadline = time.time() + max(8.0, args.initial_wait_sec)
+                while time.time() < deadline and page is None:
+                    for candidate in context.pages:
+                        if candidate.url.split("?")[0] == url.split("?")[0]:
+                            page = candidate
+                            break
+                    if page is None:
+                        time.sleep(0.5)
             if page is None:
                 raise RuntimeError("CDP 未找到 AppleScript 打开的参考标签页")
             page.bring_to_front()
@@ -532,6 +549,12 @@ async ({ seconds, settleMs }) => {
                     "canvas": {k: v for k, v in result.items() if k != "dataUrl"},
                 })
         finally:
+            if tab_session.get("mode") == "playwright-tab" and page is not None and not args.keep_tab:
+                try:
+                    page.close()
+                    report.setdefault("chrome_tab", {}).update({"cleanup": "closed-playwright-tab"})
+                except Exception as exc:
+                    report.setdefault("chrome_tab", {}).update({"cleanup": "failed", "error": str(exc)})
             cleanup = cleanup_chrome_tab(tab_session)
             if cleanup:
                 report.setdefault("chrome_tab", {}).update(cleanup)
