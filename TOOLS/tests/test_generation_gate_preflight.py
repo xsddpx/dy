@@ -19,7 +19,7 @@ class GenerationGatePreflightTest(unittest.TestCase):
         (self.root / "MATERIAL/fixed-role/anna.png").write_bytes(b"anna")
         (self.root / "TEMP/run/reference-grid.jpg").write_bytes(b"grid")
         (self.root / "TEMP/run/selected-confirmation.png").write_bytes(b"confirmation")
-        (self.root / "TEMP/run/dreamina-prompt.txt").write_text("画面人物以 @图1 为身份锚点。", encoding="utf-8")
+        (self.root / "TEMP/run/dreamina-vid-prompt.txt").write_text("画面人物以 @图1 为身份锚点。", encoding="utf-8")
         (self.root / "TEMP/run/grid-report.json").write_text(json.dumps({
             "decision": "pass",
             "validation": {"decision": "pass"},
@@ -31,7 +31,7 @@ class GenerationGatePreflightTest(unittest.TestCase):
         }), encoding="utf-8")
         (self.root / "TEMP/run/prompt-lint.json").write_text(json.dumps({
             "results": [{
-                "path": "TEMP/run/dreamina-prompt.txt",
+                "path": "TEMP/run/dreamina-vid-prompt.txt",
                 "decision": "pass",
                 "route": "anna",
                 "channel": "auto",
@@ -43,7 +43,7 @@ class GenerationGatePreflightTest(unittest.TestCase):
 
     def run_gate(self, *extra_args, prompt_text=None):
         if prompt_text is not None:
-            (self.root / "TEMP/run/dreamina-prompt.txt").write_text(prompt_text, encoding="utf-8")
+            (self.root / "TEMP/run/dreamina-vid-prompt.txt").write_text(prompt_text, encoding="utf-8")
         base_args = [
             "python3", str(SCRIPT),
             "--engine", "dreamina",
@@ -51,7 +51,7 @@ class GenerationGatePreflightTest(unittest.TestCase):
             "--channel", "auto",
             "--reference-url", "https://www.douyin.com/video/1",
             "--grid-report", "TEMP/run/grid-report.json",
-            "--prompt-file", "TEMP/run/dreamina-prompt.txt",
+            "--prompt-file", "TEMP/run/dreamina-vid-prompt.txt",
             "--confirmation-image", "TEMP/run/selected-confirmation.png",
             "--out-dir", "TEMP/run",
         ]
@@ -93,7 +93,7 @@ class GenerationGatePreflightTest(unittest.TestCase):
             "--channel", "other",
             "--reference-url", "https://www.douyin.com/video/1",
             "--grid-report", "TEMP/run/grid-report.json",
-            "--prompt-file", "TEMP/run/dreamina-prompt.txt",
+            "--prompt-file", "TEMP/run/dreamina-vid-prompt.txt",
             "--confirmation-image", "TEMP/run/selected-confirmation.png",
             "--out-dir", "TEMP/run",
         ], cwd=self.root, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

@@ -941,7 +941,7 @@ def write_report(out_dir, report):
             lines.extend([
                 "",
                 "## 头脸信息检测",
-                f"- 作用范围：仅供确认图 prompt lint 参考",
+                f"- 作用范围：仅供 img prompt 参考",
                 f"- 结论：{head_face.get('decision')}",
                 f"- 是否检测到头脸信息：{head_face.get('has_head_face_info')}",
                 f"- 检测帧数：{head_face.get('frame_count', 0)}",
@@ -952,7 +952,7 @@ def write_report(out_dir, report):
             lines.extend([
                 "",
                 "## 头脸信息检测",
-                f"- 作用范围：仅供确认图 prompt lint 参考",
+                f"- 作用范围：仅供 img prompt 参考",
                 f"- 结论：{head_face.get('decision') or 'unavailable'}",
                 f"- 原因：{head_face.get('reason') or head_face.get('error') or 'unknown'}",
             ])
@@ -1052,7 +1052,7 @@ def main():
                 head_face_detection = detect_head_face_info(frames)
                 report["head_face_detection"] = head_face_detection
                 if not head_face_detection.get("available"):
-                    report["warnings"].append("头脸信息检测不可用；仅影响确认图 prompt lint 的参考信息")
+                    report["warnings"].append("头脸信息检测不可用；仅影响 img prompt 的参考信息")
                 validation = validate_capture(frames, grid_path, report, args)
                 report["validation"] = validation
                 if validation["errors"]:
@@ -1198,7 +1198,7 @@ def main():
         head_face_detection = detect_head_face_info(frames)
         report["head_face_detection"] = head_face_detection
         if not head_face_detection.get("available"):
-            report["warnings"].append("头脸信息检测不可用；仅影响确认图 prompt lint 的参考信息")
+            report["warnings"].append("头脸信息检测不可用；仅影响 img prompt 的参考信息")
         validation = validate_capture(frames, grid_path, report, args)
         report["validation"] = validation
         if validation["errors"]:

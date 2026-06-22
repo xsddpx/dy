@@ -48,7 +48,7 @@
 4. 提示词：实际查看宫格或帧图后写可见画面语言；默认非 TNS 不运行 lint。
 5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Dreamina `image2image` 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02/A-03` 三张。
 6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
-7. 视频生成：把正式 prompt 转写为 `@图1=选中确认图`，通过 `generation_gate.py --engine dreamina --route anna --channel auto` 后提交 Dreamina 视频。
+7. 视频生成：把 vid prompt 转写为 `@图1=选中确认图`，通过 `generation_gate.py --engine dreamina --route anna --channel auto` 后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 9. 记录收尾：成功生成正式视频后写入去重账本；发布后补充发布状态并刷新运行记录。
 

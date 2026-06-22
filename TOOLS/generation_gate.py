@@ -121,18 +121,18 @@ def validate_dreamina_prompt(path, errors):
         add_error(errors, "Dreamina 通道缺少 --prompt-file")
         return {}
     if not path.exists():
-        add_error(errors, f"Dreamina prompt 文件不存在：{path}")
+        add_error(errors, f"Dreamina vid prompt 文件不存在：{path}")
         return {"prompt_file": str(path)}
     text = path.read_text(encoding="utf-8", errors="replace")
     if "@图1" not in text:
-        add_error(errors, "Dreamina prompt 缺少 @图1 图片引用（@图1=自动门禁选中的确认图）")
+        add_error(errors, "Dreamina vid prompt 缺少 @图1 图片引用（@图1=自动门禁选中的确认图）")
     found = [term for term in FORBIDDEN_PROMPT_TERMS if term in text]
     if found:
-        add_error(errors, f"Dreamina prompt 含不支持或内部流程词：{', '.join(found)}")
+        add_error(errors, f"Dreamina vid prompt 含不支持或内部流程词：{', '.join(found)}")
     fixed_hits = [term for term in FIXED_CAMERA_TERMS if term in text]
     handheld_hits = [term for term in HANDHELD_CAMERA_TERMS if term in text]
     if fixed_hits and handheld_hits:
-        add_error(errors, f"Dreamina prompt 拍摄方式冲突：固定机位与手持描述不能同时出现（固定：{', '.join(fixed_hits)}；手持：{', '.join(handheld_hits)}）")
+        add_error(errors, f"Dreamina vid prompt 拍摄方式冲突：固定机位与手持描述不能同时出现（固定：{', '.join(fixed_hits)}；手持：{', '.join(handheld_hits)}）")
     return {
         "prompt_file": str(path.resolve()),
         "required_refs": ["@图1"],
@@ -178,7 +178,7 @@ def main():
     parser.add_argument("--channel", choices=["auto"], required=True)
     parser.add_argument("--reference-url", required=True)
     parser.add_argument("--grid-report", required=True)
-    parser.add_argument("--prompt-lint-report", default=None, help="TNS 收敛重试时必填；默认非 TNS 提交不要求 prompt lint")
+    parser.add_argument("--prompt-lint-report", default=None, help="TNS 收敛重试时必填；默认非 TNS 提交不要求 vid prompt lint")
     parser.add_argument("--tns-retry", action="store_true", help="TNS/安全拦截后的 prompt 收敛重试")
     parser.add_argument("--prompt-file", required=True)
     parser.add_argument("--confirmation-image", required=True, help="自动门禁选中的 Dreamina 原始确认图")

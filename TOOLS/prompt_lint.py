@@ -70,7 +70,7 @@ def lint_text(text, path, route="anna", channel="auto"):
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
     forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:
-        add(findings, "error", "unsafe_body_terms", f"正式 prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
+        add(findings, "error", "unsafe_body_terms", f"vid prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
     if not any(term in text for term in CHEST_ART_TERMS):
         add(findings, "error", "missing_chest_artistic_expression", "缺少上身曲线的艺术化转译")
     if not any(term in text for term in HIP_ART_TERMS):
@@ -110,7 +110,7 @@ def write_reports(results, out_dir):
     report_md = out_dir / "report.md"
     report_json.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = [
-        "# TNS Prompt Lint 报告",
+        "# TNS vid prompt lint 报告",
         "",
         f"- 样本数：{len(results)}",
         f"- 通过：{sum(1 for r in results if r['decision'] == 'pass')}",
@@ -127,8 +127,8 @@ def write_reports(results, out_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="检查 dy 项目的 auto prompt 是否满足 TNS 收敛硬门。")
-    parser.add_argument("prompts", nargs="+", help="prompt 文本文件")
+    parser = argparse.ArgumentParser(description="检查 dy 项目的 vid prompt 是否满足 TNS 收敛硬门。")
+    parser.add_argument("prompts", nargs="+", help="vid prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")

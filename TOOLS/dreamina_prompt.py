@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Dreamina video prompts for the anna auto workflow."""
+"""Build Dreamina vid prompts for the anna auto workflow."""
 
 import argparse
 import re
@@ -35,24 +35,24 @@ def validate_prompt(text, route="anna", channel="auto"):
     if channel != "auto":
         errors.append("dy 项目只支持 channel=auto")
     if "@图1" not in text:
-        errors.append("Dreamina prompt 缺少 @图1（@图1=自动门禁选中的确认图）")
+        errors.append("Dreamina vid prompt 缺少 @图1（@图1=自动门禁选中的确认图）")
     found = [term for term in FORBIDDEN_TERMS if term in text]
     if found:
-        errors.append(f"Dreamina prompt 含不支持或内部流程词：{', '.join(found)}")
+        errors.append(f"Dreamina vid prompt 含不支持或内部流程词：{', '.join(found)}")
     return errors
 
 
 def main():
-    parser = argparse.ArgumentParser(description="将正式 prompt 转写为 dy 项目的 Dreamina @图1 视频 prompt。")
-    parser.add_argument("prompt", help="源 prompt 文件")
+    parser = argparse.ArgumentParser(description="将 vid prompt 转写为 dy 项目的 Dreamina @图1 视频输入。")
+    parser.add_argument("prompt", help="源 vid prompt 文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
-    parser.add_argument("--out", required=True, help="输出 Dreamina prompt 文件")
+    parser.add_argument("--out", required=True, help="输出 Dreamina vid prompt 文件")
     args = parser.parse_args()
 
     source = Path(args.prompt)
     if not source.exists():
-        print(f"源 prompt 不存在：{source}", file=sys.stderr)
+        print(f"源 vid prompt 不存在：{source}", file=sys.stderr)
         return 2
 
     try:
