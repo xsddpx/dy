@@ -66,6 +66,7 @@ NON_MUSIC_SOUND_TERMS = [
     "音效",
 ]
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
+SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
 
 
 def positive_sound_hits(text):
@@ -76,7 +77,8 @@ def positive_sound_hits(text):
             index = text.find(term, start)
             if index < 0:
                 break
-            prefix = text[max(0, index - 18):index]
+            boundary = max(text.rfind(mark, 0, index) for mark in SOUND_SENTENCE_BOUNDARIES)
+            prefix = text[boundary + 1:index]
             if not any(negation in prefix for negation in SOUND_NEGATION_TERMS):
                 hits.append(term)
                 break
