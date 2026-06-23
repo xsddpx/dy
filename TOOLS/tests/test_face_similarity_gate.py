@@ -27,13 +27,14 @@ class FaceSimilarityGateTest(unittest.TestCase):
         selected = FACE_GATE.choose_best_slot(enriched)
         self.assertEqual(selected["slot"], "A-02")
 
-    def test_rejects_when_similarity_below_threshold(self):
+    def test_reference_slot_still_ranks_when_similarity_below_threshold(self):
         enriched = FACE_GATE.attach_similarity(self.slots(), {
             "/tmp/a.png": {"checks": {"anna": {"ok": True, "similarity_percent": 89.9}}, "face_similarity_min_percent": 89.9, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": -0.1},
             "/tmp/b.png": {"checks": {"anna": {"ok": False, "error": "no-face-detected"}}, "face_similarity_min_percent": None, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": None},
             "/tmp/c.png": {"checks": {"anna": {"ok": True, "similarity_percent": 50}}, "face_similarity_min_percent": 50, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": -40},
         }, 90)
-        self.assertIsNone(FACE_GATE.choose_best_slot(enriched))
+        selected = FACE_GATE.choose_best_slot(enriched)
+        self.assertEqual(selected["slot"], "A-01")
 
     def test_tie_prefers_display_then_slot_order(self):
         enriched = FACE_GATE.attach_similarity(self.slots(), {

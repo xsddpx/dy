@@ -520,12 +520,11 @@ def attach_similarity(slots, comparisons, threshold):
     return enriched
 
 
-def choose_best_slot(slots):
-    eligible = [item for item in slots if item.get("auto_select_eligible")]
-    if not eligible:
+def choose_reference_slot(slots):
+    if not slots:
         return None
     return sorted(
-        eligible,
+        slots,
         key=lambda item: (
             -float(item.get("face_similarity_margin_min_percent") or -999),
             -float(item.get("face_similarity_min_percent") or 0),
@@ -533,6 +532,10 @@ def choose_best_slot(slots):
             str(item.get("slot") or ""),
         ),
     )[0]
+
+
+def choose_best_slot(slots):
+    return choose_reference_slot(slots)
 
 
 def build_report(args):
@@ -555,33 +558,32 @@ def build_report(args):
         face_mesh_model=args.face_mesh_model,
     )
     enriched = attach_similarity(slots, comparisons, args.threshold)
-    selected = choose_best_slot(enriched)
-    errors = []
-    if not selected:
-        errors.append(f"没有确认图通过人脸一致性门禁（人脸基础 {args.threshold}%）")
+    reference = choose_reference_slot(enriched)
     return {
         "created_at": datetime.now().isoformat(timespec="seconds"),
-        "decision": "pass" if selected else "fail",
+        "decision": "reference",
         "method": "insightface",
         "model": args.model,
         "route": args.route,
         "threshold_percent": args.threshold,
         "min_threshold_percent": args.min_threshold,
-        "threshold_policy": "face gate uses adjusted_threshold=threshold*effective_face_visible_ratio; if candidate has no comparable InsightFace face, face gate is skipped as out-of-frame",
+        "threshold_policy": "reference only: adjusted_threshold=threshold*effective_face_visible_ratio is reported but never blocks video generation",
         "face_mesh_model": str(args.face_mesh_model),
         "candidate_face_policy": f"largest {max_candidate_faces} face(s) by bounding-box area",
         "role_policy": "anna only",
         "manifest": str(manifest_path),
         "roles": {role: str(path) for role, path in role_paths.items()},
         "slots": enriched,
-        "selected_slot": selected.get("slot") if selected else None,
-        "selected_confirmation_image": selected.get("image_path") if selected else None,
-        "errors": errors,
+        "reference_slot": reference.get("slot") if reference else None,
+        "reference_confirmation_image": reference.get("image_path") if reference else None,
+        "selected_slot": reference.get("slot") if reference else None,
+        "selected_confirmation_image": reference.get("image_path") if reference else None,
+        "errors": [],
     }
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="用 anna 人脸一致性筛选确认图。")
+    parser = argparse.ArgumentParser(description="生成 anna 人脸相似度参考报告，不作为硬门禁。")
     parser.add_argument("--manifest", required=True, help="confirmation-manifest.json")
     parser.add_argument("--route", choices=["anna"], required=True)
     parser.add_argument("--threshold", type=float, default=75.0, help="无遮挡时的人脸相似度标准")
@@ -616,18 +618,20 @@ def main():
             stage="confirmation",
             event="face_similarity",
             status=report["decision"],
-            summary=f"人脸相似度门禁 {report['decision']}，选中 {report['selected_slot'] or '无'}",
+            summary=f"人脸相似度参考 {report['decision']}，参考槽位 {report['reference_slot'] or '无'}",
             data=summary,
         )
         refresh_markdown(args.record_jsonl)
     print(json.dumps({
         "decision": report["decision"],
+        "reference_slot": report["reference_slot"],
+        "reference_confirmation_image": report["reference_confirmation_image"],
         "selected_slot": report["selected_slot"],
         "selected_confirmation_image": report["selected_confirmation_image"],
         "report": str(out),
         "errors": report["errors"],
     }, ensure_ascii=False, indent=2))
-    return 0 if report["decision"] == "pass" else 1
+    return 0
 
 
 if __name__ == "__main__":

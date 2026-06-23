@@ -107,10 +107,12 @@ def _format_value(value: Any) -> str:
 
 def _face_similarity_lines(event: dict[str, Any]) -> list[str]:
     data = event.get("data") or {}
+    slot = data.get("reference_slot") or data.get("selected_slot")
+    image = data.get("reference_confirmation_image") or data.get("selected_confirmation_image")
     return [
         f"- 结论：{_format_value(data.get('decision') or event.get('status'))}",
-        f"- 选中槽位：{_format_value(data.get('selected_slot'))}",
-        f"- 选中确认图：{_format_value(data.get('selected_confirmation_image'))}",
+        f"- 参考槽位：{_format_value(slot)}",
+        f"- 参考确认图：{_format_value(image)}",
         f"- 动态阈值：{_format_value(data.get('adjusted_threshold_min_percent'))}%",
         f"- 候选最高分：{_format_value(data.get('best_similarity_percent'))}%",
         f"- 跳过人脸槽位：{_format_value(data.get('face_gate_skipped_slots'))}",
@@ -275,7 +277,7 @@ def face_similarity_summary(report: dict[str, Any]) -> dict[str, Any]:
             best = slot
 
     selected = None
-    selected_slot = report.get("selected_slot")
+    selected_slot = report.get("reference_slot") or report.get("selected_slot")
     for slot in slots:
         if slot.get("slot") == selected_slot:
             selected = slot
@@ -294,7 +296,9 @@ def face_similarity_summary(report: dict[str, Any]) -> dict[str, Any]:
     return {
         "decision": report.get("decision"),
         "selected_slot": selected_slot,
-        "selected_confirmation_image": report.get("selected_confirmation_image"),
+        "selected_confirmation_image": report.get("reference_confirmation_image") or report.get("selected_confirmation_image"),
+        "reference_slot": report.get("reference_slot"),
+        "reference_confirmation_image": report.get("reference_confirmation_image"),
         "adjusted_threshold_min_percent": (selected or {}).get("adjusted_threshold_min_percent"),
         "best_similarity_percent": (best or {}).get("face_similarity_min_percent"),
         "face_gate_skipped_slots": ", ".join(str(item) for item in skipped_slots) if skipped_slots else None,

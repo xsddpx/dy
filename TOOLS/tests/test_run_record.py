@@ -56,9 +56,9 @@ class RunRecordTest(unittest.TestCase):
 
     def test_face_similarity_summary_contains_required_fields(self):
         report = {
-            "decision": "pass",
-            "selected_slot": "A-02",
-            "selected_confirmation_image": "TEMP/run/confirm/A-02.png",
+            "decision": "reference",
+            "reference_slot": "A-02",
+            "reference_confirmation_image": "TEMP/run/confirm/A-02.png",
             "slots": [
                 {
                     "slot": "A-01",
@@ -75,8 +75,9 @@ class RunRecordTest(unittest.TestCase):
             ],
         }
         summary = RUN_RECORD.face_similarity_summary(report)
-        self.assertEqual(summary["decision"], "pass")
+        self.assertEqual(summary["decision"], "reference")
         self.assertEqual(summary["selected_slot"], "A-02")
+        self.assertEqual(summary["reference_slot"], "A-02")
         self.assertEqual(summary["adjusted_threshold_min_percent"], 63.5)
         self.assertEqual(summary["best_similarity_percent"], 91.25)
 
@@ -86,13 +87,13 @@ class RunRecordTest(unittest.TestCase):
                 record,
                 stage="confirmation",
                 event="face_similarity",
-                status="pass",
-                summary="人脸相似度门禁 pass，选中 A-02",
+                status="reference",
+                summary="人脸相似度参考 reference，参考槽位 A-02",
                 data=summary,
             )
             md = RUN_RECORD.refresh_markdown(record)
             text = md.read_text(encoding="utf-8")
-            self.assertIn("选中槽位：A-02", text)
+            self.assertIn("参考槽位：A-02", text)
             self.assertIn("动态阈值：63.5%", text)
             self.assertIn("候选最高分：91.25%", text)
 

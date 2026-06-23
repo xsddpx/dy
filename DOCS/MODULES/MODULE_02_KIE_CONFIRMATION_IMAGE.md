@@ -1,11 +1,12 @@
-# 模块 02：Kie 确认图与自动选图
+# 模块 02：Kie 确认图与选择
 
 ## 职责
 
 - 从参考帧生成强遮挡参考图。
 - 用 `anna-upload-2k.jpg` 和强遮挡参考图提交 Kie Nano Banana Pro 1K 生图。
 - 每批固定生成 `A-01/A-02/A-03` 三个槽位。
-- 用 `face_similarity_gate.py` 自动选择唯一可用确认图。
+- 用 `face_similarity_gate.py` 生成人脸相似度参考报告。
+- 执行者从成功生成的确认图中选择唯一可用确认图。
 
 ## 输入与 @ 引用
 
@@ -65,14 +66,15 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 
 `kie_confirmation_image.py` 每个槽位生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `nano-banana-pro-1K`。失败槽位仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
 
-## 人脸一致性门禁
+## 人脸相似度参考
 
 - `face_similarity_gate.py` 使用 `MATERIAL/fixed-role/anna.png` 作为本地比对源。
 - 默认基础阈值为 `75%`。
-- 候选确认图有人脸入镜时，门禁按有效脸部可见比例动态调整阈值。
-- 候选确认图没有可比对人脸时，记录为脸部不入镜并跳过人脸一致性子门。
-- 多张候选通过时，优先选择相似度 margin 更高、相似度更高、槽位顺序更靠前的确认图。
-- `face-similarity-report.json` 必须保留为本次自动选图证据。
+- 候选确认图有人脸入镜时，报告按有效脸部可见比例计算调整后参考阈值。
+- 候选确认图没有可比对人脸时，记录为脸部不入镜并跳过相似度子项。
+- 报告会给出 `reference_slot` 和 `reference_confirmation_image`，仅供执行者参考。
+- 不因相似度低、无可比对人脸或 `reference_slot` 为空而阻断视频生成；是否可用由执行者结合身份、构图、身材、真实感和画面稳定性判断。
+- `face-similarity-report.json` 必须保留为本次选择参考证据。
 
 ## 通过标准
 
@@ -83,5 +85,5 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 - 三个槽位的 img prompt 均使用 `人物：`、`环境：`、`其他：` 三段式；环境差异按轻度、中度、明显逐级增加，但最终 prompt 不写解释性变化标签。
 - 每个 `环境：` 均已写清具体空间、关键陈设、材质、光线来源、空间纵深和主体关系。
 - `confirmation-manifest.json/md` 已生成。
-- `face-similarity-report.json` 的 `decision=pass`。
+- `face-similarity-report.json` 已生成；其结论只作为参考，不作为通过标准。
 - `selected_confirmation_image` 指向 Kie 下载到本地的原始确认图。

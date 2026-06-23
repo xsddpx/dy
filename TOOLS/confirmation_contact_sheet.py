@@ -88,7 +88,7 @@ def build_sheet(args):
     manifest = load_json(manifest_path)
     report = load_json(args.face_report) if args.face_report else {}
     scores = score_map(report)
-    selected_slot = report.get("selected_slot")
+    selected_slot = report.get("reference_slot") or report.get("selected_slot")
 
     slots = manifest.get("slots", [])
     if not slots:
@@ -105,7 +105,7 @@ def build_sheet(args):
     sheet = np.full((sheet_h, sheet_w, 3), 238, dtype=np.uint8)
 
     title = f"{manifest.get('batch', '')} confirmation contact sheet"
-    subtitle = f"selected: {selected_slot or '-'} | confirmation similarity gate: {report.get('decision', '-')}"
+    subtitle = f"reference: {selected_slot or '-'} | face similarity: {report.get('decision', '-')}"
     draw_multiline(sheet, [title, subtitle], (margin, 24), scale=0.62, line_height=25, thickness=2)
 
     entries = []
@@ -142,7 +142,7 @@ def build_sheet(args):
         label_y = y + thumb_h + 23
         label_lines = [
             f"{slot} | {status} | {similarity_text}",
-            f"{'AUTO SELECTED' if selected else item.get('prompt_note') or ''}"[:42],
+            f"{'REFERENCE' if selected else item.get('prompt_note') or ''}"[:42],
         ]
         draw_multiline(sheet, label_lines, (x + 8, label_y), scale=0.52, line_height=23, thickness=1)
         entries.append({
