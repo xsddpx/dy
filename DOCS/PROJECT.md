@@ -51,7 +51,7 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
-3. 参考宫格与动画反推：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图推测整体动画并写入 `grid-prompt.txt`。
+3. 参考宫格、导演结构反推与 grid-prompt 规范记录：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图反推可见导演结构、身材卖点校准和参考六锁定结论，并写入 `grid-prompt.txt`。
 4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
 5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Kie Nano Banana Pro 1K 先上传 `anna.png` 作为 `@图1`，并在 img prompt 中声明 `@图1` 是同一人的多视角、多表情角色参考图，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02` 两张。
 6. 确认图选择：执行者从成功生成的确认图中选择一张进入视频生成，并记录选择原因。
