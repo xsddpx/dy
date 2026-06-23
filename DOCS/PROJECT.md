@@ -7,12 +7,12 @@
 - 默认路线：`anna` 单人。
 - 固定通道：`auto`。
 - 视频规格：9:16、720p、5-6 秒。
-- 生成工具：Dreamina CLI。
+- 生成工具：Codex 内置 `image_gen` 负责确认图，Dreamina CLI 负责视频。
 - 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`。
 
 ## 内容边界
 
-- 只写可见画面、动作、镜头、场景、穿搭和画面质感。
+- 只写可见画面、动作、镜头、场景和画面质感。
 - 保持成熟、写实、生活化、平台可发布表达。
 - 严禁低俗、裸体、未成年感和不可发布内容。
 - 只执行 `anna auto` 完整发布链路，不接入其他生成路线、角色或兜底工具。
@@ -20,7 +20,7 @@
 ## 固定资产
 
 - 原始角色卡：`MATERIAL/fixed-role/anna.png`
-- Dreamina 上传代理图：`MATERIAL/fixed-role/anna-upload-2k.jpg`
+- Codex Image Gen 角色参考图：`MATERIAL/fixed-role/anna-upload-2k.jpg`
 - 本地预览代理图：`MATERIAL/fixed-role/anna-proxy-1k.jpg`
 - 参考去重账本：`MATERIAL/reference-history.json`
 
@@ -29,7 +29,7 @@
 - 固定执行账户 `xsddpx` 的 CDP Chrome：`TOOLS/open_cdp_chrome.sh`，默认 `http://127.0.0.1:9222`。
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
-- Dreamina 确认图：`dreamina image2image --model_version 5.0 --ratio 9:16 --resolution_type 2k`。
+- Codex Image Gen 确认图：由当前 Codex 会话调用内置 `image_gen`，生成后保存到 `TEMP/RUN_ID/confirm-A-HHMMSS/raw/`。
 - Dreamina 视频：`dreamina multimodal2video --model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 
 ## 目录边界
@@ -42,12 +42,12 @@
 
 ## 固定流程
 
-1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
+1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
 3. 参考宫格与动画反推：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图推测整体动画并写入 `grid-prompt.txt`。
 4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
-5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Dreamina `image2image` 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02/A-03` 三张。
-6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
+5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Codex 内置 `image_gen` 使用 `anna-upload-2k.jpg` 作为 `@图1`，使用强遮挡参考图作为 `@图2`，让图像本身提供姿态、动作、镜头关系、构图关系和空间关系，每批固定生成 `A-01/A-02/A-03` 三张。
+6. 确认图选择：执行者从成功生成的三张确认图中选择一张进入视频生成，并记录 `selected_slot` 和 `selected_confirmation_image`。
 7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 9. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录。
@@ -55,6 +55,6 @@
 ## 硬阻断
 
 - 参考宫格未通过，不进入提示词或生成。
-- 确认图没有通过人脸一致性门禁，不进入视频生成。
+- 没有可用确认图或未记录选中确认图，不进入视频生成。
 - 发布前未完成 `内容由AI生成` 声明，不得发布。
 - 登录失效、验证码、账号安全、平台风控、上传失败、发布按钮禁用等平台阻断时停止并报告。
