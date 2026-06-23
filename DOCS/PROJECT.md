@@ -45,7 +45,7 @@
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
 3. 参考宫格与动画反推：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图推测整体动画并写入 `grid-prompt.txt`。
-4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
+4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；`人物：` 段不展开描述 `@图2` 的姿态、动作、镜头或构图关系；同批 `01-03` 的环境保持同一类型，`01` 按参考环境原样描述，`02-03` 在同类空间内逐级增加细节；默认非 TNS 不运行 lint。
 5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Codex 内置 `image_gen` 使用 `anna-upload-2k.jpg` 作为 `@图1`，使用强遮挡参考图作为 `@图2`，让图像本身提供姿态、动作、镜头关系、构图关系和空间关系，每批固定生成 `A-01/A-02/A-03` 三张。
 6. 确认图选择：执行者从成功生成的三张确认图中选择一张进入视频生成，并记录 `selected_slot` 和 `selected_confirmation_image`。
 7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
