@@ -8,7 +8,7 @@
 2. 7 天去重。
 3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，并根据宫格写 `grid-prompt.txt`。
 4. 写确认图 img prompt。
-5. Dreamina `image2image` 生成三张确认图。
+5. Kie Nano Banana Pro 1K 生成三张确认图。
 6. 人脸一致性门禁自动选图。
 7. 综合 img prompt 和 grid prompt 人工重写 vid prompt，Dreamina `multimodal2video` 生成 5-6 秒竖屏视频。
 8. 上传抖音，设置 `内容由AI生成` 声明并发布。
@@ -27,3 +27,5 @@ cd /Users/Shared/codex/dy
 zsh TOOLS/open_cdp_chrome.sh 9222
 python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ```
+
+Kie 确认图生图前，先在本地 `.env` 配置 `KIE_API_KEY`，不要提交 `.env`。

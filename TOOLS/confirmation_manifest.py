@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an auditable Dreamina confirmation batch manifest."""
+"""Build an auditable confirmation image batch manifest."""
 
 import argparse
 import hashlib
@@ -137,7 +137,7 @@ def validate_entries(entries, batch):
 
 def write_markdown(manifest, path):
     lines = [
-        "# Dreamina 确认图批次清单",
+        "# 确认图批次清单",
         "",
         f"- RUN_ID：{manifest['run_id']}",
         f"- 批次：{manifest['batch']}",

@@ -1,6 +1,9 @@
 # Local process and output files may contain browser state, credentials, dependencies, and large media.
 /TEMP/
 /OUTPUT/
+.env
+.env.*
+!.env.example
 
 # macOS metadata.
 .DS_Store

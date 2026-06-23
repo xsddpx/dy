@@ -49,21 +49,21 @@ class ConfirmationManifestTest(unittest.TestCase):
                 "submit_id": "11111111-dddd",
                 "status": "success",
                 "image_path": str(self.image1),
-                "model_version": "4.7",
+                "model_version": "nano-banana-pro-1K",
             },
             {
                 "slot": "A-02",
                 "submit_id": "22222222-eeee",
                 "status": "fail",
                 "fail_reason": "generation failed",
-                "model_version": "4.7",
+                "model_version": "nano-banana-pro-1K",
             },
             {
                 "slot": "A-03",
                 "submit_id": "33333333-ffff",
                 "status": "success",
                 "image_path": str(self.image3),
-                "model_version": "4.7",
+                "model_version": "nano-banana-pro-1K",
             },
         ])
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)

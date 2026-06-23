@@ -1,15 +1,15 @@
-# 模块 02：Dreamina 确认图与自动选图
+# 模块 02：Kie 确认图与自动选图
 
 ## 职责
 
 - 从参考帧生成强遮挡参考图。
-- 用 `anna-upload-2k.jpg` 和强遮挡参考图提交 Dreamina `image2image`。
+- 用 `anna-upload-2k.jpg` 和强遮挡参考图提交 Kie Nano Banana Pro 1K 生图。
 - 每批固定生成 `A-01/A-02/A-03` 三个槽位。
 - 用 `face_similarity_gate.py` 自动选择唯一可用确认图。
 
 ## 输入与 @ 引用
 
-- Dreamina `image2image` 先上传 `MATERIAL/fixed-role/anna-upload-2k.jpg`，在 prompt 中用 `@图1` 指代。
+- Kie 生图先上传 `MATERIAL/fixed-role/anna-upload-2k.jpg`，在 prompt 中用 `@图1` 指代。
 - 再上传本次强遮挡参考图，作为 `@图2`。
 - `@图1` 提供人物身份、五官、脸型、发型、神态和稳定身材比例。
 - `@图2` 提供姿态、身体角度、动作、手部位置、穿搭版型、腰线、腿部入镜范围和镜头距离。
@@ -25,9 +25,17 @@
 - 自动检测缺失或遮挡框明显异常时，才使用 `--rect x,y,w,h` 手工兜底。
 - 遮挡图统一保存为 `TEMP/RUN_ID/reference-masked.png`，报告保存为 `TEMP/RUN_ID/reference-masked-report.json`。
 
+## Kie 配置
+
+- 本地 `.env` 必须配置 `KIE_API_KEY`，不得提交 `.env`。
+- 确认图模型固定为 `nano-banana-pro`。
+- 输出规格固定为 `aspect_ratio=9:16`、`resolution=1K`、`output_format=png`。
+- 本地图片先通过 Kie File Stream Upload 获得临时 URL，再传入 `image_input`。
+- Kie 临时 URL 有时效，生成成功后必须立即下载原始确认图到 `TEMP/RUN_ID/confirm-A-HHMMSS/raw/`，后续只使用本地文件路径。
+
 ## img prompt
 
-img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：` 三段式。每段都必须是 Dreamina 可直接执行的画面描述，不写流程说明、合规说明或变化原因。执行者必须先为本批三张确认图设计环境方向，再写入 `环境：` 段；环境必须具体到空间类型、关键陈设、材质、光线来源、空间纵深和主体关系。
+img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：` 三段式。每段都必须是 Kie Nano Banana Pro 可直接执行的画面描述，不写流程说明、合规说明或变化原因。执行者必须先为本批三张确认图设计环境方向，再写入 `环境：` 段；环境必须具体到空间类型、关键陈设、材质、光线来源、空间纵深和主体关系。
 
 ```text
 人物：使用 @图1 的人物替换 @图2 中的人物。保持 @图1 的长相、五官、脸型、发型、神态和稳定身材比例；参考 @图2 的姿态、身体角度、动作、手部位置、穿搭版型、腰线、腿部入镜范围和镜头距离。
@@ -47,11 +55,15 @@ img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：
 
 ```bash
 python3 TOOLS/reference_mask.py TEMP/RUN_ID/frame-01.png --grid-report TEMP/RUN_ID/reference-grid-report.json --out TEMP/RUN_ID/reference-masked.png --report TEMP/RUN_ID/reference-masked-report.json
-dreamina image2image --images MATERIAL/fixed-role/anna-upload-2k.jpg,TEMP/RUN_ID/reference-masked.png --prompt "..." --model_version 5.0 --ratio 9:16 --resolution_type 2k
-python3 TOOLS/confirmation_manifest.py ...
+python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-01 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-01-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
+python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-02 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-02-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
+python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-03 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-03-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
+python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --topic TOPIC --out-dir TEMP/RUN_ID/confirm-A-HHMMSS --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-01-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-02-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-03-entry.json
 python3 TOOLS/face_similarity_gate.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --route anna --out TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
 python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --face-report TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
 ```
+
+`kie_confirmation_image.py` 每个槽位生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `nano-banana-pro-1K`。失败槽位仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
 
 ## 人脸一致性门禁
 
@@ -72,4 +84,4 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 - 每个 `环境：` 均已写清具体空间、关键陈设、材质、光线来源、空间纵深和主体关系。
 - `confirmation-manifest.json/md` 已生成。
 - `face-similarity-report.json` 的 `decision=pass`。
-- `selected_confirmation_image` 指向 Dreamina 原始确认图。
+- `selected_confirmation_image` 指向 Kie 下载到本地的原始确认图。

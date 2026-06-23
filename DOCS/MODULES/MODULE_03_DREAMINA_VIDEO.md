@@ -9,8 +9,8 @@
 
 - img prompt 和 vid prompt 是两个阶段的输入。
 - img prompt 用于确认图阶段，使用 `@图1=角色上传图`、`@图2=强遮挡参考图`。
-- vid prompt 用于视频阶段，只上传模块 02 选中的 Dreamina 原始确认图，并在 prompt 中用 `@图1` 指代。
-- Dreamina 图片指代统一使用 `@` 方式，不做脚本转换。
+- vid prompt 用于视频阶段，只上传模块 02 选中的 Kie 原始确认图，并在 prompt 中用 `@图1` 指代。
+- Dreamina 视频阶段的图片指代统一使用 `@` 方式，不做脚本转换。
 - 如果 img prompt 中的 `@图2` 是强遮挡参考图或动作复刻参考，vid prompt 只能吸收其动作、镜头和构图含义，不保留 `@图2`。
 - 执行者必须分析 img prompt 的人物、环境、画面质感，以及 grid prompt 的整体动画，重新写成新的 vid prompt；不得用脚本做简单合并。
 

@@ -19,4 +19,4 @@ python3 TOOLS/browser_reference_grid.py "REFERENCE_URL" --out-dir TEMP/RUN_ID/ -
 - `reference-grid.jpg`、`reference-grid-report.json`、`reference-grid-report.md` 已写入 `TEMP/RUN_ID/`。
 - `grid-prompt.txt` 已写入 `TEMP/RUN_ID/`，内容包括人物动作连续性、镜头运动、节奏、姿态变化和画面动态重点。
 - 宫格报告 `decision=pass` 且 `validation.decision=pass`。
-- 宫格只用于 img prompt 和 grid prompt 分析与记录，不作为 Dreamina 输入。
+- 宫格只用于 img prompt 和 grid prompt 分析与记录，不直接作为 Kie 或 Dreamina 输入。

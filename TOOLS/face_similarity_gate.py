@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select Dreamina confirmation images by identity gate."""
+"""Select confirmation images by identity gate."""
 
 import argparse
 import itertools
@@ -581,7 +581,7 @@ def build_report(args):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="用 anna 人脸一致性筛选 Dreamina 确认图。")
+    parser = argparse.ArgumentParser(description="用 anna 人脸一致性筛选确认图。")
     parser.add_argument("--manifest", required=True, help="confirmation-manifest.json")
     parser.add_argument("--route", choices=["anna"], required=True)
     parser.add_argument("--threshold", type=float, default=75.0, help="无遮挡时的人脸相似度标准")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a labeled contact sheet for Dreamina confirmation images."""
+"""Build a labeled contact sheet for confirmation images."""
 
 import argparse
 import json

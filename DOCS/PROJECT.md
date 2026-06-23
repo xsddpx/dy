@@ -7,7 +7,7 @@
 - 默认路线：`anna` 单人。
 - 固定通道：`auto`。
 - 视频规格：9:16、720p、5-6 秒。
-- 生成工具：Dreamina CLI。
+- 生成工具：Kie API 负责确认图，Dreamina CLI 负责视频。
 - 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`。
 
 ## 核心卖点与方向
@@ -29,7 +29,7 @@
 ## 固定资产
 
 - 原始角色卡：`MATERIAL/fixed-role/anna.png`
-- Dreamina 上传代理图：`MATERIAL/fixed-role/anna-upload-2k.jpg`
+- Kie 确认图角色参考图：`MATERIAL/fixed-role/anna-upload-2k.jpg`
 - 本地预览代理图：`MATERIAL/fixed-role/anna-proxy-1k.jpg`
 - 参考去重账本：`MATERIAL/reference-history.json`
 
@@ -38,7 +38,7 @@
 - 固定执行账户 `xsddpx` 的 CDP Chrome：`TOOLS/open_cdp_chrome.sh`，默认 `http://127.0.0.1:9222`。
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
-- Dreamina 确认图：`dreamina image2image --model_version 5.0 --ratio 9:16 --resolution_type 2k`。
+- Kie 确认图：`nano-banana-pro`，9:16，1K，PNG。
 - Dreamina 视频：`dreamina multimodal2video --model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 
 ## 目录边界
@@ -51,12 +51,12 @@
 
 ## 固定流程
 
-1. 预检与建档：读取项目文档，检查 CDP Chrome、Dreamina、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
+1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
 3. 参考宫格与动画反推：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图推测整体动画并写入 `grid-prompt.txt`。
 4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
-5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Dreamina `image2image` 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02/A-03` 三张。
-6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Dreamina 原始确认图进入视频生成。
+5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Kie Nano Banana Pro 1K 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02/A-03` 三张。
+6. 自动选图：运行 `face_similarity_gate.py`，只允许门禁通过的 Kie 原始确认图进入视频生成。
 7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 9. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录。

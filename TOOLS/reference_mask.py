@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a black-box masked reference image for Dreamina confirmation."""
+"""Create a black-box masked reference image for confirmation generation."""
 
 import argparse
 import json
