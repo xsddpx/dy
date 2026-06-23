@@ -28,9 +28,7 @@
 
 ## 固定资产
 
-- 原始角色卡：`MATERIAL/fixed-role/anna.png`
-- Kie 确认图角色参考图：`MATERIAL/fixed-role/anna-upload-2k.jpg`
-- 本地预览代理图：`MATERIAL/fixed-role/anna-proxy-1k.jpg`
+- 固定角色图：`MATERIAL/fixed-role/anna.png`，这是一张同一位成年女性的多视角、多表情角色参考图。
 - 参考去重账本：`MATERIAL/reference-history.json`
 
 ## 本地环境
@@ -55,7 +53,7 @@
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
 3. 参考宫格与动画反推：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图推测整体动画并写入 `grid-prompt.txt`。
 4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
-5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Kie Nano Banana Pro 1K 先上传 `anna-upload-2k.jpg` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02` 两张。
+5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Kie Nano Banana Pro 1K 先上传 `anna.png` 作为 `@图1`，并在 img prompt 中声明 `@图1` 是同一人的多视角、多表情角色参考图，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02` 两张。
 6. 确认图选择：运行 `face_similarity_gate.py` 生成人脸相似度参考报告；该报告只作为参考，不作为硬门禁或自动选图依据，执行者从成功生成的确认图中选择一张进入视频生成。
 7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。

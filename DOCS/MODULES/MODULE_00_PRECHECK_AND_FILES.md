@@ -13,7 +13,6 @@
 - 需要接入 CDP 时优先使用 Playwright `connect_over_cdp`；非 Playwright 链路只用于人工排障或兼容兜底。
 - `dreamina user_credit` 可查询账户积分。
 - `MATERIAL/fixed-role/anna.png` 存在。
-- `MATERIAL/fixed-role/anna-upload-2k.jpg` 是 2048x2048 JPG。
 - `TEMP/`、`OUTPUT/` 可读写。
 
 ## 固定执行账户

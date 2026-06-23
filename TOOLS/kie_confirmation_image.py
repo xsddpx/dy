@@ -308,7 +308,7 @@ def main() -> int:
     parser.add_argument("--batch", required=True)
     parser.add_argument("--slot", required=True, help="槽位，如 A-01")
     parser.add_argument("--topic", required=True)
-    parser.add_argument("--role-image", default="MATERIAL/fixed-role/anna-upload-2k.jpg")
+    parser.add_argument("--role-image", default="MATERIAL/fixed-role/anna.png")
     parser.add_argument("--reference-image", required=True)
     parser.add_argument("--prompt", default=None)
     parser.add_argument("--prompt-path", default=None)
