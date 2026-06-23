@@ -657,6 +657,168 @@ return {
     return last
 
 
+def classify_ai_cover_recommendation_snapshot(snapshot: dict[str, Any]) -> str:
+    if not snapshot.get("hasSection"):
+        return "absent"
+    if snapshot.get("generating"):
+        return "generating"
+    if snapshot.get("empty"):
+        return "empty"
+    if snapshot.get("hasRecommendation"):
+        return "ready"
+    return "done"
+
+
+def wait_for_ai_cover_recommendation(timeout_sec: int) -> dict[str, Any]:
+    deadline = time.time() + max(0, timeout_sec)
+    settle_until: float | None = None
+    last: dict[str, Any] = {}
+    while True:
+        last = dom_action(
+            r'''
+var text = document.body ? document.body.innerText : "";
+var compact = text.replace(/\s+/g, " ");
+var hasSection = /Ai智能推荐封面|AI智能推荐封面/.test(compact);
+var generating = /Ai智能推荐封面生成中|AI智能推荐封面生成中/.test(compact);
+if (hasSection && /Ai智能推荐封面[^]*?生成中|AI智能推荐封面[^]*?生成中/.test(compact)) {
+  generating = true;
+}
+return {
+  url: location.href,
+  title: document.title,
+  hasSection: hasSection,
+  generating: generating,
+  empty: /暂无更多推荐/.test(compact),
+  hasRecommendation: hasSection && !generating && !/暂无更多推荐/.test(compact),
+  coverPass: /封面效果检测通过|封面检测通过|暂未发现封面低质问题/.test(compact),
+  assistantPass: /作品未见异常/.test(compact),
+  textSample: compact.slice(0, 1200)
+};
+'''
+        )
+        status = classify_ai_cover_recommendation_snapshot(last)
+        last["status"] = status
+        if status != "generating" and settle_until is None:
+            settle_until = time.time() + min(60, max(15, timeout_sec // 3))
+            last["settling"] = True
+        if status != "generating" and settle_until is not None and time.time() >= settle_until:
+            last["settling"] = False
+            return last
+        if time.time() >= deadline:
+            last["status"] = "timeout"
+            return last
+        time.sleep(3)
+
+
+def apply_ai_cover_recommendation(cdp_url: str | None, timeout_sec: int = 30) -> dict[str, Any]:
+    if not cdp_url:
+        return {"ok": False, "status": "skipped", "reason": "未配置 CDP，无法点击 Ai智能推荐封面"}
+    if playwright_import_error():
+        return {"ok": False, "status": "skipped", "reason": playwright_import_error()}
+
+    from playwright.sync_api import sync_playwright
+
+    timeout_ms = max(5, timeout_sec) * 1000
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_ms)
+        pages = [page for context in browser.contexts for page in context.pages]
+        page = next((item for item in pages if is_video_publish_page(item.url)), None)
+        if page is None:
+            return {"ok": False, "status": "failed", "reason": "没有找到抖音发布页"}
+        page.bring_to_front()
+
+        target = page.evaluate(
+            r'''
+() => {
+  function visible(el) {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 2 && r.height > 2;
+  }
+  function text(el) {
+    return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  const sections = Array.from(document.querySelectorAll('body *'))
+    .filter(visible)
+    .map((el) => ({el, t: text(el), r: el.getBoundingClientRect()}))
+    .filter((item) => /Ai智能推荐封面|AI智能推荐封面/.test(item.t))
+    .filter((item) => item.r.width > 120 && item.r.width < 800 && item.r.height > 40 && item.r.height < 260)
+    .sort((a, b) => (a.r.width * a.r.height) - (b.r.width * b.r.height));
+  const section = sections[0];
+  if (!section) return {ok: false, reason: '没有找到 Ai智能推荐封面 区块'};
+  const sr = section.r;
+  const images = Array.from(section.el.querySelectorAll('img, canvas, video'))
+    .filter(visible)
+    .map((el) => ({el, r: el.getBoundingClientRect(), t: text(el)}))
+    .filter((item) => item.r.width >= 40 && item.r.height >= 50)
+    .filter((item) => item.r.left >= sr.left - 5 && item.r.left <= sr.right + 5)
+    .filter((item) => item.r.top >= sr.top - 5 && item.r.top <= sr.bottom + 5)
+    .sort((a, b) => (a.r.left - b.r.left) || (a.r.top - b.r.top));
+  const image = images[0];
+  if (!image) {
+    return {
+      ok: false,
+      reason: 'Ai智能推荐封面区块没有可点击封面图',
+      sectionText: section.t.slice(0, 500),
+      sectionBox: {x: sr.x, y: sr.y, width: sr.width, height: sr.height}
+    };
+  }
+  const r = image.r;
+  return {
+    ok: true,
+    x: r.x + r.width / 2,
+    y: r.y + r.height / 2,
+    sectionText: section.t.slice(0, 500),
+    imageBox: {x: r.x, y: r.y, width: r.width, height: r.height}
+  };
+}
+'''
+        )
+        if not target.get("ok"):
+            browser.close()
+            return {"ok": False, "status": "failed", **target}
+
+        page.mouse.click(target["x"], target["y"])
+        page.wait_for_timeout(800)
+        confirm = page.get_by_text("确定", exact=True).last
+        if confirm.count() == 0 or not confirm.is_visible(timeout=3000):
+            browser.close()
+            return {"ok": False, "status": "failed", "reason": "点击推荐封面后未出现确认弹窗", **target}
+        confirm.click(timeout=timeout_ms)
+
+        deadline = time.time() + max(15, timeout_sec)
+        last_text = ""
+        cover_texts: list[str] = []
+        while time.time() < deadline:
+            page.wait_for_timeout(1500)
+            last_text = page.locator("body").inner_text(timeout=5000)
+            cover_texts = page.locator(".coverControl-CjlzqC").all_inner_texts()
+            if "生成中" not in last_text and "封面检测中" not in last_text:
+                page.wait_for_timeout(2000)
+                last_text = page.locator("body").inner_text(timeout=5000)
+                cover_texts = page.locator(".coverControl-CjlzqC").all_inner_texts()
+                if "生成中" not in last_text and "封面检测中" not in last_text:
+                    browser.close()
+                    return {
+                        "ok": True,
+                        "status": "applied",
+                        "clicked": {"x": target["x"], "y": target["y"]},
+                        "image_box": target.get("imageBox"),
+                        "cover_texts": [text.replace("\n", " ") for text in cover_texts],
+                        "text_sample": " ".join(last_text.split())[:1000],
+                    }
+
+        browser.close()
+        return {
+            "ok": False,
+            "status": "timeout",
+            "reason": "确认应用 Ai智能推荐封面后等待处理超时",
+            "clicked": {"x": target["x"], "y": target["y"]},
+            "cover_texts": [text.replace("\n", " ") for text in cover_texts],
+            "text_sample": " ".join(last_text.split())[:1000],
+        }
+
+
 def set_text_fields(title: str, description: str) -> dict[str, Any]:
     payload = json.dumps({"title": title, "description": description}, ensure_ascii=False)
     return dom_action(
@@ -1665,6 +1827,8 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
         f"- 标签：{', '.join(report.get('tags') or []) or '无'}",
         f"- 上传：{report.get('steps', {}).get('upload', {}).get('status')}",
         f"- 封面：{report.get('steps', {}).get('cover', {}).get('status')}",
+        f"- AI智能推荐封面：{report.get('steps', {}).get('ai_cover_recommendation', {}).get('status')}",
+        f"- 应用AI智能封面：{report.get('steps', {}).get('ai_cover_apply', {}).get('status')}",
         f"- 文案：{report.get('steps', {}).get('copywriting', {}).get('status')}",
         f"- 自主声明：{report.get('steps', {}).get('declaration', {}).get('status')}",
         f"- 发文助手：{report.get('steps', {}).get('assistant', {}).get('status')}",
@@ -1749,6 +1913,8 @@ def build_base_report(args: argparse.Namespace, video: Path, tags: list[str], wa
         "steps": {
             "upload": {"status": "pending"},
             "cover": {"status": "pending"},
+            "ai_cover_recommendation": {"status": "pending"},
+            "ai_cover_apply": {"status": "pending"},
             "copywriting": {"status": "pending"},
             "declaration": {"status": "pending", "blocking": False},
             "assistant": {"status": "pending"},
@@ -1802,6 +1968,12 @@ def main() -> int:
         help="封面帧选择：recommended 选网站推荐帧；middle 选视频中间帧；ai-recommended 走 AI封面 生成；none 跳过",
     )
     parser.add_argument("--cover-timeout", type=int, default=15, help="封面帧选择尝试秒数；失败不阻断发布")
+    parser.add_argument(
+        "--ai-cover-recommendation-timeout",
+        type=int,
+        default=180,
+        help="等待主发布页右侧 Ai智能推荐封面 生成完成的秒数；0 表示只检查一次",
+    )
     parser.add_argument("--record-jsonl", default=None, help="可选：追加写入 TEMP/RUN_ID/RUN_ID-run-record.jsonl")
     args = parser.parse_args()
 
@@ -1904,15 +2076,11 @@ return {
         return fail(report, out_dir, "等待上传表单超时", 4)
     report["steps"]["upload"]["status"] = "uploaded-or-form-ready"
 
-    cover = set_cover_frame(args.cover_frame, args.cover_timeout)
-    report["steps"]["cover"].update(cover)
-    if cover.get("status") == "skipped":
-        report["steps"]["cover"]["status"] = "skipped"
-    elif cover.get("ok"):
-        report["steps"]["cover"]["status"] = "set"
-    else:
-        report["steps"]["cover"]["status"] = "warning"
-        report["warnings"].append(f"封面帧选择失败，继续发布：{cover.get('reason')}")
+    # 当前验证重点是主发布页右侧「Ai智能推荐封面」；先禁用进入封面设置器的步骤。
+    report["steps"]["cover"].update({
+        "status": "skipped",
+        "reason": "跳过封面设置器，等待并应用主发布页右侧 Ai智能推荐封面",
+    })
 
     copywriting = set_text_fields(args.title, args.description)
     tag_result = fill_tags(tags)
@@ -1933,6 +2101,18 @@ return {
     report["steps"]["declaration"].update(declaration)
     if declaration.get("status") != "set":
         return fail(report, out_dir, "自主声明未成功设置为内容由AI生成，按项目规则阻断发布", 6)
+
+    ai_cover = wait_for_ai_cover_recommendation(args.ai_cover_recommendation_timeout)
+    report["steps"]["ai_cover_recommendation"].update(ai_cover)
+    if ai_cover.get("status") == "timeout":
+        report["warnings"].append("Ai智能推荐封面等待超时；继续执行后续发布设置")
+    elif ai_cover.get("status") in {"ready", "empty", "done"}:
+        ai_cover_apply = apply_ai_cover_recommendation(DOM_CDP_URL, args.cover_timeout)
+        report["steps"]["ai_cover_apply"].update(ai_cover_apply)
+        if not ai_cover_apply.get("ok"):
+            report["warnings"].append(f"Ai智能推荐封面应用失败：{ai_cover_apply.get('reason')}")
+    else:
+        report["steps"]["ai_cover_apply"].update({"status": "skipped", "reason": f"推荐封面状态为 {ai_cover.get('status')}"})
 
     assistant = check_assistant()
     report["steps"]["assistant"].update({"status": "pass" if assistant.get("ok") else "blocked", "result": assistant})

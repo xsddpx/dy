@@ -68,6 +68,22 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertEqual(MODULE.normalize_cover_frame("ai"), "ai-recommended")
         self.assertEqual(MODULE.normalize_cover_frame("ai_recommended"), "ai-recommended")
 
+    def test_classify_ai_cover_recommendation_snapshot(self):
+        self.assertEqual(MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": False}), "absent")
+        self.assertEqual(
+            MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True, "generating": True}),
+            "generating",
+        )
+        self.assertEqual(
+            MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True, "empty": True}),
+            "empty",
+        )
+        self.assertEqual(
+            MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True, "hasRecommendation": True}),
+            "ready",
+        )
+        self.assertEqual(MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True}), "done")
+
     def test_main_help_includes_no_publish(self):
         stdout = io.StringIO()
         with self.assertRaises(SystemExit) as cm:
@@ -75,6 +91,7 @@ class DouyinPublishHelperTest(unittest.TestCase):
                 MODULE.main()
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("--no-publish", stdout.getvalue())
+        self.assertIn("--ai-cover-recommendation-timeout", stdout.getvalue())
 
     def test_resolve_cdp_url_prefers_cli_value(self):
         with mock.patch.dict(os.environ, {"DOUYIN_CHROME_CDP_URL": "http://127.0.0.1:9222"}):
