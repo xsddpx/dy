@@ -267,7 +267,34 @@ def parse_rect(value):
     return {"x": x, "y": y, "width": width, "height": height}
 
 
+def is_computer_use_capture(args):
+    return bool(args.computer_use_capture and args.computer_use_rect)
+
+
+def mark_computer_use_required(report, tab_session, reason, rect=None):
+    report["decision"] = "computer_use_required"
+    report["computer_use_required"] = {
+        "reason": reason,
+        "instruction": (
+            "请用 Computer Use 聚焦当前 Chrome 参考视频页，定位纯视频主体 9:16 区域，"
+            "只包含视频画面，不包含浏览器栏、推荐栏、评论区或播放器控件；随后用 "
+            "--computer-use-rect x,y,w,h --computer-use-capture 重新运行本工具。"
+        ),
+        "recommended_next_args": "--computer-use-rect x,y,w,h --computer-use-capture",
+        "chrome_window_rect": rect,
+    }
+    report["warnings"].append("无法从 video 元素获得可控帧，已请求 Computer Use 兜底定位 9:16 视频主体区域")
+    if tab_session:
+        tab_session["keep_tab"] = True
+        report.setdefault("chrome_tab", {}).update({"keep_tab": True, "cleanup_reason": "computer_use_required"})
+
+
 def choose_capture_rect(args, state):
+    if is_computer_use_capture(args):
+        rect = parse_rect(args.computer_use_rect)
+        rect["source"] = "computer-use-9x16-screen"
+        return rect
+
     if args.rect:
         rect = parse_rect(args.rect)
         rect["source"] = "custom-rect"
@@ -898,15 +925,16 @@ def validate_capture(frames, grid_path, report, args):
     if repeated_ui_risks:
         errors.append("宫格疑似包含非视频主体 UI：" + "、".join(repeated_ui_risks))
 
-    if report.get("chrome_js_unavailable"):
+    computer_use_capture = report.get("capture_mode") == "computer-use-9x16-screen"
+    if report.get("chrome_js_unavailable") and not computer_use_capture:
         errors.append("Chrome AppleScript JS 权限不可用，无法读取/控制真实 video 元素")
-    if report.get("duration_sec", 0) <= 0:
+    if report.get("duration_sec", 0) <= 0 and not computer_use_capture:
         errors.append("视频时长为 0 或不可读，不能确认关键帧来自可控播放")
     if report.get("capture_mode") == "custom-rect":
         errors.append("使用了手动固定裁剪区域；正式宫格必须由可验证的 video 元素区域自动确定")
     if report.get("capture_mode") == "chrome-window":
         errors.append("使用了整窗截图；整窗截图不得作为正式参考宫格")
-    if any(frame.get("mode") == "natural-playback" for frame in report.get("frames", [])):
+    if any(frame.get("mode") == "natural-playback" for frame in report.get("frames", [])) and not computer_use_capture:
         errors.append("使用自然播放间隔截图；正式宫格必须能按时长跳转或确认可控采样")
 
     return {
@@ -1020,6 +1048,8 @@ def main():
     parser.add_argument("--capture-method", choices=["auto", "canvas", "screen"], default="auto", help="auto 优先从 video 像素抽帧，失败后回退屏幕截图")
     parser.add_argument("--crop-mode", choices=["auto", "window"], default="auto", help="auto 优先估算 9:16 视频主体区域；window 仅用于调试，不得作为正式宫格")
     parser.add_argument("--rect", default=None, help="手动截图区域 x,y,w,h；设置后覆盖自动区域")
+    parser.add_argument("--computer-use-rect", default=None, help="Computer Use 识别出的 9:16 视频主体区域 x,y,w,h")
+    parser.add_argument("--computer-use-capture", action="store_true", help="允许使用 Computer Use 识别区域按屏幕截图生成正式宫格")
     parser.add_argument("--viewport-offset-x", type=int, default=0, help="video DOM 到屏幕坐标的 X 偏移校正")
     parser.add_argument("--viewport-offset-y", type=int, default=88, help="video DOM 到屏幕坐标的 Y 偏移校正，默认估算 Chrome 工具栏高度")
     parser.add_argument("--keep-tab", action="store_true", help="调试时保留临时参考页；默认生成报告后自动关闭")
@@ -1135,15 +1165,18 @@ def main():
             "has_current_src": state.get("hasCurrentSrc"),
         })
         if not state.get("ok"):
-            report["errors"].append(state.get("reason") or "页面未找到可播放视频")
-            return finish(report, out_dir, tab_session, 1)
+            if is_computer_use_capture(args):
+                report["warnings"].append(state.get("reason") or "页面未找到可播放视频；使用 Computer Use 区域兜底截图")
+            else:
+                mark_computer_use_required(report, tab_session, state.get("reason") or "页面未找到可播放视频")
+                return finish(report, out_dir, tab_session, 2)
 
         rect = choose_capture_rect(args, state)
         report["capture_rect"] = rect
         report["capture_mode"] = rect["source"]
         if rect["source"] == "chrome-window" and not args.rect:
-            report["errors"].append("无法确认 9:16 视频主体裁剪区域，整窗截图不得作为正式参考宫格；请启用 Chrome AppleScript JS、传入 --rect，或先做视觉定位裁剪")
-            return finish(report, out_dir, tab_session, 1)
+            mark_computer_use_required(report, tab_session, "无法自动确认 9:16 视频主体裁剪区域", rect)
+            return finish(report, out_dir, tab_session, 2)
         if rect["source"] == "video-subject-9x16-estimate":
             report["warnings"].append("已从横向播放器区域估算中央 9:16 视频主体；正式使用前应抽查宫格不含浏览器 UI、推荐栏、播放器控制条或模糊背景")
         if rect["source"] == "video-rect-estimate":
@@ -1152,7 +1185,7 @@ def main():
         frames = []
         duration = report["duration_sec"]
         if duration > 0 and not no_js_fallback:
-            use_canvas = args.capture_method in {"auto", "canvas"}
+            use_canvas = args.capture_method in {"auto", "canvas"} and rect["source"] != "computer-use-9x16-screen"
             canvas_failed = False
             for index, seconds in enumerate(target_times(duration, args.frames), start=1):
                 seek_result = seek_video(seconds)
@@ -1174,6 +1207,8 @@ def main():
                         frame_record["canvas"] = json.loads(cap.get("stdout") or "{}")
                     except json.JSONDecodeError:
                         pass
+                elif rect["source"] == "computer-use-9x16-screen":
+                    frame_record["capture"] = "computer-use-9x16-screen"
                 report["frames"].append(frame_record)
             if use_canvas and not canvas_failed and frames:
                 report["capture_mode"] = "video-canvas-frame"
@@ -1197,7 +1232,10 @@ def main():
                     report["errors"].append(f"第 {index} 帧截图失败：{cap['stderr'].strip()}")
                     continue
                 frames.append(path)
-                report["frames"].append({"path": str(path), "mode": "natural-playback"})
+                frame_record = {"path": str(path), "mode": "natural-playback"}
+                if rect["source"] == "computer-use-9x16-screen":
+                    frame_record["capture"] = "computer-use-9x16-screen"
+                report["frames"].append(frame_record)
 
         if len(frames) < 2:
             report["errors"].append("有效截图少于 2 张，未生成宫格")

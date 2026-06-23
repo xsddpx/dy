@@ -1,4 +1,15 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {
+      "recorded_at": "2026-06-23T13:56:45.825182+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7647868942070022619",
+      "canonical_url": "https://www.douyin.com/video/7647868942070022619",
+      "source": "https://www.douyin.com/video/7647868942070022619",
+      "title": "favorite-764786"
+    }
+  ],
+  "updated_at": "2026-06-23T13:56:45.825756+00:00"
 }
