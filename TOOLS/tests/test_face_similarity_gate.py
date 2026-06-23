@@ -15,14 +15,12 @@ class FaceSimilarityGateTest(unittest.TestCase):
         return [
             {"slot": "A-01", "resolved_image_path": "/tmp/a.png", "image_path": "/tmp/a.png", "display": True},
             {"slot": "A-02", "resolved_image_path": "/tmp/b.png", "image_path": "/tmp/b.png", "display": True},
-            {"slot": "A-03", "resolved_image_path": "/tmp/c.png", "image_path": "/tmp/c.png", "display": False},
         ]
 
     def test_single_role_selects_highest_above_threshold(self):
         enriched = FACE_GATE.attach_similarity(self.slots(), {
             "/tmp/a.png": {"checks": {"anna": {"ok": True, "similarity_percent": 91}}, "face_similarity_min_percent": 91, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": 1},
             "/tmp/b.png": {"checks": {"anna": {"ok": True, "similarity_percent": 96}}, "face_similarity_min_percent": 96, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": 6},
-            "/tmp/c.png": {"checks": {"anna": {"ok": True, "similarity_percent": 94}}, "face_similarity_min_percent": 94, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": 4},
         }, 90)
         selected = FACE_GATE.choose_best_slot(enriched)
         self.assertEqual(selected["slot"], "A-02")
@@ -31,7 +29,6 @@ class FaceSimilarityGateTest(unittest.TestCase):
         enriched = FACE_GATE.attach_similarity(self.slots(), {
             "/tmp/a.png": {"checks": {"anna": {"ok": True, "similarity_percent": 89.9}}, "face_similarity_min_percent": 89.9, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": -0.1},
             "/tmp/b.png": {"checks": {"anna": {"ok": False, "error": "no-face-detected"}}, "face_similarity_min_percent": None, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": None},
-            "/tmp/c.png": {"checks": {"anna": {"ok": True, "similarity_percent": 50}}, "face_similarity_min_percent": 50, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": -40},
         }, 90)
         selected = FACE_GATE.choose_best_slot(enriched)
         self.assertEqual(selected["slot"], "A-01")
@@ -40,7 +37,6 @@ class FaceSimilarityGateTest(unittest.TestCase):
         enriched = FACE_GATE.attach_similarity(self.slots(), {
             "/tmp/a.png": {"checks": {"anna": {"ok": True, "similarity_percent": 94}}, "face_similarity_min_percent": 94, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": 4},
             "/tmp/b.png": {"checks": {"anna": {"ok": True, "similarity_percent": 94}}, "face_similarity_min_percent": 94, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": 4},
-            "/tmp/c.png": {"checks": {"anna": {"ok": True, "similarity_percent": 94}}, "face_similarity_min_percent": 94, "adjusted_threshold_min_percent": 90, "face_similarity_margin_min_percent": 4},
         }, 90)
         selected = FACE_GATE.choose_best_slot(enriched)
         self.assertEqual(selected["slot"], "A-01")

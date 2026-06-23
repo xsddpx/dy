@@ -8,7 +8,7 @@
 2. 7 天去重。
 3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，并根据宫格写 `grid-prompt.txt`。
 4. 写确认图 img prompt。
-5. Kie Nano Banana Pro 1K 生成三张确认图。
+5. Kie Nano Banana Pro 1K 生成两张确认图。
 6. 生成人脸相似度参考报告，并由执行者选择确认图。
 7. 综合 img prompt 和 grid prompt 人工重写 vid prompt，Dreamina `multimodal2video` 生成 5-6 秒竖屏视频。
 8. 上传抖音，设置 `内容由AI生成` 声明并发布。

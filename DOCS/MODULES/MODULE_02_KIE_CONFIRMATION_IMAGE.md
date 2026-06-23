@@ -4,7 +4,7 @@
 
 - 从参考帧生成强遮挡参考图。
 - 用 `anna-upload-2k.jpg` 和强遮挡参考图提交 Kie Nano Banana Pro 1K 生图。
-- 每批固定生成 `A-01/A-02/A-03` 三个槽位。
+- 每批固定生成 `A-01/A-02` 两个槽位。
 - 用 `face_similarity_gate.py` 生成人脸相似度参考报告。
 - 执行者从成功生成的确认图中选择唯一可用确认图。
 
@@ -36,7 +36,7 @@
 
 ## img prompt
 
-img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：` 三段式。每段都必须是 Kie Nano Banana Pro 可直接执行的画面描述，不写流程说明、合规说明或变化原因。执行者必须先为本批三张确认图设计环境方向，再写入 `环境：` 段；环境必须具体到空间类型、关键陈设、材质、光线来源、空间纵深和主体关系。
+img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：` 三段式。每段都必须是 Kie Nano Banana Pro 可直接执行的画面描述，不写流程说明、合规说明或变化原因。执行者必须先为本批两张确认图设计环境方向，再写入 `环境：` 段；环境必须具体到空间类型、关键陈设、材质、光线来源、空间纵深和主体关系。
 
 ```text
 人物：使用 @图1 的人物替换 @图2 中的人物。保持 @图1 的长相、五官、脸型、发型、神态和稳定身材比例；参考 @图2 的姿态、身体角度、动作、手部位置、穿搭版型、腰线、腿部入镜范围和镜头距离。
@@ -44,13 +44,12 @@ img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：
 其他：@图2 中的黑色遮挡块只是隐私处理，不生成到最终画面。真实皮肤纹理，自然光影，真实面料质感，穿搭轮廓清晰，腰线可见，构图稳定，画面物理真实。
 ```
 
-同批三个槽位必须提前策划环境变化，并按变化幅度递进：
+同批两个槽位必须提前策划环境变化，并按变化幅度递进：
 
 - `A-01` 环境轻度变化：保留参考的整体生活化气质和镜头关系，适合“同类用途但不同空间设计”。
 - `A-02` 环境中度变化：改变空间类型或光线氛围，并增加可感知的陈设或空间层次；保持动作和穿搭结构清晰。
-- `A-03` 环境明显变化：选择更有区别的生活化场景或空间叙事，背景层次、光线或站位关系明显拉开，但人物仍是画面主体。
 
-三张图不能只是颜色、局部陈设或光线强弱的微调。轻度、中度、明显是执行者的策划标准，不写进最终 img prompt；最终 img prompt 只保留 `人物：`、`环境：`、`其他：` 三段可执行画面描述。`环境：` 不能只写“生活化空间”“自然光”“干净背景”等泛化词，必须给出可见物件、材质、光线位置和空间关系。人物身份始终以 `@图1` 为准，参考关系始终以 `@图2` 为动作、穿搭结构和镜头关系来源。
+两张图不能只是颜色、局部陈设或光线强弱的微调。轻度、中度是执行者的策划标准，不写进最终 img prompt；最终 img prompt 只保留 `人物：`、`环境：`、`其他：` 三段可执行画面描述。`环境：` 不能只写“生活化空间”“自然光”“干净背景”等泛化词，必须给出可见物件、材质、光线位置和空间关系。人物身份始终以 `@图1` 为准，参考关系始终以 `@图2` 为动作、穿搭结构和镜头关系来源。
 
 ## 命令
 
@@ -58,8 +57,7 @@ img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：
 python3 TOOLS/reference_mask.py TEMP/RUN_ID/frame-01.png --grid-report TEMP/RUN_ID/reference-grid-report.json --out TEMP/RUN_ID/reference-masked.png --report TEMP/RUN_ID/reference-masked-report.json
 python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-01 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-01-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
 python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-02 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-02-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
-python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-03 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-03-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
-python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --topic TOPIC --out-dir TEMP/RUN_ID/confirm-A-HHMMSS --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-01-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-02-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-03-entry.json
+python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --topic TOPIC --out-dir TEMP/RUN_ID/confirm-A-HHMMSS --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-01-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-02-entry.json
 python3 TOOLS/face_similarity_gate.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --route anna --out TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
 python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --face-report TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
 ```
@@ -81,8 +79,8 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 - `@图1` 对应 `anna-upload-2k.jpg`，`@图2` 对应强遮挡参考图。
 - 强遮挡参考图已遮住原人物脸部和可识别头脸特征，并保留动作、穿搭和构图信息。
 - `reference-masked-report.json` 已记录源图、输出图、遮挡模式和遮挡矩形；自动模式下还记录原始人脸检测框、坐标换算结果和扩张参数。
-- 三个槽位编号固定为 `A-01/A-02/A-03`。
-- 三个槽位的 img prompt 均使用 `人物：`、`环境：`、`其他：` 三段式；环境差异按轻度、中度、明显逐级增加，但最终 prompt 不写解释性变化标签。
+- 两个槽位编号固定为 `A-01/A-02`。
+- 两个槽位的 img prompt 均使用 `人物：`、`环境：`、`其他：` 三段式；环境差异按轻度、中度逐级增加，但最终 prompt 不写解释性变化标签。
 - 每个 `环境：` 均已写清具体空间、关键陈设、材质、光线来源、空间纵深和主体关系。
 - `confirmation-manifest.json/md` 已生成。
 - `face-similarity-report.json` 已生成；其结论只作为参考，不作为通过标准。

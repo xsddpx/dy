@@ -112,7 +112,7 @@ def make_proxy(source, out_path, short_edge, target_bytes):
 
 
 def validate_entries(entries, batch):
-    expected = [f"{batch}-{idx:02d}" for idx in range(1, 4)]
+    expected = [f"{batch}-{idx:02d}" for idx in range(1, 3)]
     actual = [entry.get("slot") for entry in entries]
     if len(entries) != len(expected):
         raise ValueError(f"每批必须正好 {len(expected)} 个提交位，当前为 {len(entries)}")
@@ -243,13 +243,13 @@ def build_manifest(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="生成确认图批次清单，固定 01/02/03 三个提交位且失败占位。")
+    parser = argparse.ArgumentParser(description="生成确认图批次清单，固定 01/02 两个提交位且失败占位。")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--stamp", required=True, help="文件名前缀，如 YYYYMMDD-HHmm")
     parser.add_argument("--batch", required=True, help="批次字母，如 A、B、C")
     parser.add_argument("--topic", required=True, help="参考代号主题，如 ck06170959相思情感")
     parser.add_argument("--out-dir", required=True)
-    parser.add_argument("--entry", action="append", required=True, help="提交位 JSON，必须正好提供 01/02/03 三个")
+    parser.add_argument("--entry", action="append", required=True, help="提交位 JSON，必须正好提供 01/02 两个")
     parser.add_argument("--proxy-short-edge", type=int, default=720)
     parser.add_argument("--proxy-target-bytes", type=int, default=200_000)
     args = parser.parse_args()
