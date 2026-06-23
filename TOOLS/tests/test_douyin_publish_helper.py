@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+import io
 import os
 import unittest
 from pathlib import Path
@@ -58,6 +59,22 @@ class DouyinPublishHelperTest(unittest.TestCase):
     def test_description_contains_tags(self):
         self.assertTrue(MODULE.description_contains_tags("今天很好看 #纯欲 #穿搭", ["纯欲", "穿搭"]))
         self.assertFalse(MODULE.description_contains_tags("今天很好看 #纯欲", ["纯欲", "穿搭"]))
+
+    def test_normalize_cover_frame_aliases(self):
+        self.assertEqual(MODULE.normalize_cover_frame(None), "recommended")
+        self.assertEqual(MODULE.normalize_cover_frame("recommend"), "recommended")
+        self.assertEqual(MODULE.normalize_cover_frame("mid"), "middle")
+        self.assertEqual(MODULE.normalize_cover_frame("skip"), "none")
+        self.assertEqual(MODULE.normalize_cover_frame("ai"), "ai-recommended")
+        self.assertEqual(MODULE.normalize_cover_frame("ai_recommended"), "ai-recommended")
+
+    def test_main_help_includes_no_publish(self):
+        stdout = io.StringIO()
+        with self.assertRaises(SystemExit) as cm:
+            with mock.patch("sys.argv", ["douyin_publish_helper.py", "--help"]), mock.patch("sys.stdout", stdout):
+                MODULE.main()
+        self.assertEqual(cm.exception.code, 0)
+        self.assertIn("--no-publish", stdout.getvalue())
 
     def test_resolve_cdp_url_prefers_cli_value(self):
         with mock.patch.dict(os.environ, {"DOUYIN_CHROME_CDP_URL": "http://127.0.0.1:9222"}):

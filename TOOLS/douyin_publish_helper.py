@@ -31,6 +31,7 @@ HARD_ASSISTANT_WORDS = ("违规", "禁止发布", "无法发布", "发布失败"
 SOFT_ASSISTANT_WORDS = ("建议", "可优化", "推荐", "提示", "风险提醒")
 AI_DECLARATION_WORDS = ("内容由AI生成", "AI生成", "人工智能生成", "AIGC")
 DEFAULT_CDP_URL = "http://127.0.0.1:9222"
+DOM_CDP_URL: str | None = None
 
 
 def is_video_publish_page(url: str) -> bool:
@@ -148,7 +149,7 @@ def wait_for_page_ready(timeout_sec: int) -> dict[str, Any]:
     deadline = time.time() + timeout_sec
     last: dict[str, Any] = {}
     while time.time() < deadline:
-        last = chrome_json(
+        last = dom_action(
             r'''
 var text = document.body ? document.body.innerText : "";
 return {
@@ -171,7 +172,35 @@ return {
     return last
 
 
+def dom_action_via_playwright(cdp_url: str, js_body: str, timeout: int = 30) -> dict[str, Any]:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout * 1000)
+        pages = [page for context in browser.contexts for page in context.pages]
+        page = None
+        for candidate in pages:
+            if is_video_publish_page(candidate.url) or is_upload_page(candidate.url):
+                page = candidate
+                break
+        if page is None:
+            for candidate in pages:
+                if "creator.douyin.com" in candidate.url:
+                    page = candidate
+                    break
+        if page is None and pages:
+            page = pages[0]
+        if page is None:
+            raise RuntimeError("CDP 已连接，但没有可用页面")
+
+        page.bring_to_front()
+        return page.evaluate(f"() => JSON.stringify((function(){{{js_body}}})())")
+
+
 def dom_action(js_body: str, timeout: int = 30) -> dict[str, Any]:
+    if DOM_CDP_URL:
+        out = dom_action_via_playwright(DOM_CDP_URL, js_body, timeout=timeout)
+        return json.loads(out or "null")
     return chrome_json(js_body, timeout=timeout)
 
 
@@ -668,6 +697,8 @@ def fill_tags(tags: list[str]) -> dict[str, Any]:
     clean_tags = [tag.strip().lstrip("#") for tag in tags if tag.strip()]
     if not clean_tags:
         return {"ok": True, "filled": 0, "tags": []}
+    if DOM_CDP_URL:
+        return fill_tags_via_playwright(DOM_CDP_URL, clean_tags)
 
     payload = json.dumps(clean_tags, ensure_ascii=False)
     return dom_action(
@@ -704,6 +735,617 @@ tags.forEach(function(tag) {{
 return {{ok: true, filled: tags.length, tags: tags}};
 '''
     )
+
+
+def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 10) -> dict[str, Any]:
+    from playwright.sync_api import sync_playwright
+
+    def body_text(page: Any) -> str:
+        try:
+            return page.locator("body").inner_text(timeout=3000)
+        except Exception:
+            return ""
+
+    def has_highlighted_topic(page: Any, tag: str) -> bool:
+        return bool(page.evaluate(
+            """(tag) => {
+              function visible(el) {
+                const s = getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 1 && r.height > 1;
+              }
+              const editor = Array.from(document.querySelectorAll(
+                '[contenteditable=true], .editor-kit-root-container, .editor-comp-publish-container-d4oeQI, .zone-container'
+              )).find(visible);
+              if (!editor) return false;
+              const target = '#' + tag;
+              return Array.from(editor.querySelectorAll('*')).some((el) => {
+                const text = (el.innerText || el.textContent || '').replace(/\\s+/g, '').trim();
+                const bg = getComputedStyle(el).backgroundColor;
+                return text === target && /rgba?\\(1,\\s*118,\\s*247/.test(bg);
+              });
+            }""",
+            tag,
+        ))
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_sec * 1000)
+        pages = [page for context in browser.contexts for page in context.pages]
+        page = next((item for item in pages if "creator.douyin.com/creator-micro/content/publish" in item.url), None)
+        if page is None:
+            page = next((item for item in pages if "creator.douyin.com" in item.url), None)
+        if page is None:
+            return {"ok": False, "filled": 0, "tags": tags, "reason": "没有找到抖音发布页"}
+
+        page.bring_to_front()
+        filled: list[str] = []
+        actions: list[dict[str, Any]] = []
+
+        for tag in tags:
+            try:
+                add_topic = page.get_by_text("#添加话题", exact=True).first
+                add_topic.click(timeout=timeout_sec * 1000)
+                page.wait_for_timeout(400)
+
+                page.keyboard.type(tag, delay=35)
+                page.wait_for_timeout(800)
+
+                suggestion = page.get_by_text(f"#{tag}", exact=True).first
+                if suggestion.count() == 0 or not suggestion.is_visible(timeout=2000):
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(300)
+                    actions.append({"tag": tag, "ok": False, "reason": "没有找到完整匹配的话题建议"})
+                    continue
+
+                suggestion.click(timeout=3000)
+
+                page.wait_for_timeout(700)
+                ok = has_highlighted_topic(page, tag)
+                actions.append({"tag": tag, "ok": ok, "method": "topic-suggestion"})
+                if ok:
+                    filled.append(tag)
+            except Exception as exc:
+                actions.append({"tag": tag, "ok": False, "reason": str(exc)})
+
+        return {
+            "ok": len(filled) == len(tags),
+            "filled": len(filled),
+            "tags": tags,
+            "method": "playwright-topic-token",
+            "actions": actions,
+        }
+
+
+def normalize_cover_frame(value: str | None) -> str:
+    normalized = (value or "recommended").strip().lower()
+    aliases = {
+        "skip": "none",
+        "off": "none",
+        "false": "none",
+        "recommend": "recommended",
+        "suggested": "recommended",
+        "mid": "middle",
+        "center": "middle",
+        "ai": "ai-recommended",
+        "ai_recommended": "ai-recommended",
+        "airecommended": "ai-recommended",
+        "ai-generated": "ai-recommended",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def click_locator_center(page: Any, locator: Any, timeout_ms: int) -> dict[str, Any]:
+    try:
+        locator.wait_for(state="visible", timeout=timeout_ms)
+        box = locator.bounding_box(timeout=timeout_ms)
+        if not box:
+            return {"ok": False, "reason": "目标元素没有可点击区域"}
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        page.wait_for_timeout(150)
+        page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        return {"ok": True, "box": box}
+    except Exception as exc:
+        return {"ok": False, "reason": str(exc)}
+
+
+def set_cover_frame_via_playwright(cdp_url: str, frame_mode: str, timeout_sec: int) -> dict[str, Any]:
+    from playwright.sync_api import sync_playwright
+
+    mode = normalize_cover_frame(frame_mode)
+    timeout_ms = max(5, timeout_sec) * 1000
+    started = time.time()
+    actions: list[dict[str, Any]] = []
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_ms)
+        pages = [page for context in browser.contexts for page in context.pages]
+        page = next((item for item in pages if is_video_publish_page(item.url)), None)
+        if page is None:
+            page = next((item for item in pages if "creator.douyin.com" in item.url), None)
+        if page is None:
+            return {"ok": False, "status": "failed", "mode": mode, "reason": "没有找到抖音发布页"}
+
+        page.bring_to_front()
+        cover_texts = page.locator(".coverControl-CjlzqC").all_inner_texts()
+        vertical_set = any("竖封面3:4" in text and "选择封面" not in text for text in cover_texts)
+        horizontal_set = any("横封面4:3" in text and "选择封面" not in text for text in cover_texts)
+        if vertical_set and horizontal_set and mode != "ai-recommended":
+            page_text = page.locator("body").inner_text(timeout=timeout_ms)
+            return {
+                "ok": True,
+                "status": "set",
+                "mode": mode,
+                "method": "playwright-cdp",
+                "actions": [{"step": "detect_existing_cover", "ok": True, "cover_texts": cover_texts}],
+                "cover_missing_warning": "横/竖双封面缺失" in page_text,
+                "elapsed_sec": round(time.time() - started, 3),
+            }
+
+        dialog = page.locator('[role="dialog"], .dy-creator-content-modal-body').first
+        if dialog.count() > 0 and dialog.is_visible():
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(500)
+            dialog = page.locator('[role="dialog"], .dy-creator-content-modal-body').first
+        if dialog.count() == 0 or not dialog.is_visible():
+            open_result = {"ok": False, "reason": "没有找到可打开的封面入口"}
+            for selector in (".cover-Jg3T4p", ".coverControl-CjlzqC", ".filter-k_CjvJ"):
+                target = page.locator(selector).first
+                if target.count() == 0:
+                    continue
+                open_result = click_locator_center(page, target, timeout_ms)
+                open_result["selector"] = selector
+                if not open_result.get("ok"):
+                    continue
+                try:
+                    dialog.wait_for(state="visible", timeout=3000)
+                    break
+                except Exception as exc:
+                    open_result = {"ok": False, "selector": selector, "reason": f"点击后未打开封面编辑器：{exc}"}
+            actions.append({"step": "open_cover_editor", **open_result})
+            if not open_result.get("ok"):
+                return {"ok": False, "status": "failed", "mode": mode, "reason": open_result.get("reason"), "actions": actions}
+        else:
+            actions.append({"step": "open_cover_editor", "ok": True, "method": "already-open"})
+
+        def open_cover_editor_from_main(stage: str) -> dict[str, Any]:
+            targets: list[Any] = []
+            if stage == "horizontal":
+                controls = page.locator(".coverControl-CjlzqC")
+                for idx in range(controls.count()):
+                    candidate = controls.nth(idx)
+                    try:
+                        text = candidate.inner_text(timeout=1000)
+                    except Exception:
+                        continue
+                    if "横封面4:3" in text:
+                        targets.append(candidate)
+                buttons = page.locator(".cover-Jg3T4p")
+                if buttons.count() > 1:
+                    targets.append(buttons.nth(1))
+            else:
+                buttons = page.locator(".cover-Jg3T4p")
+                if buttons.count() > 0:
+                    targets.append(buttons.first)
+
+            for target in targets:
+                click = click_locator_center(page, target, timeout_ms)
+                if not click.get("ok"):
+                    continue
+                try:
+                    dialog.wait_for(state="visible", timeout=3000)
+                    expected_title = "设置横封面" if stage == "horizontal" else "设置竖封面"
+                    deadline = time.time() + 5
+                    while time.time() < deadline:
+                        dialog_text = dialog.inner_text(timeout=timeout_ms)
+                        if expected_title in dialog_text:
+                            return {"ok": True, **click, "title": expected_title}
+                        page.wait_for_timeout(300)
+                    return {"ok": True, **click}
+                except Exception:
+                    continue
+            return {"ok": False, "reason": f"没有找到可打开的{stage}封面入口"}
+
+        def ensure_ai_cover_tab() -> dict[str, Any]:
+            tab = dialog.get_by_text("AI封面", exact=True).first
+            if tab.count() == 0:
+                return {"ok": False, "reason": "没有找到 AI封面 入口"}
+            click = click_locator_center(page, tab, timeout_ms)
+            if not click.get("ok"):
+                return {"ok": False, "reason": click.get("reason")}
+            page.wait_for_timeout(500)
+            return {"ok": True, **click}
+
+        def trigger_ai_cover(stage: str) -> dict[str, Any]:
+            expected_title = "设置横封面" if stage == "horizontal" else "设置竖封面"
+            try:
+                dialog_text = dialog.inner_text(timeout=timeout_ms)
+            except Exception:
+                dialog_text = ""
+            if expected_title not in dialog_text:
+                return {"ok": False, "stage": stage, "reason": f"当前封面弹层不是{expected_title}"}
+
+            tab_result = ensure_ai_cover_tab()
+            if not tab_result.get("ok"):
+                return {"ok": False, "stage": stage, "reason": tab_result.get("reason")}
+
+            button = dialog.get_by_text("AI生成封面", exact=True).last
+            if button.count() == 0:
+                return {"ok": False, "stage": stage, "reason": "没有找到 AI生成封面 按钮"}
+
+            click = click_locator_center(page, button, timeout_ms)
+            if not click.get("ok"):
+                return {"ok": False, "stage": stage, "reason": click.get("reason")}
+
+            deadline = time.time() + min(max(6, timeout_sec), 20)
+            observed_text = ""
+            while time.time() < deadline:
+                dialog_text = dialog.inner_text(timeout=timeout_ms)
+                observed_text = dialog_text
+                if "继续生成" in dialog_text or "取消生成" in dialog_text or "生成中" in dialog_text:
+                    return {
+                        "ok": True,
+                        "stage": stage,
+                        "selection": "ai-generated-cover",
+                        "signal": "continue-generate" if "继续生成" in dialog_text else "generating",
+                        "dialog_text": dialog_text[:400],
+                        **click,
+                    }
+                page.wait_for_timeout(500)
+
+            return {
+                "ok": False,
+                "stage": stage,
+                "reason": "点击 AI生成封面 后未观察到生成状态",
+                "dialog_text": observed_text[:400],
+            }
+
+        def select_video_frame(stage: str) -> dict[str, Any]:
+            expected_title = "设置横封面" if stage == "horizontal" else "设置竖封面"
+            try:
+                dialog_text = dialog.inner_text(timeout=timeout_ms)
+            except Exception:
+                dialog_text = ""
+            if expected_title not in dialog_text:
+                return {"ok": False, "stage": stage, "reason": f"当前封面弹层不是{expected_title}"}
+
+            frames = page.locator(".preview-frame-rt7Mc1")
+            frames.first.wait_for(state="visible", timeout=timeout_ms)
+            count = frames.count()
+            if count <= 0:
+                return {"ok": False, "stage": stage, "reason": "没有找到视频帧缩略图"}
+            index = count // 2 if mode in {"middle", "recommended"} else 0
+            click = click_locator_center(page, frames.nth(index), timeout_ms)
+            return {
+                "ok": bool(click.get("ok")),
+                "stage": stage,
+                "frame_index": index,
+                "frame_count": count,
+                "selection": "middle-frame" if mode == "middle" else "middle-frame-fallback",
+                **click,
+            }
+
+        def select_with_optional_ai_fallback(stage: str) -> dict[str, Any]:
+            if mode != "ai-recommended":
+                return select_video_frame(stage)
+            ai_result = trigger_ai_cover(stage)
+            if ai_result.get("ok"):
+                return ai_result
+            fallback = select_video_frame(stage)
+            fallback["fallback_from_ai"] = True
+            fallback["fallback_reason"] = ai_result.get("reason")
+            return fallback
+
+        def finish_editor() -> dict[str, Any]:
+            finish_button = dialog.get_by_text("完成", exact=True).last
+            deadline = time.time() + min(max(8, timeout_sec), 30)
+            last_error = ""
+            while time.time() < deadline:
+                try:
+                    if finish_button.count() > 0 and finish_button.is_visible() and finish_button.is_enabled():
+                        finish_button.click(timeout=3000)
+                        page.wait_for_timeout(1500)
+                        return {"ok": True, "text": "完成"}
+                except Exception as exc:
+                    last_error = str(exc)
+                    if dialog.count() == 0 or not dialog.is_visible():
+                        return {"ok": True, "text": "完成", "note": "点击时弹层已关闭，按成功处理"}
+                page.wait_for_timeout(500)
+
+            if dialog.count() == 0 or not dialog.is_visible():
+                return {"ok": True, "text": "完成", "note": "等待完成按钮时弹层已关闭，按成功处理"}
+            return {"ok": False, "reason": last_error or "完成按钮在等待窗口内不可点击"}
+
+        vertical = select_with_optional_ai_fallback("vertical")
+        actions.append({"step": "select_vertical_frame", **vertical})
+        if not vertical.get("ok"):
+            return {"ok": False, "status": "failed", "mode": mode, "reason": vertical.get("reason"), "actions": actions}
+
+        horizontal_button = page.get_by_text("设置横封面", exact=True).last
+        if horizontal_button.count() > 0 and horizontal_button.is_visible():
+            horizontal_button.click(timeout=timeout_ms)
+            page.wait_for_timeout(800)
+            horizontal = select_with_optional_ai_fallback("horizontal")
+            actions.append({"step": "select_horizontal_frame", **horizontal})
+            if not horizontal.get("ok"):
+                return {"ok": False, "status": "failed", "mode": mode, "reason": horizontal.get("reason"), "actions": actions}
+            finish = finish_editor()
+            actions.append({"step": "finish_cover_editor", **finish})
+            if not finish.get("ok"):
+                return {"ok": False, "status": "failed", "mode": mode, "reason": finish.get("reason"), "actions": actions}
+        else:
+            if mode == "ai-recommended":
+                finish = finish_editor()
+                actions.append({"step": "finish_cover_editor", **finish})
+                if not finish.get("ok"):
+                    return {"ok": False, "status": "failed", "mode": mode, "reason": finish.get("reason"), "actions": actions}
+                reopen = open_cover_editor_from_main("horizontal")
+                actions.append({"step": "open_horizontal_cover_editor", **reopen})
+                if reopen.get("ok"):
+                    horizontal = select_with_optional_ai_fallback("horizontal")
+                    actions.append({"step": "select_horizontal_frame", **horizontal})
+                    if not horizontal.get("ok"):
+                        return {"ok": False, "status": "failed", "mode": mode, "reason": horizontal.get("reason"), "actions": actions}
+                    finish = finish_editor()
+                    actions.append({"step": "finish_horizontal_cover_editor", **finish})
+                    if not finish.get("ok"):
+                        return {"ok": False, "status": "failed", "mode": mode, "reason": finish.get("reason"), "actions": actions}
+                else:
+                    actions.append({"step": "select_horizontal_frame", "ok": True, "skipped": True, "reason": "没有设置横封面按钮且无法从主页面重开横封面编辑器"})
+            else:
+                actions.append({"step": "select_horizontal_frame", "ok": True, "skipped": True, "reason": "没有设置横封面按钮"})
+                finish = finish_editor()
+                actions.append({"step": "finish_cover_editor", **finish})
+                if not finish.get("ok"):
+                    return {"ok": False, "status": "failed", "mode": mode, "reason": finish.get("reason"), "actions": actions}
+
+        page_text = page.locator("body").inner_text(timeout=timeout_ms)
+        cover_missing = "横/竖双封面缺失" in page_text
+        return {
+            "ok": True,
+            "status": "set",
+            "mode": mode,
+            "method": "playwright-cdp",
+            "actions": actions,
+            "cover_missing_warning": cover_missing,
+            "elapsed_sec": round(time.time() - started, 3),
+        }
+
+
+def set_cover_frame(frame_mode: str, timeout_sec: int) -> dict[str, Any]:
+    mode = normalize_cover_frame(frame_mode)
+    if mode == "none":
+        return {"ok": True, "status": "skipped", "reason": "cover-frame=none"}
+    if mode not in {"recommended", "middle", "ai-recommended"}:
+        return {"ok": False, "status": "failed", "reason": f"未知封面模式：{frame_mode}"}
+    if DOM_CDP_URL:
+        return set_cover_frame_via_playwright(DOM_CDP_URL, mode, timeout_sec)
+
+    started = time.time()
+    open_result = dom_action(
+        r'''
+function visible(el) {
+  var r = el.getBoundingClientRect();
+  var s = getComputedStyle(el);
+  return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none';
+}
+function textOf(el) {
+  return (el.innerText || el.textContent || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+}
+function clickable(el) {
+  if (!el || !visible(el)) return false;
+  if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button') return true;
+  if (typeof el.onclick === 'function') return true;
+  var cls = String(el.className || '');
+  return /(cover|poster|thumb|edit|button|action|trigger)/i.test(cls);
+}
+function pickControl(el) {
+  var current = el;
+  while (current && current !== document.body) {
+    var r = current.getBoundingClientRect();
+    if (clickable(current) && r.width < Math.max(window.innerWidth * 0.95, 900) && r.height < 180) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return el;
+}
+function clickLike(el) {
+  el.scrollIntoView({block: 'center'});
+  el.focus && el.focus();
+  ['mousedown', 'mouseup', 'click'].forEach(function(type) {
+    el.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true, view: window}));
+  });
+}
+var nodes = Array.from(document.querySelectorAll('button, [role=button], a, div, span, label'));
+var candidates = nodes.map(function(el) {
+  if (!visible(el)) return null;
+  var text = textOf(el);
+  var cls = String(el.className || '');
+  var aria = el.getAttribute('aria-label') || '';
+  var combined = [text, cls, aria].join(' ');
+  if (!/封面|cover|poster/i.test(combined)) return null;
+  if (/上传封面|本地上传|上传图片|upload/i.test(combined)) return null;
+  var control = pickControl(el);
+  var r = control.getBoundingClientRect();
+  return {
+    el: control,
+    text: text,
+    exact: /^(设置封面|选择封面|编辑封面|封面)$/.test(text),
+    action: /设置封面|选择封面|编辑封面|更换封面/.test(text),
+    area: r.width * r.height,
+    top: r.top
+  };
+}).filter(Boolean).sort(function(a, b) {
+  return (Number(b.action) - Number(a.action)) ||
+    (Number(b.exact) - Number(a.exact)) ||
+    (a.area - b.area) ||
+    (a.top - b.top);
+});
+if (!candidates.length) return {ok: false, reason: '没有找到封面入口'};
+var target = candidates[0];
+clickLike(target.el);
+return {ok: true, text: target.text, candidate_count: candidates.length};
+''',
+        timeout=max(5, timeout_sec),
+    )
+    if not open_result.get("ok"):
+        open_result.update({"status": "failed", "mode": mode})
+        return open_result
+
+    time.sleep(1)
+    select_result: dict[str, Any] = {}
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        select_result = dom_action(
+            rf'''
+var mode = {json.dumps(mode)};
+function visible(el) {{
+  var r = el.getBoundingClientRect();
+  var s = getComputedStyle(el);
+  return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none';
+}}
+function textOf(el) {{
+  return (el.innerText || el.textContent || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+}}
+function clickLike(el) {{
+  el.scrollIntoView({{block: 'center'}});
+  el.focus && el.focus();
+  ['mousedown', 'mouseup', 'click'].forEach(function(type) {{
+    el.dispatchEvent(new MouseEvent(type, {{bubbles: true, cancelable: true, view: window}}));
+  }});
+}}
+function rootNode() {{
+  var roots = Array.from(document.querySelectorAll('[role=dialog], [class*=modal], [class*=Modal], [class*=drawer], [class*=Drawer]')).filter(visible);
+  roots.sort(function(a, b) {{
+    var ar = a.getBoundingClientRect();
+    var br = b.getBoundingClientRect();
+    return (br.width * br.height) - (ar.width * ar.height);
+  }});
+  return roots[0] || document.body;
+}}
+function setRangeToMiddle(root) {{
+  var ranges = Array.from(root.querySelectorAll('input[type=range]')).filter(visible);
+  if (!ranges.length) return null;
+  var range = ranges[0];
+  var min = Number(range.min || 0);
+  var max = Number(range.max || 100);
+  var value = String(min + (max - min) / 2);
+  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(range, value);
+  range.dispatchEvent(new Event('input', {{bubbles: true}}));
+  range.dispatchEvent(new Event('change', {{bubbles: true}}));
+  return {{ok: true, value: value}};
+}}
+function clickTab(root, pattern) {{
+  var tabs = Array.from(root.querySelectorAll('button, [role=button], [role=tab], div, span, a')).filter(visible);
+  var target = tabs.find(function(el) {{
+    var text = textOf(el);
+    return pattern.test(text) && !/上传|本地|图片/.test(text);
+  }});
+  if (!target) return null;
+  clickLike(target);
+  return textOf(target);
+}}
+function mediaCandidates(root) {{
+  var nodes = Array.from(root.querySelectorAll('img, canvas, video, button, [role=button], div, span')).filter(visible);
+  return nodes.map(function(el) {{
+    var r = el.getBoundingClientRect();
+    var text = textOf(el);
+    var cls = String(el.className || '');
+    var style = String(el.getAttribute('style') || '');
+    var mediaLike = /IMG|CANVAS|VIDEO/.test(el.tagName) ||
+      /cover|poster|thumb|frame|image/i.test(cls + ' ' + style + ' ' + text);
+    var blocked = /上传|本地|图片上传|选择图片|upload/i.test(text + ' ' + cls);
+    var control = el;
+    var current = el;
+    while (current && current !== root && current !== document.body) {{
+      var cr = current.getBoundingClientRect();
+      var ccls = String(current.className || '');
+      if ((current.tagName === 'BUTTON' || current.getAttribute('role') === 'button' || /item|card|thumb|cover|frame|select/i.test(ccls)) &&
+          cr.width > 10 && cr.height > 10 && cr.width < window.innerWidth * 0.95) {{
+        control = current;
+      }}
+      current = current.parentElement;
+    }}
+    return {{
+      el: control,
+      text: text,
+      area: r.width * r.height,
+      centerX: r.left + r.width / 2,
+      centerY: r.top + r.height / 2,
+      mediaLike: mediaLike,
+      blocked: blocked,
+      recommended: /推荐|智能|最佳/.test(text + ' ' + cls)
+    }};
+  }}).filter(function(item) {{
+    return item.mediaLike && !item.blocked && item.area > 600 && item.area < window.innerWidth * window.innerHeight * 0.5;
+  }});
+}}
+function clickConfirm(root) {{
+  var buttons = Array.from(root.querySelectorAll('button, [role=button], a, div, span')).filter(visible);
+  var target = buttons.reverse().find(function(el) {{
+    var text = textOf(el);
+    return /确定|完成|保存|使用|确认|应用/.test(text) && !/取消|返回/.test(text);
+  }});
+  if (!target) return null;
+  clickLike(target);
+  return textOf(target);
+}}
+var root = rootNode();
+var rootText = textOf(root).slice(0, 800);
+var tabClicked = null;
+var rangeResult = null;
+if (mode === 'recommended') {{
+  tabClicked = clickTab(root, /推荐|智能|最佳/);
+}} else {{
+  tabClicked = clickTab(root, /视频帧|视频封面|从视频|选择封面|封面/);
+  rangeResult = setRangeToMiddle(root);
+}}
+var candidates = mediaCandidates(root);
+if (!candidates.length) {{
+  return {{ok: false, reason: '没有找到可选封面帧', mode: mode, tab_clicked: tabClicked, range: rangeResult, root_text: rootText}};
+}}
+var target = null;
+if (mode === 'recommended') {{
+  target = candidates.find(function(item) {{ return item.recommended; }}) || candidates[0];
+}} else {{
+  var viewportMid = window.innerWidth / 2;
+  candidates.sort(function(a, b) {{
+    return Math.abs(a.centerX - viewportMid) - Math.abs(b.centerX - viewportMid);
+  }});
+  target = candidates[0];
+}}
+clickLike(target.el);
+var confirmText = clickConfirm(root);
+return {{
+  ok: true,
+  mode: mode,
+  tab_clicked: tabClicked,
+  range: rangeResult,
+  selected_text: target.text,
+  candidate_count: candidates.length,
+  confirm_text: confirmText
+}};
+''',
+            timeout=max(5, timeout_sec),
+        )
+        if select_result.get("ok"):
+            select_result.update({
+                "status": "set",
+                "mode": mode,
+                "open": open_result,
+                "elapsed_sec": round(time.time() - started, 3),
+            })
+            return select_result
+        time.sleep(1)
+
+    select_result.update({
+        "status": "failed",
+        "mode": mode,
+        "open": open_result,
+        "elapsed_sec": round(time.time() - started, 3),
+    })
+    return select_result
 
 
 def try_set_ai_declaration(timeout_sec: int) -> dict[str, Any]:
@@ -1022,6 +1664,7 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
         f"- 标题：{report.get('title')}",
         f"- 标签：{', '.join(report.get('tags') or []) or '无'}",
         f"- 上传：{report.get('steps', {}).get('upload', {}).get('status')}",
+        f"- 封面：{report.get('steps', {}).get('cover', {}).get('status')}",
         f"- 文案：{report.get('steps', {}).get('copywriting', {}).get('status')}",
         f"- 自主声明：{report.get('steps', {}).get('declaration', {}).get('status')}",
         f"- 发文助手：{report.get('steps', {}).get('assistant', {}).get('status')}",
@@ -1105,6 +1748,7 @@ def build_base_report(args: argparse.Namespace, video: Path, tags: list[str], wa
         "final_url": None,
         "steps": {
             "upload": {"status": "pending"},
+            "cover": {"status": "pending"},
             "copywriting": {"status": "pending"},
             "declaration": {"status": "pending", "blocking": False},
             "assistant": {"status": "pending"},
@@ -1125,6 +1769,7 @@ def fail(report: dict[str, Any], out_dir: Path, message: str, code: int) -> int:
 
 
 def main() -> int:
+    global DOM_CDP_URL
     parser = argparse.ArgumentParser(description="自动完成抖音创作者中心发布页的重复操作。")
     parser.add_argument("video", help="待发布 MP4 路径")
     parser.add_argument("--title", required=True, help="作品标题")
@@ -1134,6 +1779,7 @@ def main() -> int:
     parser.add_argument("--upload-url", default=DEFAULT_UPLOAD_URL, help="抖音创作者中心上传页")
     parser.add_argument("--current-tab", action="store_true", help="接管当前已上传完成的发布表单，不重新打开上传页")
     parser.add_argument("--dry-run", action="store_true", help="只校验参数和报告输出，不接管 Chrome")
+    parser.add_argument("--no-publish", action="store_true", help="执行到发布按钮前停止；用于验证上传、封面、文案和声明")
     parser.add_argument(
         "--upload-mode",
         choices=["auto", "cdp", "dialog"],
@@ -1149,6 +1795,13 @@ def main() -> int:
     parser.add_argument("--upload-timeout", type=int, default=300, help="等待上传/表单出现的秒数")
     parser.add_argument("--publish-timeout", type=int, default=90, help="点击发布后等待结果的秒数")
     parser.add_argument("--declaration-timeout", type=int, default=20, help="自主声明尝试秒数；失败会阻断发布")
+    parser.add_argument(
+        "--cover-frame",
+        choices=["recommended", "middle", "ai-recommended", "none"],
+        default="recommended",
+        help="封面帧选择：recommended 选网站推荐帧；middle 选视频中间帧；ai-recommended 走 AI封面 生成；none 跳过",
+    )
+    parser.add_argument("--cover-timeout", type=int, default=15, help="封面帧选择尝试秒数；失败不阻断发布")
     parser.add_argument("--record-jsonl", default=None, help="可选：追加写入 TEMP/RUN_ID/RUN_ID-run-record.jsonl")
     args = parser.parse_args()
 
@@ -1157,6 +1810,8 @@ def main() -> int:
     video = Path(args.video).expanduser().resolve()
     tags, tag_warnings = normalize_tags(args.tag)
     report = build_base_report(args, video, tags, tag_warnings)
+    if args.upload_mode in {"auto", "cdp"} or args.current_tab:
+        DOM_CDP_URL = resolve_cdp_url(args.cdp_url) or DEFAULT_CDP_URL
 
     if not video.exists():
         return fail(report, out_dir, f"视频文件不存在：{video}", 2)
@@ -1249,6 +1904,16 @@ return {
         return fail(report, out_dir, "等待上传表单超时", 4)
     report["steps"]["upload"]["status"] = "uploaded-or-form-ready"
 
+    cover = set_cover_frame(args.cover_frame, args.cover_timeout)
+    report["steps"]["cover"].update(cover)
+    if cover.get("status") == "skipped":
+        report["steps"]["cover"]["status"] = "skipped"
+    elif cover.get("ok"):
+        report["steps"]["cover"]["status"] = "set"
+    else:
+        report["steps"]["cover"]["status"] = "warning"
+        report["warnings"].append(f"封面帧选择失败，继续发布：{cover.get('reason')}")
+
     copywriting = set_text_fields(args.title, args.description)
     tag_result = fill_tags(tags)
     report["steps"]["copywriting"].update({"status": "filled", "fields": copywriting, "tags": tag_result})
@@ -1273,6 +1938,14 @@ return {
     report["steps"]["assistant"].update({"status": "pass" if assistant.get("ok") else "blocked", "result": assistant})
     if not assistant.get("ok"):
         return fail(report, out_dir, f"发文助手或页面出现硬错误：{assistant.get('hard_matches')}", 6)
+
+    if args.no_publish:
+        report["decision"] = "ready-not-published"
+        report["steps"]["publish"]["status"] = "skipped-by-no-publish"
+        report["warnings"].append("已按 --no-publish 停在发布按钮前，未点击发布")
+        report["report_json"], report["report_md"] = [str(p) for p in write_report(out_dir, report)]
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
 
     publish_click = click_publish()
     report["steps"]["publish"]["click"] = publish_click
