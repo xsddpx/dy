@@ -5,6 +5,7 @@
 - 接收用户指定参考，或从抖音收藏抽样。
 - 对自主参考执行 7 天去重。
 - 生成 6 帧参考宫格和报告。
+- 根据参考宫格或帧图推测整体动画，写入 `grid-prompt.txt`。
 
 ## 命令
 
@@ -16,5 +17,6 @@ python3 TOOLS/browser_reference_grid.py "REFERENCE_URL" --out-dir TEMP/RUN_ID/ -
 ## 通过标准
 
 - `reference-grid.jpg`、`reference-grid-report.json`、`reference-grid-report.md` 已写入 `TEMP/RUN_ID/`。
+- `grid-prompt.txt` 已写入 `TEMP/RUN_ID/`，内容包括人物动作连续性、镜头运动、节奏、姿态变化和画面动态重点。
 - 宫格报告 `decision=pass` 且 `validation.decision=pass`。
-- 宫格只用于反推和记录，不作为 Dreamina 输入。
+- 宫格只用于 img prompt 和 grid prompt 分析与记录，不作为 Dreamina 输入。

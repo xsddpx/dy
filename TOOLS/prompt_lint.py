@@ -54,6 +54,36 @@ FIXED_CAMERA_TERMS = ["固定手机机位", "固定手机支架", "固定机位"
 HANDHELD_CAMERA_TERMS = ["手持", "轻微手持", "手持自拍", "手持跟拍", "跟拍"]
 META_INSTRUCTION_TERMS = ["身材表达使用艺术化穿搭语言", "艺术化穿搭语言："]
 DEFAULT_INDOOR_BACKGROUND_TERMS = ["背景只做同类室内浅墙", "背景仍为同类室内浅墙", "同类室内浅墙与地面光线"]
+NON_MUSIC_SOUND_TERMS = [
+    "环境声",
+    "人声",
+    "脚步声",
+    "衣料声",
+    "镜头声",
+    "口播",
+    "对白",
+    "喘息",
+    "音效",
+]
+SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
+SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
+
+
+def positive_sound_hits(text):
+    hits = []
+    for term in NON_MUSIC_SOUND_TERMS:
+        start = 0
+        while True:
+            index = text.find(term, start)
+            if index < 0:
+                break
+            boundary = max(text.rfind(mark, 0, index) for mark in SOUND_SENTENCE_BOUNDARIES)
+            prefix = text[boundary + 1:index]
+            if not any(negation in prefix for negation in SOUND_NEGATION_TERMS):
+                hits.append(term)
+                break
+            start = index + len(term)
+    return hits
 
 
 def lint_text(text, path, route="anna", channel="auto"):
@@ -87,6 +117,9 @@ def lint_text(text, path, route="anna", channel="auto"):
     indoor_background_hits = [term for term in DEFAULT_INDOOR_BACKGROUND_TERMS if term in text]
     if indoor_background_hits:
         add(findings, "error", "default_indoor_background_lock", f"prompt 含默认室内背景硬编码：{', '.join(indoor_background_hits)}")
+    non_music_sound_hits = positive_sound_hits(text)
+    if non_music_sound_hits:
+        add(findings, "error", "non_music_sound_terms", f"vid prompt 含音乐以外的声音：{', '.join(non_music_sound_hits)}")
 
     errors = sum(1 for f in findings if f["severity"] == "error")
     warnings = sum(1 for f in findings if f["severity"] == "warn")

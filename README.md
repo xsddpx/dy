@@ -6,11 +6,11 @@
 
 1. 从用户指定参考或抖音收藏选参考。
 2. 7 天去重。
-3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格。
-4. 写可见画面 prompt。
+3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，并根据宫格写 `grid-prompt.txt`。
+4. 写确认图 img prompt。
 5. Dreamina `image2image` 生成三张确认图。
 6. 人脸一致性门禁自动选图。
-7. Dreamina `multimodal2video` 生成 5-6 秒竖屏视频。
+7. 综合 img prompt 和 grid prompt 人工重写 vid prompt，Dreamina `multimodal2video` 生成 5-6 秒竖屏视频。
 8. 上传抖音，设置 `内容由AI生成` 声明并发布。
 9. 记录产物、去重账本和发布状态。
 
