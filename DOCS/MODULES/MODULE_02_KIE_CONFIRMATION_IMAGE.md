@@ -5,7 +5,6 @@
 - 从参考帧生成强遮挡参考图。
 - 用 `anna.png` 和强遮挡参考图提交 Kie Nano Banana Pro 1K 生图。
 - 每批固定生成 `A-01/A-02` 两个槽位。
-- 用 `face_similarity_gate.py` 生成人脸相似度参考报告。
 - 执行者从成功生成的确认图中选择唯一可用确认图。
 
 ## 输入与 @ 引用
@@ -59,21 +58,10 @@ python3 TOOLS/reference_mask.py TEMP/RUN_ID/frame-01.png --grid-report TEMP/RUN_
 python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-01 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-01-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
 python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-02 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-02-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
 python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --topic TOPIC --out-dir TEMP/RUN_ID/confirm-A-HHMMSS --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-01-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-02-entry.json
-python3 TOOLS/face_similarity_gate.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --route anna --out TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
-python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json --face-report TEMP/RUN_ID/confirm-A-HHMMSS/face-similarity-report.json
+python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json
 ```
 
 `kie_confirmation_image.py` 每个槽位生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `nano-banana-pro-1K`。失败槽位仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
-
-## 人脸相似度参考
-
-- `face_similarity_gate.py` 使用 `MATERIAL/fixed-role/anna.png` 作为本地比对源。
-- 默认基础阈值为 `75%`。
-- 候选确认图有人脸入镜时，报告按有效脸部可见比例计算调整后参考阈值。
-- 候选确认图没有可比对人脸时，记录为脸部不入镜并跳过相似度子项。
-- 报告会给出 `reference_slot` 和 `reference_confirmation_image`，仅供执行者参考。
-- 不因相似度低、无可比对人脸或 `reference_slot` 为空而阻断视频生成；是否可用由执行者结合身份、构图、身材、真实感和画面稳定性判断。
-- `face-similarity-report.json` 必须保留为本次选择参考证据。
 
 ## 通过标准
 
@@ -84,5 +72,4 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 - 两个槽位的 img prompt 均使用 `人物：`、`环境：`、`其他：` 三段式；`人物：` 段已声明 `@图1` 是同一人的多视角、多表情角色参考图，并以左下大脸和正面脸作为主要身份依据；环境差异按轻度、中度逐级增加，但最终 prompt 不写解释性变化标签。
 - 每个 `环境：` 均已写清具体空间、关键陈设、材质、光线来源、空间纵深和主体关系。
 - `confirmation-manifest.json/md` 已生成。
-- `face-similarity-report.json` 已生成；其结论只作为参考，不作为通过标准。
 - `selected_confirmation_image` 指向 Kie 下载到本地的原始确认图。
