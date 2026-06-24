@@ -41,6 +41,8 @@
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - auto/fast 视频：`dreamina multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png`，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 - slow 确认图：`nano-banana-pro`，9:16，1K，PNG；slow 视频只上传选中的 Kie 原始确认图。
+- TNS/安全拦截导致图片或视频未生成时，允许在当前模式、当前生成节点内从 `v1` 收敛到 `v5`；`v1` 是首次提交，`v2-v5` 是最多 4 次逐步收敛。
+- TNS 收敛只适用于生成工具明确返回 TNS/安全拦截且没有生成产物的情况；网络、登录、积分、参数错误、上传失败、超时等仍按硬阻断处理。
 
 ## 目录边界
 
@@ -65,8 +67,9 @@
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - `slow` 在模块 01 后执行模块 02：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Kie Nano Banana Pro 1K 先上传 `anna.png` 作为 `@图1`，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02` 两张。
 - `slow` 必须从成功生成的确认图中选择一张进入视频生成，并记录选择原因。
-- `slow` 视频生成综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图作为 `@图1` 后提交 Dreamina 视频。
+- `slow` 视频生成综合 `img prompt` 和 `grid-prompt.txt` 的参考类型、可见导演结构重新写成可直接提交 Dreamina 的最终 `vid prompt`，只上传选中确认图作为 `@图1` 后提交 Dreamina 视频。
 - 不因 `auto/fast` 失败自动切换到 `slow`，也不因 `slow` 失败自动切回 `auto/fast`。
+- slow 确认图若因 TNS/安全拦截未生成图片，只对失败槽位按 `v2-v5` 继续收敛；任一槽位成功生成可用确认图后，不为追求更多候选继续 TNS 收敛，直接进入确认图选择。
 
 ## 硬阻断
 
@@ -74,5 +77,6 @@
 - `auto/fast` 缺少 `MATERIAL/fixed-role/anna.png`、`reference-grid-report.json` 通过记录、含参考类型识别的 `grid-prompt.txt` 时，不进入视频生成。
 - `slow` 没有可用确认图或未记录选中确认图，不进入视频生成。
 - 视频生成只允许上传 `@图1` 单图；vid prompt 含 `@图2` 或 Dreamina 命令包含第二个 `--image` 时，不进入提交。
+- 视频或图片生成因 TNS/安全拦截到 `v5` 仍未产出时停止，不发布，不切换 `fast/slow`，并报告 `v1-v5` 失败摘要。
 - 发布前未完成 `内容由AI生成` 声明，不得发布。
 - 登录失效、验证码、账号安全、平台风控、上传失败、发布按钮禁用等平台阻断时停止并报告。

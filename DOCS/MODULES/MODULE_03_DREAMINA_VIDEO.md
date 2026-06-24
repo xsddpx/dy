@@ -19,8 +19,8 @@
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - Dreamina 视频阶段的图片指代统一使用 `@` 方式，不做脚本转换。
 - 确认图阶段的 `@图2` 是强遮挡参考图；视频阶段没有 `@图2`，vid prompt 不得沿用确认图阶段强遮挡参考图的语义。
-- `auto/fast` 没有 img prompt 输入，执行者必须只根据 `anna.png` 的角色身份和 `grid-prompt.txt` 的可见导演结构重写 vid prompt。
-- `slow` 执行者必须分析 img prompt 的人物、环境、画面质感，以及 grid prompt 的整体动画、可见导演结构、身材卖点校准和参考六锁定结论，重新写成新的 vid prompt；不得用脚本做简单合并。
+- `auto/fast` 没有 img prompt 输入，执行者必须根据 `anna.png` 的角色身份，以及 `grid-prompt.txt` 的参考类型、可见导演结构重写 vid prompt。
+- `slow` 执行者必须分析 img prompt 的人物、环境、画面质感，以及 grid prompt 的参考类型、整体动画、可见导演结构、身材卖点校准和参考六锁定结论，重新写成新的 vid prompt；不得用脚本做简单合并。
 - 任何模式都不得把强遮挡参考图或参考宫格图作为 Dreamina 输入。
 - 最终 vid prompt 必须是 Dreamina 可直接执行的画面描述，不得出现 `grid-prompt.txt`、`reference-grid`、`参考宫格`、`同时吸收`、`吸收 grid`、`根据 grid`、`根据文档`、`上述分析`、`文件`、`流程`、`节点` 等内部来源词或解释性词。
 
@@ -47,7 +47,7 @@
 ## auto/fast 命令
 
 ```bash
-dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat TEMP/RUN_ID/vid-prompt.txt)" --model_version seedance2.0_vip --ratio 9:16 --video_resolution 720p --duration 5
+dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" --model_version seedance2.0_vip --ratio 9:16 --video_resolution 720p --duration 5
 ```
 
 `--duration` 可按本次画面节奏使用 `5` 或 `6`。
@@ -77,17 +77,21 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 slow 命令示例：
 
 ```bash
-dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png --prompt "$(cat TEMP/RUN_ID/vid-prompt.txt)" --model_version seedance2.0_vip --ratio 9:16 --video_resolution 720p --duration 5
+dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" --model_version seedance2.0_vip --ratio 9:16 --video_resolution 720p --duration 5
 ```
 
-任何模式生成失败时，都不自动切换到另一个模式；停止并报告 Dreamina 返回状态、已使用输入、`vid prompt` 路径和可选下一步。
+任何模式遇到非 TNS/安全拦截的生成失败，或 TNS/安全拦截收敛到 `v5` 后仍未生成时，都不自动切换到另一个模式；停止并报告 Dreamina 返回状态、已使用输入、`vid prompt` 路径、最高尝试版本和可选下一步。
 
 ## 重试
 
 - Dreamina 命令包含第二个 `--image`、把 `reference-grid.jpg` 作为输入，或 vid prompt 含 `@图2` 时，不得提交 Dreamina；已提交的视频节点一律弃用，不下载、不质检、不发布。
-- `auto/fast` 同一角色卡和同一 prompt 最多自动提交 2 次，包含第一次提交和最多一次自动收敛或原样重提。
-- `slow` 同一确认图和同一 prompt 最多自动提交 2 次，包含第一次提交和最多一次自动收敛或原样重提。
-- TNS/安全拦截后的收敛版本必须重新运行 `prompt_lint.py`。
+- 视频 prompt 初稿固定为 `vid-prompt-v1.txt`；`v1` 是首次提交。
+- 只有 Dreamina 明确返回 TNS/安全拦截且没有生成可下载 MP4 时，才允许继续写 `vid-prompt-v2.txt` 到 `vid-prompt-v5.txt` 逐步收敛并重提。
+- `auto/fast` 在 TNS 收敛期间仍只使用同一张 `MATERIAL/fixed-role/anna.png`；`slow` 仍只使用同一张选中确认图。不得因 TNS 切换模式、换图、增加第二张图、接入其他路线或兜底工具。
+- TNS/安全拦截后的每个收敛版本必须重新人工改写，重新运行 `prompt_lint.py`，lint 通过后才可提交 Dreamina。
+- 到 `v5` 仍因 TNS/安全拦截未生成 MP4 时，停止，不发布，并报告 `v1-v5` 的失败摘要和最后可选下一步。
+- 网络、登录、积分、参数错误、上传失败、超时、Dreamina 返回非 TNS 失败等不进入 `v2-v5` 收敛，按硬阻断报告。
+- 每次 TNS 尝试必须记录版本号、prompt 路径、Dreamina 返回状态、失败原因和是否进入下一版；最终交付时报告最高尝试版本。
 
 ## 通过标准
 

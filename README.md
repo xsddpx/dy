@@ -6,8 +6,8 @@
 
 1. 从用户指定参考或抖音收藏选参考。
 2. 7 天去重。
-3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，并根据宫格写 `grid-prompt.txt`。
-4. 根据 `grid-prompt.txt` 人工重写 `vid-prompt.txt`。
+3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，先完成参考类型识别，再根据宫格写五段式 `grid-prompt.txt`。
+4. 根据 `grid-prompt.txt` 的参考类型和可见导演结构，人工重写可直接提交 Dreamina 的 `vid-prompt.txt`。
 5. Dreamina `multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png` 生成 5-6 秒竖屏视频。
 6. 下载并质检 MP4。
 7. 上传抖音，设置 `内容由AI生成` 声明并发布。

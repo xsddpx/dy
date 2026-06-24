@@ -42,7 +42,7 @@ img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：
 模块 01 的参考类型只允许转译成可见画面意图写入 img prompt，例如“穿搭展示式正面站姿关键帧”“镜前自拍式手机近景构图”“走路回头式侧身转身瞬间”。最终 img prompt 不得写 `参考类型=`、`主类型=`、`次类型=`、`grid-prompt.txt`、`参考宫格`、`类型判断依据`、流程说明或文件来源说明。
 
 ```text
-人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。使用 @图1 的人物替换 @图2 中的人物。保持 @图1 的长相、五官、脸型、发型、神态和稳定身材比例；参考 @图2 的姿态、身体角度、动作、手部位置、穿搭版型、腰线、腿部入镜范围和镜头距离。
+人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。使用 @图1 的人物替换 @图2 中的人物，保持 @图1 的长相、五官、脸型、发型、神态和稳定身材比例。
 环境：清晨的公寓客厅一角，浅灰布艺沙发在画面后侧，旁边有窄木边几、玻璃水杯、折叠瑜伽垫和一盆高叶绿植；白色纱帘透入柔和窗光，木地板有自然反光，空间整洁但有真实日常痕迹。
 其他：@图2 中的黑色遮挡块只是隐私处理，不生成到最终画面。真实皮肤纹理，自然光影，真实面料质感，穿搭轮廓清晰，腰线可见，构图稳定，画面物理真实。
 ```
@@ -52,19 +52,28 @@ img prompt 用于确认图阶段，采用 `人物：`、`环境：`、`其他：
 - `A-01` 环境轻度变化：保留参考的整体生活化气质和镜头关系，适合“同类用途但不同空间设计”。
 - `A-02` 环境中度变化：改变空间类型或光线氛围，并增加可感知的陈设或空间层次；保持动作和穿搭结构清晰。
 
-两张图不能只是颜色、局部陈设或光线强弱的微调。轻度、中度是执行者的策划标准，不写进最终 img prompt；最终 img prompt 只保留 `人物：`、`环境：`、`其他：` 三段可执行画面描述。`人物：` 段必须声明 `@图1` 是同一人的多视角、多表情角色参考图，并指定左下大脸和正面脸为主要身份依据。`环境：` 不能只写“生活化空间”“自然光”“干净背景”等泛化词，必须给出可见物件、材质、光线位置和空间关系。人物身份始终以 `@图1` 为准，参考关系始终以 `@图2` 为动作、穿搭结构和镜头关系来源。
+两张图不能只是颜色、局部陈设或光线强弱的微调。轻度、中度是执行者的策划标准，不写进最终 img prompt；最终 img prompt 只保留 `人物：`、`环境：`、`其他：` 三段可执行画面描述。`人物：` 段必须声明 `@图1` 是同一人的多视角、多表情角色参考图，并指定左下大脸和正面脸为主要身份依据，只写 `@图1` 人物替换和身份保持，不展开描述 `@图2` 的姿态、动作、镜头或构图关系。`环境：` 不能只写“生活化空间”“自然光”“干净背景”等泛化词，必须给出可见物件、材质、光线位置和空间关系。人物身份始终以 `@图1` 为准，`@图2` 只作为输入图像中的动作、穿搭结构和镜头关系来源。
 
 ## 命令
 
 ```bash
 python3 TOOLS/reference_mask.py TEMP/RUN_ID/frame-01.png --grid-report TEMP/RUN_ID/reference-grid-report.json --out TEMP/RUN_ID/reference-masked.png --report TEMP/RUN_ID/reference-masked-report.json
-python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-01 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-01-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
-python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-02 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-02-img-prompt.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
+python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-01 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-01-img-prompt-v1.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
+python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-02 --topic TOPIC --reference-image TEMP/RUN_ID/reference-masked.png --prompt-path TEMP/RUN_ID/A-02-img-prompt-v1.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
 python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --topic TOPIC --out-dir TEMP/RUN_ID/confirm-A-HHMMSS --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-01-entry.json --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-02-entry.json
 python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json
 ```
 
 `kie_confirmation_image.py` 每个槽位生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `nano-banana-pro-1K`。失败槽位仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
+
+## TNS 收敛
+
+- 确认图初稿固定为 `A-01-img-prompt-v1.txt` 和 `A-02-img-prompt-v1.txt`；`v1` 是首次提交。
+- 只有 Kie 明确返回 TNS/安全拦截且该槽位没有生成可下载图片时，才允许继续写 `A-XX-img-prompt-v2.txt` 到 `A-XX-img-prompt-v5.txt` 逐步收敛并重提。
+- TNS 收敛只针对失败槽位；已成功生成可用确认图的槽位不得为追求更多候选继续重提。
+- 任一槽位成功生成可用确认图后，停止图片 TNS 收敛并进入确认图选择；两个槽位均因 TNS 收敛到 `v5` 仍未生成时，停止，不进入 Dreamina 视频生成。
+- 网络、登录、积分、参数错误、上传失败、超时、Kie 返回非 TNS 失败等不进入 `v2-v5` 收敛，按硬阻断报告。
+- 每次 TNS 尝试必须记录版本号、prompt 路径、Kie 返回状态、失败原因和是否进入下一版；最终交付时报告最高尝试版本。
 
 ## 通过标准
 
@@ -72,7 +81,7 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 - 强遮挡参考图已遮住原人物脸部和可识别头脸特征，并保留动作、穿搭和构图信息。
 - `reference-masked-report.json` 已记录源图、输出图、遮挡模式和遮挡矩形；自动模式下还记录原始人脸检测框、坐标换算结果和扩张参数。
 - 两个槽位编号固定为 `A-01/A-02`。
-- 两个槽位的 img prompt 均使用 `人物：`、`环境：`、`其他：` 三段式；`人物：` 段已声明 `@图1` 是同一人的多视角、多表情角色参考图，并以左下大脸和正面脸作为主要身份依据；环境差异按轻度、中度逐级增加，但最终 prompt 不写解释性变化标签。
+- 两个槽位的 img prompt 均使用 `人物：`、`环境：`、`其他：` 三段式；`人物：` 段已声明 `@图1` 是同一人的多视角、多表情角色参考图，并以左下大脸和正面脸作为主要身份依据；环境差异按轻度、中度逐级增加，但最终 prompt 不写解释性变化标签；如发生 TNS 收敛，已保留 `v1-v5` 版本记录。
 - img prompt 可转译参考类型的画面意图，但不得出现类型分析标签、文件名、流程说明或类型判断依据。
 - 每个 `环境：` 均已写清具体空间、关键陈设、材质、光线来源、空间纵深和主体关系。
 - `confirmation-manifest.json/md` 已生成。
