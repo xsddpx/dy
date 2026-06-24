@@ -24,7 +24,8 @@
 - 只写可见画面、动作、镜头、场景、穿搭和画面质感。
 - 保持成熟、写实、生活化、平台可发布表达。
 - 严禁低俗、裸体、未成年感和不可发布内容。
-- 只执行 `anna auto` 完整发布链路，不接入其他生成路线、角色或兜底工具。
+- 默认执行 `anna auto` 完整发布链路；只有用户明确指定“快速通道”“跳过确认图”或“备用流程”时，才启用快速通道备选。
+- 不接入其他生成路线、角色或兜底工具。
 
 ## 固定资产
 
@@ -37,7 +38,8 @@
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - Kie 确认图：`nano-banana-pro`，9:16，1K，PNG。
-- Dreamina 视频：`dreamina multimodal2video` 同时上传选中确认图和参考宫格图，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
+- Dreamina 视频主流程：`dreamina multimodal2video` 同时上传选中确认图和参考宫格图，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
+- Dreamina 视频快速通道：仅在用户显式指定时，直接上传 `MATERIAL/fixed-role/anna.png` 和 `TEMP/RUN_ID/reference-grid.jpg`，跳过 Kie 确认图节点。
 
 ## 目录边界
 
@@ -59,10 +61,20 @@
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 9. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录。
 
+## 快速通道备选
+
+- 快速通道只吸收旧 SOP 的通道思想，不恢复旧项目的 TapNow、双人路线、固定画布、7 秒参数、参考图轮选或其他旧工具规则。
+- 快速通道只在用户明确说“快速通道”“跳过确认图”或“备用流程”时启用；默认不启用，不因 Kie 失败、时间紧或已有候选文件自动切换。
+- 快速通道仍必须完成预检、参考选择或去重、参考宫格、`grid-prompt.txt`、Dreamina 生成、质检、发布和记录。
+- 快速通道跳过模块 02 的 Kie 确认图和确认图选择，直接进入模块 03；Dreamina 输入固定为 `@图1 = MATERIAL/fixed-role/anna.png`、`@图2 = TEMP/RUN_ID/reference-grid.jpg`。
+- 快速通道 `vid prompt` 必须由 `grid-prompt.txt` 人工重写生成，强调人物身份以 `@图1` 角色卡为准，`@图2` 参考宫格只提供场景、分镜、镜头视角、穿搭版型、动作节奏和封面停顿。
+- 快速通道不得使用强遮挡参考图作为 Dreamina 输入；强遮挡参考图只属于 Kie 确认图主流程。
+- 快速通道生成失败时，不自动切回主流程；停止并报告实际失败原因与可选下一步。
+
 ## 硬阻断
 
 - 参考宫格未通过，不进入提示词或生成。
-- 没有可用确认图或未记录选中确认图，不进入视频生成。
+- 主流程没有可用确认图或未记录选中确认图，不进入视频生成；快速通道显式启用时不要求 `selected_confirmation_image`，但必须有 `MATERIAL/fixed-role/anna.png`、`reference-grid.jpg` 和 `grid-prompt.txt`。
 - 视频生成前缺少 `reference-grid.jpg`，或 vid prompt 未把 `@图2` 说明为参考宫格图，不进入 Dreamina 提交。
 - 发布前未完成 `内容由AI生成` 声明，不得发布。
 - 登录失效、验证码、账号安全、平台风控、上传失败、发布按钮禁用等平台阻断时停止并报告。
