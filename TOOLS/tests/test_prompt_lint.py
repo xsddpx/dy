@@ -40,7 +40,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue(any(f["code"] == "unsupported_terms" for f in result["findings"]), result["findings"])
 
     def test_at_image_two_fails_for_video_prompt(self):
-        result = self.lint(GOOD_PROMPT + " @图2 参考宫格图。")
+        result = self.lint(GOOD_PROMPT + " 参考宫格图不能写成 @图2。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "unsupported_terms" for f in result["findings"]), result["findings"])
 

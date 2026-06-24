@@ -93,7 +93,7 @@ def lint_text(text, path, route="anna", channel="auto"):
     if channel != "auto":
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
     if not re.search(r"@?[^\s，。；;]*确认图|confirmation[-_ ]?image|@图1", text, re.IGNORECASE):
-        add(findings, "error", "missing_confirmation_image", "auto 通道缺少确认图引用或说明")
+        add(findings, "error", "missing_confirmation_image", "auto/fast 视频 prompt 缺少 @图1 单图身份引用或说明")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
