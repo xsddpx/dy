@@ -282,6 +282,63 @@ async def _set_file_input_via_playwright(cdp_url: str, video: Path, upload_url: 
         }
 
 
+def _set_file_input_via_playwright_sync(cdp_url: str, video: Path, upload_url: str, timeout_sec: int) -> dict[str, Any]:
+    from playwright.sync_api import sync_playwright
+
+    timeout_ms = timeout_sec * 1000
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_ms)
+        contexts = browser.contexts
+        if not contexts:
+            return {"ok": False, "method": "playwright-cdp", "reason": "CDP 已连接，但没有可用浏览器上下文"}
+
+        page = None
+        for context in contexts:
+            for candidate in context.pages:
+                if is_upload_page(candidate.url) or is_video_publish_page(candidate.url):
+                    page = candidate
+                    break
+            if page:
+                break
+
+        if page is None:
+            for context in contexts:
+                for candidate in context.pages:
+                    if "creator.douyin.com" in candidate.url:
+                        page = candidate
+                        break
+                if page:
+                    break
+
+        if page is None:
+            page = contexts[0].pages[0] if contexts[0].pages else contexts[0].new_page()
+            page.goto(upload_url, wait_until="domcontentloaded", timeout=timeout_ms)
+
+        page.bring_to_front()
+        if not (is_upload_page(page.url) or is_video_publish_page(page.url)):
+            page.goto(upload_url, wait_until="domcontentloaded", timeout=timeout_ms)
+
+        file_input = page.locator('input[type="file"]').first
+        if file_input.count() == 0:
+            for selector in ('text=发布视频', 'button:has-text("发布视频")', '[role=tab]:has-text("发布视频")'):
+                try:
+                    page.locator(selector).first.click(timeout=3000)
+                    page.wait_for_timeout(1000)
+                    break
+                except Exception:
+                    continue
+        file_input.wait_for(state="attached", timeout=timeout_ms)
+        file_input.set_input_files(str(video))
+        return {
+            "ok": True,
+            "method": "playwright-cdp",
+            "url": page.url,
+            "title": page.title(),
+            "path_used": str(video),
+            "connection": "sync",
+        }
+
+
 def set_file_input_via_playwright(cdp_url: str | None, video: Path, upload_url: str, timeout_sec: int = 20) -> dict[str, Any]:
     if not cdp_url:
         return {"ok": False, "method": "playwright-cdp", "skipped": True, "reason": "未配置 CDP 地址"}
@@ -296,7 +353,7 @@ def set_file_input_via_playwright(cdp_url: str | None, video: Path, upload_url: 
         }
 
     try:
-        return asyncio.run(_set_file_input_via_playwright(cdp_url, video, upload_url, timeout_sec))
+        return _set_file_input_via_playwright_sync(cdp_url, video, upload_url, timeout_sec)
     except Exception as exc:
         return {"ok": False, "method": "playwright-cdp", "reason": str(exc), "cdp_url": cdp_url}
 
