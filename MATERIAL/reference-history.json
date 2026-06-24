@@ -45,7 +45,16 @@
       "canonical_url": "https://www.douyin.com/video/7652315023138423674",
       "source": "https://www.douyin.com/video/7652315023138423674",
       "title": "20260625-0055-favorite-765231-fast"
+    },
+    {
+      "recorded_at": "2026-06-24T19:14:10.723976+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7626012443420896676",
+      "canonical_url": "https://www.douyin.com/video/7626012443420896676",
+      "source": "https://www.douyin.com/video/7626012443420896676",
+      "title": "20260625-0203-favorite-762601-fast"
     }
   ],
-  "updated_at": "2026-06-24T17:13:39.487483+00:00"
+  "updated_at": "2026-06-24T19:14:10.724553+00:00"
 }
