@@ -27,7 +27,6 @@ FORBIDDEN_BODY_TERMS = [
 ]
 
 UNSUPPORTED_TERMS = [
-    "@图2",
     "@图3",
     "附件",
     "节点",
@@ -54,6 +53,7 @@ FIXED_CAMERA_TERMS = ["固定手机机位", "固定手机支架", "固定机位"
 HANDHELD_CAMERA_TERMS = ["手持", "轻微手持", "手持自拍", "手持跟拍", "跟拍"]
 META_INSTRUCTION_TERMS = ["身材表达使用艺术化穿搭语言", "艺术化穿搭语言："]
 DEFAULT_INDOOR_BACKGROUND_TERMS = ["背景只做同类室内浅墙", "背景仍为同类室内浅墙", "同类室内浅墙与地面光线"]
+REFERENCE_GRID_TERMS = ["参考宫格", "宫格图", "reference-grid", "reference grid"]
 NON_MUSIC_SOUND_TERMS = [
     "环境声",
     "人声",
@@ -94,6 +94,8 @@ def lint_text(text, path, route="anna", channel="auto"):
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
     if not re.search(r"@?[^\s，。；;]*确认图|confirmation[-_ ]?image|@图1", text, re.IGNORECASE):
         add(findings, "error", "missing_confirmation_image", "auto 通道缺少确认图引用或说明")
+    if "@图2" not in text or not any(term in text for term in REFERENCE_GRID_TERMS):
+        add(findings, "error", "missing_reference_grid", "auto 通道缺少参考宫格图 @图2 引用或用途说明")
 
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:

@@ -37,7 +37,7 @@
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - Kie 确认图：`nano-banana-pro`，9:16，1K，PNG。
-- Dreamina 视频：`dreamina multimodal2video --model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
+- Dreamina 视频：`dreamina multimodal2video` 同时上传选中确认图和参考宫格图，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 
 ## 目录边界
 
@@ -51,11 +51,11 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
-3. 参考宫格、导演结构反推与 grid-prompt 规范记录：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图反推可见导演结构、身材卖点校准和参考六锁定结论，并写入 `grid-prompt.txt`。
+3. 参考宫格、导演结构反推与 grid-prompt 规范记录：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图反推可见导演结构、身材卖点校准和参考六锁定结论，并写入 `grid-prompt.txt`；`reference-grid.jpg` 后续作为 Dreamina 视频生成的第二张视觉参考输入。
 4. 确认图提示词：实际查看宫格或帧图后写 `img prompt`，只写可见画面语言；默认非 TNS 不运行 lint。
 5. 确认图：选关键帧，用 `reference_mask.py --grid-report` 优先按抽帧报告自动制作强遮挡参考图，检测缺失或遮挡异常时才用 `--rect` 手工兜底；Kie Nano Banana Pro 1K 先上传 `anna.png` 作为 `@图1`，并在 img prompt 中声明 `@图1` 是同一人的多视角、多表情角色参考图，再上传强遮挡参考图作为 `@图2`，每批固定生成 `A-01/A-02` 两张。
 6. 确认图选择：执行者从成功生成的确认图中选择一张进入视频生成，并记录选择原因。
-7. 视频生成：执行者综合 `img prompt` 和 `grid-prompt.txt` 重新写成最终 `vid prompt`，只上传选中确认图并用 `@图1` 指代后提交 Dreamina 视频。
+7. 视频生成：执行者综合 `img prompt`、`grid-prompt.txt` 和 `reference-grid.jpg` 重新写成最终 `vid prompt`，上传选中确认图作为 `@图1`、上传参考宫格图作为 `@图2` 后提交 Dreamina 视频。
 8. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 9. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录。
 
@@ -63,5 +63,6 @@
 
 - 参考宫格未通过，不进入提示词或生成。
 - 没有可用确认图或未记录选中确认图，不进入视频生成。
+- 视频生成前缺少 `reference-grid.jpg`，或 vid prompt 未把 `@图2` 说明为参考宫格图，不进入 Dreamina 提交。
 - 发布前未完成 `内容由AI生成` 声明，不得发布。
 - 登录失效、验证码、账号安全、平台风控、上传失败、发布按钮禁用等平台阻断时停止并报告。
