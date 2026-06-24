@@ -35,6 +35,34 @@ UNSUPPORTED_TERMS = [
     "结果数",
 ]
 
+REFERENCE_TYPES = [
+    "舞蹈律动",
+    "健身运动",
+    "穿搭展示",
+    "镜前自拍",
+    "走路回头",
+    "坐姿互动",
+    "双人互动",
+    "生活场景剧情",
+]
+
+INTERNAL_SOURCE_TERMS = [
+    "grid-prompt.txt",
+    "reference-grid",
+    "参考宫格",
+    "同时吸收",
+    "吸收",
+    "吸收grid",
+    "吸收 grid",
+    "根据grid",
+    "根据 grid",
+    "根据文档",
+    "上述分析",
+    "文件",
+    "流程",
+    "流程节点",
+]
+
 CHEST_ART_TERMS = [
     "饱满的立体廓形",
     "高感知度的面料张力",
@@ -67,6 +95,7 @@ NON_MUSIC_SOUND_TERMS = [
 ]
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
 SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
+VIDEO_TYPE_RE = re.compile(r"视频类型为(?P<main>[^，。；;\s]+)(?:，次类型为(?P<sub>[^，。；;\s]+))?")
 
 
 def positive_sound_hits(text):
@@ -86,6 +115,35 @@ def positive_sound_hits(text):
     return hits
 
 
+def video_type_finding(text):
+    matches = list(VIDEO_TYPE_RE.finditer(text))
+    if not matches:
+        return "missing_video_type", "vid prompt 缺少“视频类型为...”类型指令"
+    invalid = []
+    for match in matches:
+        main_type = match.group("main")
+        sub_type = match.group("sub")
+        if main_type not in REFERENCE_TYPES:
+            invalid.append(f"主类型={main_type}")
+        if sub_type and sub_type != "无" and sub_type not in REFERENCE_TYPES:
+            invalid.append(f"次类型={sub_type}")
+    if invalid:
+        return "invalid_video_type", f"vid prompt 含非法参考类型：{', '.join(invalid)}"
+    return None, None
+
+
+def image_one_clothing_conflict(text):
+    compact = re.sub(r"\s+", "", text)
+    patterns = [
+        "@图1中的人物和穿搭作为",
+        "@图1中人物和穿搭作为",
+        "@图1中的穿搭作为",
+        "@图1中穿搭作为",
+        "@图1的穿搭作为",
+    ]
+    return [pattern for pattern in patterns if pattern in compact]
+
+
 def lint_text(text, path, route="anna", channel="auto"):
     findings = []
     if route != "anna":
@@ -93,11 +151,19 @@ def lint_text(text, path, route="anna", channel="auto"):
     if channel != "auto":
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
     if not re.search(r"@?[^\s，。；;]*确认图|confirmation[-_ ]?image|@图1", text, re.IGNORECASE):
-        add(findings, "error", "missing_confirmation_image", "auto 通道缺少确认图引用或说明")
-
+        add(findings, "error", "missing_confirmation_image", "auto/fast 视频 prompt 缺少 @图1 单图身份引用或说明")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
+    internal_source_hits = [term for term in INTERNAL_SOURCE_TERMS if term in text]
+    if internal_source_hits:
+        add(findings, "error", "internal_source_terms", f"vid prompt 含 Dreamina 不可执行的内部来源词：{', '.join(internal_source_hits)}")
+    type_code, type_message = video_type_finding(text)
+    if type_code:
+        add(findings, "error", type_code, type_message)
+    clothing_conflicts = image_one_clothing_conflict(text)
+    if clothing_conflicts:
+        add(findings, "error", "image_one_clothing_anchor", "@图1 只能作为身份、五官、发型、脸型和稳定身材比例依据，auto/fast 不得把 @图1 穿搭作为依据")
     forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:
         add(findings, "error", "unsafe_body_terms", f"vid prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")

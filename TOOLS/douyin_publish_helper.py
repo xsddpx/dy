@@ -2145,7 +2145,7 @@ return {
         return 0
 
     report["decision"] = "unknown"
-    report["warnings"].append("点击发布后未在等待时间内确认成功页面；需主流程复查当前 Chrome 页面")
+    report["warnings"].append("点击发布后未在等待时间内确认成功页面；需人工复查当前 Chrome 页面")
     report["steps"]["publish"]["status"] = "unknown"
     report["report_json"], report["report_md"] = [str(p) for p in write_report(out_dir, report)]
     print(json.dumps(report, ensure_ascii=False, indent=2))

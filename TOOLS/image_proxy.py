@@ -99,18 +99,31 @@ def make_proxy(source, out_path, width, height, quality):
 
 def create_proxy(source, out_dir, args):
     probe_result, meta = ffprobe_image(source)
+    source_size = source.stat().st_size
     item = {
         "source": str(source),
+        "source_size": source_size,
         "probe_returncode": probe_result["returncode"],
         "source_meta": meta,
         "proxy": None,
         "proxy_size": None,
         "quality": None,
+        "skipped": False,
+        "skip_reason": None,
+        "display_path": None,
         "warnings": [],
         "errors": [],
     }
     if not meta or not meta.get("width") or not meta.get("height"):
         item["errors"].append("无法读取图片宽高")
+        return item
+
+    if not args.force_proxy and source_size <= args.skip_under_bytes:
+        item.update({
+            "skipped": True,
+            "skip_reason": "skipped_original_under_limit",
+            "display_path": str(source),
+        })
         return item
 
     dims = scaled_dimensions(meta["width"], meta["height"], args.short_edge, args.allow_upscale)
@@ -130,6 +143,7 @@ def create_proxy(source, out_dir, args):
             "proxy_size": size,
             "quality": quality,
             "proxy_meta": {"width": dims[0], "height": dims[1]},
+            "display_path": str(out_path),
         })
         if size <= args.target_bytes:
             break
@@ -152,17 +166,22 @@ def write_reports(results, out_dir):
     lines = [
         "# 图片代理图报告",
         "",
-        "| 结果 | 原图 | 代理图 | 代理尺寸 | KB | 问题 |",
-        "|---|---|---|---:|---:|---|",
+        "| 结果 | 原图 | 展示图 | 代理图 | 代理尺寸 | KB | 问题 |",
+        "|---|---|---|---|---:|---:|---|",
     ]
     for item in results:
-        status = "fail" if item["errors"] else "pass"
+        status = "fail" if item["errors"] else ("skipped" if item.get("skipped") else "pass")
         proxy_meta = item.get("proxy_meta") or {}
+        dims = ""
+        if proxy_meta.get("width") and proxy_meta.get("height"):
+            dims = f"{proxy_meta['width']}x{proxy_meta['height']}"
         size = "" if item.get("proxy_size") is None else f"{item['proxy_size'] / 1024:.1f}"
-        issues = "; ".join(item["errors"] + item["warnings"]) or "无"
+        issues = "; ".join(item["errors"] + item["warnings"]) or item.get("skip_reason") or "无"
         lines.append(
-            f"| {status} | {Path(item['source']).name} | {Path(item['proxy']).name if item.get('proxy') else ''} | "
-            f"{proxy_meta.get('width', '')}x{proxy_meta.get('height', '')} | {size} | {issues} |"
+            f"| {status} | {Path(item['source']).name} | "
+            f"{Path(item['display_path']).name if item.get('display_path') else ''} | "
+            f"{Path(item['proxy']).name if item.get('proxy') else ''} | "
+            f"{dims} | {size} | {issues} |"
         )
     report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_json, report_md
@@ -173,9 +192,11 @@ def main():
     parser.add_argument("images", nargs="+", help="待生成代理图的图片")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/image-proxies/YYYYMMDD-HHMMSS")
     parser.add_argument("--short-edge", type=int, default=720, help="代理图短边尺寸，默认 720")
-    parser.add_argument("--target-bytes", type=int, default=250_000, help="代理图目标体积，默认 250KB")
+    parser.add_argument("--target-bytes", type=int, default=100_000, help="代理图目标体积，默认 100KB")
+    parser.add_argument("--skip-under-bytes", type=int, default=100_000, help="原图小于等于该体积时跳过代理图，默认 100KB")
     parser.add_argument("--suffix", default="proxy", help="输出文件名后缀")
     parser.add_argument("--allow-upscale", action="store_true", help="允许放大小图到目标短边")
+    parser.add_argument("--force-proxy", action="store_true", help="即使原图小于跳过阈值也强制生成代理图")
     parser.add_argument("--no-report", action="store_true", help="只生成代理图，不写报告文件")
     args = parser.parse_args()
 
@@ -198,9 +219,11 @@ def main():
         "report_json": str(report_json) if report_json else None,
         "report_md": str(report_md) if report_md else None,
         "total": len(results),
-        "pass": sum(1 for item in results if not item["errors"]),
+        "pass": sum(1 for item in results if not item["errors"] and not item.get("skipped")),
+        "skipped": sum(1 for item in results if item.get("skipped")),
         "fail": sum(1 for item in results if item["errors"]),
         "proxies": [item.get("proxy") for item in results if item.get("proxy")],
+        "display_paths": [item.get("display_path") for item in results if item.get("display_path")],
     }, ensure_ascii=False, indent=2))
     return 1 if any(item["errors"] for item in results) else 0
 

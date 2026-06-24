@@ -797,7 +797,7 @@ def detect_head_face_info(frames):
             "available": False,
             "decision": "unavailable",
             "method": "macos_vision_face_and_body_pose",
-            "scope": "slow_confirmation_prompt_reference_only",
+            "scope": "reference_analysis_only",
             "reason": "no frames",
         }
     if not shutil.which("swift"):
@@ -805,7 +805,7 @@ def detect_head_face_info(frames):
             "available": False,
             "decision": "unavailable",
             "method": "macos_vision_face_and_body_pose",
-            "scope": "slow_confirmation_prompt_reference_only",
+            "scope": "reference_analysis_only",
             "reason": "swift executable not found",
         }
 
@@ -820,7 +820,7 @@ def detect_head_face_info(frames):
                 "available": False,
                 "decision": "error",
                 "method": "macos_vision_face_and_body_pose",
-                "scope": "slow_confirmation_prompt_reference_only",
+                "scope": "reference_analysis_only",
                 "error": stream_text(result["stderr"]).strip() or stream_text(result["stdout"]).strip(),
             }
         try:
@@ -830,7 +830,7 @@ def detect_head_face_info(frames):
                 "available": False,
                 "decision": "error",
                 "method": "macos_vision_face_and_body_pose",
-                "scope": "slow_confirmation_prompt_reference_only",
+                "scope": "reference_analysis_only",
                 "error": f"vision result json parse failed: {exc}",
             }
     finally:
@@ -847,7 +847,7 @@ def detect_head_face_info(frames):
     return {
         "available": True,
         "method": "macos_vision_face_and_body_pose",
-        "scope": "slow_confirmation_prompt_reference_only",
+        "scope": "reference_analysis_only",
         "basis": "reference-grid sampled frames",
         "frame_count": len(frame_results),
         "frames_with_faces": sum(1 for item in frame_results if int(item.get("faces") or 0) > 0),

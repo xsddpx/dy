@@ -251,7 +251,7 @@ def main():
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--entry", action="append", required=True, help="提交位 JSON，必须正好提供 01/02 两个")
     parser.add_argument("--proxy-short-edge", type=int, default=720)
-    parser.add_argument("--proxy-target-bytes", type=int, default=200_000)
+    parser.add_argument("--proxy-target-bytes", type=int, default=100_000)
     args = parser.parse_args()
 
     try:
