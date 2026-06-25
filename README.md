@@ -28,4 +28,4 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ```
 
-只有执行显式 `slow` 模式时才需要 Kie 确认图；生图前先在本地 `.env` 配置 `KIE_API_KEY`，不要提交 `.env`。
+只有执行显式 `slow` 模式时才需要 Kie 确认图；确认图 img prompt 直接查看宫格或帧图分析穿搭、姿态镜头、环境等内容，不依赖 `grid-prompt.txt`；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为角色卡输入，每次只生成 `A-01` 一张确认图，生图前先在本地 `.env` 配置 `KIE_API_KEY`，不要提交 `.env`。

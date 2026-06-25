@@ -38,12 +38,17 @@ class KieConfirmationImageTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.role = self.root / "role.png"
-        self.reference = self.root / "reference.png"
         self.prompt = self.root / "prompt.txt"
         self.out_dir = self.root / "confirm-A-1200"
         self.role.write_bytes(PNG_1X1)
-        self.reference.write_bytes(PNG_1X1)
-        self.prompt.write_text("人物：使用 @图1 的人物替换 @图2 中的人物。\n环境：室内。\n其他：真实光影。", encoding="utf-8")
+        self.prompt.write_text(
+            "人物：以 @图1 中的人物作为身份依据。\n"
+            "穿搭：修身短上衣，高腰半裙，腰线清晰。\n"
+            "姿态镜头：正面站姿，平视半身近景。\n"
+            "环境：室内客厅，自然窗光。\n"
+            "其他：真实光影。",
+            encoding="utf-8",
+        )
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -56,7 +61,6 @@ class KieConfirmationImageTest(unittest.TestCase):
             "slot": "A-01",
             "topic": "smoke测试",
             "role_image": str(self.role),
-            "reference_image": str(self.reference),
             "prompt": None,
             "prompt_path": str(self.prompt),
             "prompt_note": "smoke",
@@ -80,7 +84,6 @@ class KieConfirmationImageTest(unittest.TestCase):
     def test_success_generates_entry_and_downloads_image(self):
         post_responses = [
             FakeResponse({"success": True, "code": 200, "data": {"downloadUrl": "https://tmp/role.png", "fileName": "role.png"}}),
-            FakeResponse({"success": True, "code": 200, "data": {"downloadUrl": "https://tmp/reference.png", "fileName": "reference.png"}}),
             FakeResponse({"code": 200, "msg": "success", "data": {"taskId": "task_nano-banana-pro_1234567890"}}),
         ]
         get_responses = [
@@ -92,10 +95,10 @@ class KieConfirmationImageTest(unittest.TestCase):
                 mock.patch.object(MODULE.requests, "get", side_effect=get_responses) as get:
             result = MODULE.run_generation(self.args())
 
-        self.assertEqual(post.call_count, 3)
-        create_body = post.call_args_list[2].kwargs["json"]
+        self.assertEqual(post.call_count, 2)
+        create_body = post.call_args_list[1].kwargs["json"]
         self.assertEqual(create_body["model"], "nano-banana-pro")
-        self.assertEqual(create_body["input"]["image_input"], ["https://tmp/role.png", "https://tmp/reference.png"])
+        self.assertEqual(create_body["input"]["image_input"], ["https://tmp/role.png"])
         self.assertEqual(create_body["input"]["aspect_ratio"], "9:16")
         self.assertEqual(create_body["input"]["resolution"], "1K")
         self.assertEqual(get.call_count, 3)
@@ -104,11 +107,12 @@ class KieConfirmationImageTest(unittest.TestCase):
         self.assertEqual(entry["submit_id"], "task_nano-banana-pro_1234567890")
         self.assertEqual(entry["model_version"], "nano-banana-pro-1K")
         self.assertTrue(Path(entry["image_path"]).exists())
+        self.assertIn("role_upload", entry["kie"])
+        self.assertNotIn("reference_upload", entry["kie"])
 
     def test_failed_task_writes_failure_entry(self):
         post_responses = [
             FakeResponse({"success": True, "code": 200, "data": {"downloadUrl": "https://tmp/role.png"}}),
-            FakeResponse({"success": True, "code": 200, "data": {"downloadUrl": "https://tmp/reference.png"}}),
             FakeResponse({"code": 200, "data": {"taskId": "task_fail"}}),
         ]
         get_responses = [

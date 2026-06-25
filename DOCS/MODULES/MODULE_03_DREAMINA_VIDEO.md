@@ -3,25 +3,26 @@
 ## 职责
 
 - 在默认 `auto/fast` 模式下，根据 `anna.png` 和模块 01 的 grid prompt 人工重写最终 vid prompt。
-- 在显式 `slow` 模式下，综合模块 02 的 img prompt 和模块 01 的 grid prompt，人工重写最终 vid prompt。
+- 在显式 `slow` 模式下，综合模块 02 的 img prompt 和模块 01 的 grid prompt，人工重写最终 vid prompt；其中模块 02 的 img prompt 已直接来自宫格或帧图分析，不依赖 grid prompt。
 - 提交 Dreamina `multimodal2video` 并下载正式 MP4。
 
 ## prompt 边界
 
 - img prompt 和 vid prompt 是两个阶段的输入。
-- img prompt 用于确认图阶段，使用 `@图1=角色上传图`、`@图2=强遮挡参考图`。
+- img prompt 用于确认图阶段，使用 `@图1=角色上传图`。
+- slow 的 img prompt 直接查看 `reference-grid.jpg` 或帧图生成，重点分析穿搭、环境、人物姿态和镜头关系，不读取或依赖 `grid-prompt.txt`。
 - `auto/fast` 视频阶段只上传 `MATERIAL/fixed-role/anna.png`，并在 prompt 中用 `@图1` 指代。
 - `slow` 视频阶段只上传模块 02 选中的 Kie 原始图，并在 prompt 中用 `@图1` 指代。
 - 视频阶段 `@图1` 指代当前模式唯一上传的图片：`auto/fast` 中是 `anna.png`，`slow` 中是选中的 Kie 原始图。
-- 视频阶段不把 `reference-grid.jpg` 作为输入；参考宫格只作为 `grid-prompt.txt` 的文字分析来源，vid prompt 中不保留 `@图2`。
+- 视频阶段不把 `reference-grid.jpg` 作为输入；参考宫格只作为 `grid-prompt.txt` 的文字分析来源，vid prompt 中不保留第二张图片引用。
 - `auto` 就是 `fast`，是默认模式；“快速通道”只是兼容叫法。
 - “跳过确认图”也是 `fast` 的兼容触发词。
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - Dreamina 视频阶段的图片指代统一使用 `@` 方式，不做脚本转换。
-- 确认图阶段的 `@图2` 是强遮挡参考图；视频阶段没有 `@图2`，vid prompt 不得沿用确认图阶段强遮挡参考图的语义。
+- 确认图阶段只上传角色图；视频阶段也只有一张图片输入，vid prompt 不得引入第二张图片语义。
 - `auto/fast` 没有 img prompt 输入，执行者必须根据 `anna.png` 的角色身份，以及 `grid-prompt.txt` 的参考类型、可见导演结构重写 vid prompt。
-- `slow` 执行者必须分析 img prompt 的人物、环境、画面质感，以及 grid prompt 的参考类型、整体动画、可见导演结构、身材卖点校准和参考六锁定结论，重新写成新的 vid prompt；不得用脚本做简单合并。
-- 任何模式都不得把强遮挡参考图或参考宫格图作为 Dreamina 输入。
+- `slow` 执行者必须分析 img prompt 的人物、穿搭、姿态镜头、环境、画面质感，以及 grid prompt 的参考类型、整体动画、可见导演结构、身材卖点校准和参考六锁定结论，重新写成新的 vid prompt；不得用脚本做简单合并。
+- 任何模式都不得把参考图、参考帧或参考宫格图作为 Dreamina 输入。
 - 最终 vid prompt 必须是 Dreamina 可直接执行的画面描述，不得出现 `grid-prompt.txt`、`reference-grid`、`参考宫格`、`同时吸收`、`吸收 grid`、`根据 grid`、`根据文档`、`上述分析`、`文件`、`流程`、`节点` 等内部来源词或解释性词。
 
 ## vid prompt 格式
@@ -63,7 +64,7 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 - `MATERIAL/fixed-role/anna.png` 存在，并作为 `@图1` 上传。
 - `TEMP/RUN_ID/grid-prompt.txt` 存在，且已记录参考类型识别、可见导演结构、身材卖点校准和参考六锁定结论。
 - `vid prompt` 已由 `grid-prompt.txt` 人工重写为可直接执行的 Dreamina 画面描述，说明人物身份、五官、发型、脸型和稳定身材比例以 `@图1` 角色卡为准，穿搭、动作、场景和表情节奏来自本次参考类型与导演结构；最终 prompt 不得出现文件名、流程说明、来源说明或“吸收/根据某文件”的表达。
-- 未上传强遮挡参考图；强遮挡参考图只属于 slow Kie 确认图流程。
+- 未上传任何参考图、参考帧或参考宫格图。
 - 未上传 `reference-grid.jpg`；参考宫格不作为 Dreamina 视频视觉输入。
 
 ## slow 显式模式
@@ -72,8 +73,8 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 
 - `selected_confirmation_image` 指向 Kie 下载到本地的原始确认图，并作为 `@图1` 上传。
 - `TEMP/RUN_ID/grid-prompt.txt` 存在，且已记录参考类型识别、可见导演结构、身材卖点校准和参考六锁定结论。
-- `vid prompt` 已综合 img prompt 和 `grid-prompt.txt` 人工重写为可直接执行的 Dreamina 画面描述，已显式写入视频类型并承接参考表情节奏，且不含 `@图2`、文件名、流程说明或确认图阶段解释。
-- 未上传强遮挡参考图或 `reference-grid.jpg`。
+- `vid prompt` 已综合 img prompt 和 `grid-prompt.txt` 人工重写为可直接执行的 Dreamina 画面描述，已显式写入视频类型并承接参考表情节奏，且不含第二张图片引用、文件名、流程说明或确认图阶段解释。
+- 未上传参考图、参考帧或 `reference-grid.jpg`。
 
 slow 命令示例：
 
@@ -85,7 +86,7 @@ dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png
 
 ## 重试
 
-- Dreamina 命令包含第二个 `--image`、把 `reference-grid.jpg` 作为输入，或 vid prompt 含 `@图2` 时，不得提交 Dreamina；已提交的视频节点一律弃用，不下载、不质检、不发布。
+- Dreamina 命令包含第二个 `--image`、把 `reference-grid.jpg` 作为输入，或 vid prompt 含第二张图片引用时，不得提交 Dreamina；已提交的视频节点一律弃用，不下载、不质检、不发布。
 - 视频 prompt 初稿固定为 `vid-prompt-v1.txt`；`v1` 是首次提交。
 - 只有 Dreamina 明确返回 TNS/安全拦截且没有生成可下载 MP4 时，才允许继续写 `vid-prompt-v2.txt` 到 `vid-prompt-v5.txt` 逐步收敛并重提。
 - `auto/fast` 在 TNS 收敛期间仍只使用同一张 `MATERIAL/fixed-role/anna.png`；`slow` 仍只使用同一张选中确认图。不得因 TNS 切换模式、换图、增加第二张图、接入其他路线或兜底工具。
@@ -97,10 +98,10 @@ dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png
 ## 通过标准
 
 - `auto/fast` Dreamina 命令只上传 `MATERIAL/fixed-role/anna.png`；`slow` Dreamina 命令只上传选中图。
-- `auto/fast` Dreamina vid prompt 使用 `@图1` 指代 `anna.png`；`slow` 使用 `@图1` 指代选中图；两种模式都不得把参考宫格写作 `@图2`。
+- `auto/fast` Dreamina vid prompt 使用 `@图1` 指代 `anna.png`；`slow` 使用 `@图1` 指代选中图；两种模式都不得把参考宫格写成图片输入。
 - `auto/fast` vid prompt 已根据角色卡和 `grid-prompt.txt` 人工重写；`slow` vid prompt 已综合 img prompt 和 `grid-prompt.txt` 人工重写。两种模式都不得机械合并。
 - vid prompt 使用 `人物：`、`环境：`、`卖点与锁定：`、`整体动画：`、`背景音乐：`、`其他：` 格式。
 - `整体动画：` 已以 `视频类型为...，次类型为...；` 开头，类型来自模块 01 的合法集合。
 - `整体动画：` 已承接模块 01 的参考表情节奏，表情随动作、镜头距离和场景自然变化，不把微笑作为默认模板。
-- vid prompt 不含 `@图2`，不沿用确认图阶段强遮挡参考图语义，不含文件名、流程说明、来源说明或音乐以外的其他声音。
+- vid prompt 不含第二张图片引用，不引入参考图视觉输入语义，不含文件名、流程说明、来源说明或音乐以外的其他声音。
 - 下载到的 MP4 可解码、竖屏、约 5-6 秒，并整理为 `OUTPUT/RUN_ID.mp4`。

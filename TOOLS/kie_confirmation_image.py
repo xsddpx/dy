@@ -237,18 +237,16 @@ def run_generation(args: argparse.Namespace) -> dict[str, Any]:
         raise KieError("缺少 prompt；请提供 --prompt 或 --prompt-path")
 
     role_image = ensure_file(args.role_image, "角色参考图")
-    reference_image = ensure_file(args.reference_image, "强遮挡参考图")
     out_dir = Path(args.out_dir).expanduser().resolve()
     raw_dir = Path(args.raw_dir).expanduser().resolve() if args.raw_dir else out_dir / "raw"
     entry_out = Path(args.entry_out).expanduser().resolve() if args.entry_out else out_dir / f"{args.slot}-entry.json"
     upload_path = args.upload_path or f"images/dy/{args.run_id}/{args.slot}"
 
     role_upload = upload_file(role_image, token, upload_path, args.timeout)
-    ref_upload = upload_file(reference_image, token, upload_path, args.timeout)
     task_id = create_task(
         token=token,
         prompt=prompt,
-        image_urls=[role_upload["download_url"], ref_upload["download_url"]],
+        image_urls=[role_upload["download_url"]],
         aspect_ratio=args.aspect_ratio,
         resolution=args.resolution,
         output_format=args.output_format,
@@ -284,7 +282,6 @@ def run_generation(args: argparse.Namespace) -> dict[str, Any]:
             "output_format": args.output_format,
             "result_url": result_urls[0],
             "role_upload": role_upload,
-            "reference_upload": ref_upload,
             "credits_consumed": task.get("creditsConsumed"),
             "cost_time": task.get("costTime"),
         },
@@ -309,7 +306,6 @@ def main() -> int:
     parser.add_argument("--slot", required=True, help="槽位，如 A-01")
     parser.add_argument("--topic", required=True)
     parser.add_argument("--role-image", default="MATERIAL/fixed-role/anna.png")
-    parser.add_argument("--reference-image", required=True)
     parser.add_argument("--prompt", default=None)
     parser.add_argument("--prompt-path", default=None)
     parser.add_argument("--prompt-note", default=None)
