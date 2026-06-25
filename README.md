@@ -6,8 +6,8 @@
 
 1. 从用户指定参考或抖音收藏选参考。
 2. 7 天去重。
-3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，先完成参考类型识别，再根据宫格写九段式 `grid-prompt.txt`。
-4. 根据 `grid-prompt.txt` 的标准块，人工整理可直接提交的 img/vid prompt；默认 fast 只进入 Dreamina `vid-prompt.txt`。
+3. 通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，再根据宫格写十段式 `grid-prompt.txt`。
+4. `grid-prompt.txt` 直接作为 Dreamina v1 的最终 vid prompt；默认 fast 只进入 Dreamina 视频生成。
 5. Dreamina `multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png` 生成 5-6 秒竖屏视频。
 6. 下载并质检 MP4。
 7. 上传抖音，设置 `内容由AI生成` 声明并发布。
@@ -28,4 +28,4 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ```
 
-只有执行显式 `slow` 模式时才需要 Kie 确认图；确认图 img prompt 从模块 01 的 `grid-prompt.txt` 取用六段式标准块并清理为 Kie 可执行文本；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为角色卡输入，每次只生成 `A-01` 一张确认图，生图前先在本地 `.env` 配置 `KIE_API_KEY`，不要提交 `.env`。
+只有执行显式 `slow` 模式时才需要 Kie 确认图；确认图 img prompt 由模块 01 的十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段得到；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为角色卡输入，每次只生成 `A-01` 一张确认图，生图前先在本地 `.env` 配置 `KIE_API_KEY`，不要提交 `.env`。

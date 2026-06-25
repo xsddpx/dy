@@ -35,6 +35,19 @@ UNSUPPORTED_TERMS = [
     "结果数",
 ]
 
+REQUIRED_SECTION_LABELS = [
+    "人物",
+    "视频类型",
+    "穿搭",
+    "姿态镜头",
+    "环境",
+    "卖点与锁定",
+    "表情节奏",
+    "整体动画",
+    "背景音乐",
+    "其他",
+]
+
 REFERENCE_TYPES = [
     "舞蹈律动",
     "健身运动",
@@ -68,6 +81,36 @@ INTERNAL_SOURCE_TERMS = [
     "流程节点",
     "身材表达使用艺术化穿搭语言",
     "艺术化穿搭语言：",
+    "视频类型为",
+]
+
+COMPLIANCE_OR_EXPLANATION_TERMS = [
+    "合规",
+    "平台可发布",
+    "审核",
+    "未成年",
+    "裸体",
+    "低俗",
+    "原视频人物身份",
+    "真人脸",
+    "账号标识",
+    "字幕水印",
+    "品牌商标",
+    "专有 IP",
+    "专有IP",
+]
+
+CONDITIONAL_OR_PLACEHOLDER_TERMS = [
+    "若 @图1",
+    "若@图1",
+    "如果 @图1",
+    "如果@图1",
+    "如 @图1",
+    "如@图1",
+    "...",
+    "……",
+    "<",
+    ">",
 ]
 
 NON_MUSIC_SOUND_TERMS = [
@@ -83,7 +126,8 @@ NON_MUSIC_SOUND_TERMS = [
 ]
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
 SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
-VIDEO_TYPE_RE = re.compile(r"视频类型为(?P<main>[^，。；;\s]+)(?:，次类型为(?P<sub>[^，。；;\s]+))?")
+SECTION_RE_TEMPLATE = r"(^|[。！？!?；;\n])\s*({label})："
+VIDEO_TYPE_RE = re.compile(r"视频类型：\s*(?P<main>[^，,。；;\s]+)\s*[；;]\s*次类型：\s*(?P<sub>[^，,。；;\s]+)")
 
 
 def positive_sound_hits(text):
@@ -106,7 +150,7 @@ def positive_sound_hits(text):
 def video_type_finding(text):
     matches = list(VIDEO_TYPE_RE.finditer(text))
     if not matches:
-        return "missing_video_type", "最终 vid prompt 缺少“视频类型为...”类型指令"
+        return "missing_video_type", "最终 vid prompt 缺少“视频类型：...；次类型：...；”类型段"
     invalid = []
     for match in matches:
         main_type = match.group("main")
@@ -117,6 +161,35 @@ def video_type_finding(text):
             invalid.append(f"次类型={sub_type}")
     if invalid:
         return "invalid_video_type", f"最终 vid prompt 含非法参考类型：{', '.join(invalid)}"
+    return None, None
+
+
+def section_finding(text):
+    positions = []
+    missing = []
+    for label in REQUIRED_SECTION_LABELS:
+        match = re.search(SECTION_RE_TEMPLATE.format(label=re.escape(label)), text)
+        if match:
+            positions.append((label, match.start(2)))
+        else:
+            missing.append(label)
+    if missing:
+        return "missing_sections", f"最终 vid prompt 缺少十段标签：{', '.join(missing)}"
+    out_of_order = [
+        REQUIRED_SECTION_LABELS[index]
+        for index in range(1, len(positions))
+        if positions[index][1] < positions[index - 1][1]
+    ]
+    if out_of_order:
+        return "section_order", f"最终 vid prompt 十段标签顺序错误：{', '.join(out_of_order)}"
+    empty = []
+    for index, (label, start) in enumerate(positions):
+        content_start = start + len(label) + 1
+        content_end = positions[index + 1][1] if index + 1 < len(positions) else len(text)
+        if not text[content_start:content_end].strip(" \t\r\n。；;"):
+            empty.append(label)
+    if empty:
+        return "empty_sections", f"最终 vid prompt 段落为空：{', '.join(empty)}"
     return None, None
 
 
@@ -146,6 +219,15 @@ def lint_text(text, path, route="anna", channel="auto"):
     internal_source_hits = [term for term in INTERNAL_SOURCE_TERMS if term in text]
     if internal_source_hits:
         add(findings, "error", "internal_source_terms", f"prompt 含生成工具不可执行的内部来源词：{', '.join(internal_source_hits)}")
+    compliance_hits = [term for term in COMPLIANCE_OR_EXPLANATION_TERMS if term in text]
+    if compliance_hits:
+        add(findings, "error", "compliance_or_explanation_terms", f"prompt 含合规说明、排除清单或平台解释词：{', '.join(compliance_hits)}")
+    conditional_hits = [term for term in CONDITIONAL_OR_PLACEHOLDER_TERMS if term in text]
+    if conditional_hits:
+        add(findings, "error", "conditional_or_placeholder_terms", f"prompt 含条件分支或占位符：{', '.join(conditional_hits)}")
+    section_code, section_message = section_finding(text)
+    if section_code:
+        add(findings, "error", section_code, section_message)
     type_code, type_message = video_type_finding(text)
     if type_code:
         add(findings, "error", type_code, type_message)
