@@ -56,8 +56,8 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
-3. 参考宫格、类型识别、导演结构反推与 grid-prompt 规范记录：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图先完成参考类型识别，再反推可见导演结构、身材卖点校准和参考六锁定结论，并写入 `grid-prompt.txt`；`reference-grid.jpg` 只用于分析与记录，不作为 Dreamina 视频生成输入。
-4. 视频提示词：执行者根据 `anna.png` 的角色身份和 `grid-prompt.txt` 的参考类型、可见导演结构人工重写可直接提交 Dreamina 的 `vid prompt`；prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用，不得出现文件名、流程说明或“吸收/根据某文件”的解释性表达。
+3. 参考宫格、类型识别、导演结构反推与 grid-prompt 规范记录：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图先完成参考类型识别，再写入九段式 `grid-prompt.txt`；`grid-prompt.txt` 是 img/vid prompt 的统一规则库和可复用拼装块，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
+4. 视频提示词：执行者根据 `anna.png` 的角色身份和 `grid-prompt.txt` 的八段式标准块人工整理可直接提交 Dreamina 的 `vid prompt`；prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用，不得出现文件名、流程说明或“吸收/根据某文件”的解释性表达。
 5. 视频生成：只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1` 后提交 Dreamina 视频。
 6. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
 7. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录。
@@ -65,16 +65,16 @@
 ## 显式 slow 模式
 
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
-- `slow` 在模块 01 后执行模块 02：执行者直接查看 `reference-grid.jpg` 或帧图，重点分析穿搭、环境、人物姿态和镜头关系，结合 `anna.png` 的角色身份规则，人工重写 Kie 可直接执行的五段式 `img prompt`；`grid-prompt.txt` 不作为 slow 确认图 img prompt 的来源；Kie Nano Banana Pro 1K 只上传 `anna.png` 作为 `@图1`，每批固定生成 `A-01` 单张确认图。
+- `slow` 在模块 01 后执行模块 02：执行者从九段式 `grid-prompt.txt` 取用 `人物：`、`穿搭：`、`姿态镜头：`、`环境：`、`卖点与锁定：`、`其他：` 六段式标准块，人工整理为 Kie 可直接执行的 `img prompt`；Kie Nano Banana Pro 1K 只上传 `anna.png` 作为 `@图1`，每批固定生成 `A-01` 单张确认图。
 - `slow` 必须在 A-01 确认图生成后硬停，展示确认图、输入来源、img prompt、TNS 收敛记录和是否建议使用；等待用户明确确认后，才能记录 `selected_slot=A-01`、`selected_confirmation_image` 和选择原因，并进入视频生成。
-- `slow` 视频生成综合 `img prompt` 和 `grid-prompt.txt` 的参考类型、可见导演结构重新写成可直接提交 Dreamina 的最终 `vid prompt`，只上传选中确认图作为 `@图1` 后提交 Dreamina 视频。
+- `slow` 视频生成使用同一份 `grid-prompt.txt` 的八段式标准块重新整理可直接提交 Dreamina 的最终 `vid prompt`，只上传选中确认图作为 `@图1` 后提交 Dreamina 视频。
 - 不因 `auto/fast` 失败自动切换到 `slow`，也不因 `slow` 失败自动切回 `auto/fast`。
 - slow 确认图若因 TNS/安全拦截未生成图片，只对 `A-01` 按 `v2-v5` 继续收敛；到 `v5` 仍未生成则停止，不生成第二张、不切换模式、不接入其他路线或兜底工具。
 
 ## 硬阻断
 
 - 参考宫格未通过，不进入提示词或生成。
-- `auto/fast` 缺少 `MATERIAL/fixed-role/anna.png`、`reference-grid-report.json` 通过记录、含参考类型识别的 `grid-prompt.txt` 时，不进入视频生成。
+- `auto/fast` 缺少 `MATERIAL/fixed-role/anna.png`、`reference-grid-report.json` 通过记录、九段式 `grid-prompt.txt` 时，不进入视频生成。
 - `slow` 没有可用确认图或未记录选中确认图，不进入视频生成。
 - 视频生成只允许上传 `@图1` 单图；vid prompt 含第二张图片引用或 Dreamina 命令包含第二个 `--image` 时，不进入提交。
 - 视频或图片生成因 TNS/安全拦截到 `v5` 仍未产出时停止，不发布，不切换 `fast/slow`，并报告 `v1-v5` 失败摘要。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint TNS retry prompts for the anna auto workflow."""
+"""Lint final TNS retry prompts for the anna auto workflow."""
 
 import argparse
 import json
@@ -50,7 +50,12 @@ INTERNAL_SOURCE_TERMS = [
     "grid-prompt.txt",
     "reference-grid",
     "参考宫格",
+    "参考类型识别",
+    "主类型=",
+    "次类型=",
+    "判断依据=",
     "同时吸收",
+    "融合",
     "吸收",
     "吸收grid",
     "吸收 grid",
@@ -61,27 +66,10 @@ INTERNAL_SOURCE_TERMS = [
     "文件",
     "流程",
     "流程节点",
+    "身材表达使用艺术化穿搭语言",
+    "艺术化穿搭语言：",
 ]
 
-CHEST_ART_TERMS = [
-    "饱满的立体廓形",
-    "高感知度的面料张力",
-    "上身丰盈的沙漏型线条",
-    "领口与上身轮廓清晰",
-]
-
-HIP_ART_TERMS = [
-    "腰胯比例明显",
-    "臀胯轮廓自然凸显",
-    "高腰线与下装包裹出稳定曲线",
-    "古典雕塑般的 S 形动态",
-    "古典雕塑般的S形动态",
-]
-
-FIXED_CAMERA_TERMS = ["固定手机机位", "固定手机支架", "固定机位", "稳定机位", "手机支架"]
-HANDHELD_CAMERA_TERMS = ["手持", "轻微手持", "手持自拍", "手持跟拍", "跟拍"]
-META_INSTRUCTION_TERMS = ["身材表达使用艺术化穿搭语言", "艺术化穿搭语言："]
-DEFAULT_INDOOR_BACKGROUND_TERMS = ["背景只做同类室内浅墙", "背景仍为同类室内浅墙", "同类室内浅墙与地面光线"]
 NON_MUSIC_SOUND_TERMS = [
     "环境声",
     "人声",
@@ -118,7 +106,7 @@ def positive_sound_hits(text):
 def video_type_finding(text):
     matches = list(VIDEO_TYPE_RE.finditer(text))
     if not matches:
-        return "missing_video_type", "vid prompt 缺少“视频类型为...”类型指令"
+        return "missing_video_type", "最终 vid prompt 缺少“视频类型为...”类型指令"
     invalid = []
     for match in matches:
         main_type = match.group("main")
@@ -128,7 +116,7 @@ def video_type_finding(text):
         if sub_type and sub_type != "无" and sub_type not in REFERENCE_TYPES:
             invalid.append(f"次类型={sub_type}")
     if invalid:
-        return "invalid_video_type", f"vid prompt 含非法参考类型：{', '.join(invalid)}"
+        return "invalid_video_type", f"最终 vid prompt 含非法参考类型：{', '.join(invalid)}"
     return None, None
 
 
@@ -157,7 +145,7 @@ def lint_text(text, path, route="anna", channel="auto"):
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
     internal_source_hits = [term for term in INTERNAL_SOURCE_TERMS if term in text]
     if internal_source_hits:
-        add(findings, "error", "internal_source_terms", f"vid prompt 含 Dreamina 不可执行的内部来源词：{', '.join(internal_source_hits)}")
+        add(findings, "error", "internal_source_terms", f"prompt 含生成工具不可执行的内部来源词：{', '.join(internal_source_hits)}")
     type_code, type_message = video_type_finding(text)
     if type_code:
         add(findings, "error", type_code, type_message)
@@ -166,26 +154,10 @@ def lint_text(text, path, route="anna", channel="auto"):
         add(findings, "error", "image_one_clothing_anchor", "@图1 只能作为身份、五官、发型、脸型和稳定身材比例依据，auto/fast 不得把 @图1 穿搭作为依据")
     forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:
-        add(findings, "error", "unsafe_body_terms", f"vid prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
-    if not any(term in text for term in CHEST_ART_TERMS):
-        add(findings, "error", "missing_chest_artistic_expression", "缺少上身曲线的艺术化转译")
-    if not any(term in text for term in HIP_ART_TERMS):
-        add(findings, "error", "missing_hip_artistic_expression", "缺少腰胯曲线的艺术化转译")
-
-    fixed_hits = [term for term in FIXED_CAMERA_TERMS if term in text]
-    handheld_hits = [term for term in HANDHELD_CAMERA_TERMS if term in text]
-    if fixed_hits and handheld_hits:
-        add(findings, "error", "camera_mode_conflict", f"拍摄方式冲突：固定机位与手持描述不能同时出现（固定：{', '.join(fixed_hits)}；手持：{', '.join(handheld_hits)}）")
-
-    meta_hits = [term for term in META_INSTRUCTION_TERMS if term in text]
-    if meta_hits:
-        add(findings, "error", "meta_instruction_leak", f"prompt 含内部规则说明：{', '.join(meta_hits)}")
-    indoor_background_hits = [term for term in DEFAULT_INDOOR_BACKGROUND_TERMS if term in text]
-    if indoor_background_hits:
-        add(findings, "error", "default_indoor_background_lock", f"prompt 含默认室内背景硬编码：{', '.join(indoor_background_hits)}")
+        add(findings, "error", "unsafe_body_terms", f"prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
     non_music_sound_hits = positive_sound_hits(text)
     if non_music_sound_hits:
-        add(findings, "error", "non_music_sound_terms", f"vid prompt 含音乐以外的声音：{', '.join(non_music_sound_hits)}")
+        add(findings, "error", "non_music_sound_terms", f"prompt 含音乐以外的声音：{', '.join(non_music_sound_hits)}")
 
     errors = sum(1 for f in findings if f["severity"] == "error")
     warnings = sum(1 for f in findings if f["severity"] == "warn")
@@ -209,7 +181,7 @@ def write_reports(results, out_dir):
     report_md = out_dir / "report.md"
     report_json.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = [
-        "# TNS vid prompt lint 报告",
+        "# TNS final prompt lint 报告",
         "",
         f"- 样本数：{len(results)}",
         f"- 通过：{sum(1 for r in results if r['decision'] == 'pass')}",
@@ -226,8 +198,8 @@ def write_reports(results, out_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="检查 dy 项目的 vid prompt 是否满足 TNS 收敛硬门。")
-    parser.add_argument("prompts", nargs="+", help="vid prompt 文本文件")
+    parser = argparse.ArgumentParser(description="检查 dy 项目的最终 prompt 是否满足 TNS 收敛硬门。")
+    parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")

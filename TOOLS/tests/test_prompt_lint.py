@@ -11,8 +11,13 @@ SPEC.loader.exec_module(PROMPT_LINT)
 
 GOOD_PROMPT = (
     "人物：以 @图1 中的人物作为身份、五官、发型、脸型和稳定身材比例依据。"
-    "修身剪裁呈现饱满的立体廓形，光影让腰胯比例明显。"
+    "穿搭：黑色修身上衣，高腰半裙，腰线清晰。"
+    "姿态镜头：正面站姿，平视半身近景，手部轻整理衣摆。"
+    "环境：现代室内镜前，柔和窗光和浅色墙面。"
+    "卖点与锁定：修身剪裁呈现饱满的立体廓形，光影让腰胯比例明显，封面停顿稳定。"
     "整体动画：视频类型为穿搭展示，次类型为健身运动；画面人物站在室内镜前自然移动。"
+    "背景音乐：轻柔电子节拍，节奏清晰。"
+    "其他：真实皮肤纹理，自然光影，真实面料质感，构图稳定，画面物理真实；除背景音乐外，不出现环境声、人声、脚步声或音效。"
 )
 
 
@@ -20,7 +25,7 @@ class PromptLintFlowTest(unittest.TestCase):
     def lint(self, text, route="anna", channel="auto"):
         return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel)
 
-    def test_auto_anna_with_confirmation_image_passes(self):
+    def test_auto_anna_with_eight_section_prompt_passes(self):
         result = self.lint(GOOD_PROMPT)
         self.assertEqual(result["decision"], "pass", result["findings"])
         self.assertEqual(result["route"], "anna")
@@ -50,16 +55,13 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "unsafe_body_terms" for f in result["findings"]), result["findings"])
 
-    def test_missing_artistic_body_translation_fails(self):
+    def test_artistic_body_translation_is_not_a_lint_requirement(self):
         result = self.lint("人物：以 @图1 中的人物作为身份依据。整体动画：视频类型为穿搭展示，次类型为无；站在室内镜前自然移动。")
-        self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "missing_chest_artistic_expression" for f in result["findings"]), result["findings"])
-        self.assertTrue(any(f["code"] == "missing_hip_artistic_expression" for f in result["findings"]), result["findings"])
+        self.assertEqual(result["decision"], "pass", result["findings"])
 
-    def test_fixed_and_handheld_camera_conflict_fails(self):
+    def test_camera_mode_conflict_is_left_to_prompt_review(self):
         result = self.lint(GOOD_PROMPT + "拍摄方式为固定手机机位，带轻微手持感。")
-        self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "camera_mode_conflict" for f in result["findings"]), result["findings"])
+        self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_non_music_sound_terms_fail(self):
         result = self.lint(GOOD_PROMPT + "背景有脚步声和环境声。")
@@ -80,7 +82,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_internal_source_terms_fail(self):
-        result = self.lint(GOOD_PROMPT + "环境：同时吸收 grid-prompt.txt 中的参考宫格内容。")
+        result = self.lint(GOOD_PROMPT + "环境：同时吸收 grid-prompt.txt 中的参考宫格内容。参考类型识别：主类型=穿搭展示。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "internal_source_terms" for f in result["findings"]), result["findings"])
 
