@@ -67,7 +67,6 @@ img prompt 用于确认图阶段，采用 `人物：`、`穿搭：`、`姿态镜
 ```bash
 python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --slot A-01 --topic TOPIC --prompt-path TEMP/RUN_ID/A-01-img-prompt-v1.txt --out-dir TEMP/RUN_ID/confirm-A-HHMMSS
 python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch A --topic TOPIC --out-dir TEMP/RUN_ID/confirm-A-HHMMSS --entry @TEMP/RUN_ID/confirm-A-HHMMSS/A-01-entry.json
-python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHMMSS/confirmation-manifest.json
 ```
 
 `kie_confirmation_image.py` 为 A-01 生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `nano-banana-pro-1K`。失败时仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
@@ -96,5 +95,5 @@ python3 TOOLS/confirmation_contact_sheet.py --manifest TEMP/RUN_ID/confirm-A-HHM
 - `穿搭：`、`姿态镜头：` 和 `环境：` 均已直接来自宫格或帧图的可见画面分析，未读取或依赖 `grid-prompt.txt`。
 - `A-01` 是本批唯一槽位；如发生 TNS 收敛，已保留 `v1-v5` 版本记录。
 - `confirmation-manifest.json/md` 已生成，且只包含 A-01。
-- A-01 原始确认图已下载到本地，代理图或接触表仅用于展示。
+- A-01 原始确认图已下载到本地；展示时优先使用原始确认图，内部视觉检查如需代理图则仅用于检查，不作为正式产物。
 - 用户明确确认后，`selected_confirmation_image` 指向 Kie 下载到本地的原始确认图。
