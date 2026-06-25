@@ -8,6 +8,7 @@
 
 ## prompt 边界
 
+- vid prompt 的内容规范只看模块 01，本模块不维护十段式标签、类型集合、人物段、穿搭、镜头、动画、音乐或画质写法。
 - `grid-prompt.txt` 是 Dreamina v1 的最终视频 prompt 本体，不是分析记录、规则库或待拼装草稿。
 - 如运行记录需要保留 `vid-prompt-v1.txt`，它必须是 `grid-prompt.txt` 的逐字副本，不得二次整理、增删段落或改写语义。
 - `auto/fast` 视频阶段只上传 `MATERIAL/fixed-role/anna.png`，并在 prompt 中用 `@图1` 指代。
@@ -17,31 +18,7 @@
 - `auto` 就是 `fast`，是默认模式；“快速通道”和“跳过确认图”只是 `fast` 的兼容叫法。
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - Dreamina 视频阶段的图片指代统一使用 `@` 方式，不做脚本转换。
-- 最终 vid prompt 不得出现文件名、来源说明、流程说明、旧参考类型字段、合规说明、平台解释、第二张图片引用或“根据/融合/吸收”等解释性表达。
-
-## vid prompt 格式
-
-最终 vid prompt 必须使用十段式结构：
-
-- `人物：`
-- `视频类型：`
-- `穿搭：`
-- `姿态镜头：`
-- `环境：`
-- `卖点与锁定：`
-- `表情节奏：`
-- `整体动画：`
-- `背景音乐：`
-- `其他：`
-
-- `人物：` 来自模块 01 的固定人物段。`auto/fast` 以 `anna.png` 作为 `@图1` 的身份、五官、发型、脸型和稳定身材比例依据；穿搭、动作、场景来自本次参考分析，不得写“以 @图1 中的穿搭作为依据”或同义表达。`slow` 以选中图作为 `@图1` 的身份、姿态和画面锚点，并与十段式 prompt 保持一致。
-- `视频类型：` 必须写主类型和次类型，主类型、次类型只允许使用模块 01 的类型集合，次类型可写 `无`。
-- 每段冒号后都必须写最终可执行内容，不得保留省略号、尖括号占位、条件分支或模板说明。
-- `穿搭：`、`姿态镜头：`、`环境：`、`卖点与锁定：`、`表情节奏：`、`整体动画：`、`背景音乐：`、`其他：` 直接沿用模块 01 最终文本，不在视频阶段重组。
-- `整体动画：` 必须写清约 5-6 秒连续动作、手部路径、身体重心变化、镜头距离、角度、运镜、节奏点和结尾停顿；`auto/fast` 最终表达必须与 `anna.png` 角色身份不冲突，`slow` 最终表达必须与选中图不冲突。
-- `表情节奏：` 必须承接参考的开场、中段、结尾眼神和脸部状态；微笑允许存在，但应与参考动作和场景匹配，不把“最后微笑停顿”写成固定收尾句式。
-- `背景音乐：` 只写音乐风格、节奏和情绪，不写歌词、对白、口播或任何非音乐声音。
-- `其他：` 只写真实皮肤纹理、自然光影、真实面料质感、穿搭轮廓清晰、腰线可见、构图稳定和画面物理真实。
+- 最终 vid prompt 必须先通过 `prompt_lint.py`；不通过时回到模块 01 重写 `grid-prompt.txt`，不得在视频阶段临时拼接或解释。
 
 ## auto/fast 命令
 
@@ -57,9 +34,8 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 `auto/fast` 必须先完成模块 00 和模块 01，通过参考宫格并写好 `grid-prompt.txt`。提交 Dreamina 前必须确认：
 
 - `MATERIAL/fixed-role/anna.png` 存在，并作为 `@图1` 上传。
-- `TEMP/RUN_ID/grid-prompt.txt` 存在，且已记录十段式最终 vid prompt。
+- `TEMP/RUN_ID/grid-prompt.txt` 存在，且通过 `prompt_lint.py`。
 - 如存在 `TEMP/RUN_ID/vid-prompt-v1.txt`，其内容与 `grid-prompt.txt` 逐字一致。
-- 最终 prompt 不含第二张图片引用、文件名、流程说明、来源说明、合规说明、平台解释或“吸收/根据某文件”的表达。
 - 未上传任何参考图、参考帧或参考宫格图。
 
 ## slow 显式模式
@@ -67,9 +43,8 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。`slow` 必须先完成模块 02 的 Kie 确认图生成与选择。提交 Dreamina 前必须确认：
 
 - `selected_confirmation_image` 指向 Kie 下载到本地的原始确认图，并作为 `@图1` 上传。
-- `TEMP/RUN_ID/grid-prompt.txt` 存在，且已记录十段式最终 vid prompt。
+- `TEMP/RUN_ID/grid-prompt.txt` 存在，且通过 `prompt_lint.py`。
 - 如存在 `TEMP/RUN_ID/vid-prompt-v1.txt`，其内容与 `grid-prompt.txt` 逐字一致。
-- 最终 prompt 已显式写入 `视频类型：` 和 `表情节奏：`，且不含第二张图片引用、文件名、流程说明、确认图阶段解释、合规说明或平台解释。
 - 未上传参考图、参考帧或 `reference-grid.jpg`。
 
 slow 命令示例：
@@ -96,7 +71,6 @@ dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png
 
 - `auto/fast` Dreamina 命令只上传 `MATERIAL/fixed-role/anna.png`；`slow` Dreamina 命令只上传选中图。
 - `auto/fast` Dreamina vid prompt 使用 `@图1` 指代 `anna.png`；`slow` 使用 `@图1` 指代选中图；两种模式都不得把参考宫格写成图片输入。
-- vid prompt 使用 `人物：`、`视频类型：`、`穿搭：`、`姿态镜头：`、`环境：`、`卖点与锁定：`、`表情节奏：`、`整体动画：`、`背景音乐：`、`其他：` 十段式。
-- `视频类型：` 已写合法主类型和次类型，`表情节奏：` 已承接模块 01 的参考表情节奏。
-- vid prompt 不含第二张图片引用，不引入参考图视觉输入语义，不含文件名、流程说明、来源说明、合规说明、平台解释、直白身材词或音乐以外的其他声音。
+- vid prompt 直接来自模块 01 的 `grid-prompt.txt`，`vid-prompt-v1.txt` 如存在则与其逐字一致，并已通过 `prompt_lint.py`。
+- vid prompt 不含第二张图片引用，不引入参考图视觉输入语义。
 - 下载到的 MP4 可解码、竖屏、约 5-6 秒，并整理为 `OUTPUT/RUN_ID.mp4`。
