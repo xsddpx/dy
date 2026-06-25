@@ -10,7 +10,9 @@ SPEC.loader.exec_module(PROMPT_LINT)
 
 
 GOOD_PROMPT = (
-    "人物：以 @图1 中的人物作为身份、五官、发型、脸型和稳定身材比例依据。"
+    "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
+    "以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。"
+    "以 @图1 中的同一位成年女性作为身份、五官、发型、脸型、自然神态和稳定身材比例依据，保持同一人物的一致性。画面中只出现这一位成年女性。"
     "视频类型：穿搭展示；次类型：健身运动；近景穿搭展示结合轻运动互动节奏。"
     "穿搭：黑色修身上衣，高腰半裙，腰线清晰。"
     "姿态镜头：正面站姿，平视半身近景，手部轻整理衣摆。"
@@ -22,16 +24,32 @@ GOOD_PROMPT = (
     "其他：真实皮肤纹理，自然光影，真实面料质感，穿搭轮廓清晰，腰线可见，构图稳定，画面物理真实。"
 )
 
+SLOW_PROMPT = GOOD_PROMPT.replace(
+    "@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
+    "以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。",
+    "",
+)
+
 
 class PromptLintFlowTest(unittest.TestCase):
-    def lint(self, text, route="anna", channel="auto"):
-        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel)
+    def lint(self, text, route="anna", channel="auto", video_mode="fast"):
+        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel, video_mode)
 
     def test_auto_anna_with_ten_section_prompt_passes(self):
         result = self.lint(GOOD_PROMPT)
         self.assertEqual(result["decision"], "pass", result["findings"])
         self.assertEqual(result["route"], "anna")
         self.assertEqual(result["channel"], "auto")
+        self.assertEqual(result["video_mode"], "fast")
+
+    def test_slow_prompt_without_role_card_declaration_passes(self):
+        result = self.lint(SLOW_PROMPT, video_mode="slow")
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_slow_prompt_with_role_card_declaration_fails(self):
+        result = self.lint(GOOD_PROMPT, video_mode="slow")
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(any(f["code"] == "slow_role_card_declaration" for f in result["findings"]), result["findings"])
 
     def test_without_confirmation_image_fails(self):
         result = self.lint("室内镜前自然移动。")
@@ -76,7 +94,9 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_conditional_person_template_fails(self):
         text = GOOD_PROMPT.replace(
-            "人物：以 @图1 中的人物作为身份、五官、发型、脸型和稳定身材比例依据。",
+            "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
+            "以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。"
+            "以 @图1 中的同一位成年女性作为身份、五官、发型、脸型、自然神态和稳定身材比例依据，保持同一人物的一致性。画面中只出现这一位成年女性。",
             "人物：以 @图1 中的人物作为身份依据；若 @图1 是多视角角色参考图，以左下大脸为主要身份依据。",
         )
         result = self.lint(text)
@@ -122,6 +142,11 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_old_reference_analysis_index_fails(self):
         result = self.lint(GOOD_PROMPT + "参考类型识别：主类型=穿搭展示；次类型=健身运动；判断依据=正面站姿。")
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(any(f["code"] == "internal_source_terms" for f in result["findings"]), result["findings"])
+
+    def test_image_one_frame_anchor_fails(self):
+        result = self.lint(GOOD_PROMPT + "人物：以 @图1 中的人物作为身份和画面锚点。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "internal_source_terms" for f in result["findings"]), result["findings"])
 

@@ -79,6 +79,7 @@ INTERNAL_SOURCE_TERMS = [
     "文件",
     "流程",
     "流程节点",
+    "画面锚点",
     "身材表达使用艺术化穿搭语言",
     "艺术化穿搭语言：",
     "视频类型为",
@@ -123,6 +124,11 @@ NON_MUSIC_SOUND_TERMS = [
     "对白",
     "喘息",
     "音效",
+]
+ROLE_CARD_DECLARATION_TERMS = [
+    "多视角、多表情角色参考图",
+    "左下大脸和正面脸",
+    "侧面、背面和表情小图",
 ]
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
 SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
@@ -205,12 +211,14 @@ def image_one_clothing_conflict(text):
     return [pattern for pattern in patterns if pattern in compact]
 
 
-def lint_text(text, path, route="anna", channel="auto"):
+def lint_text(text, path, route="anna", channel="auto", video_mode="fast"):
     findings = []
     if route != "anna":
         add(findings, "error", "unsupported_route", "dy 项目只支持 anna 路线")
     if channel != "auto":
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
+    if video_mode not in {"fast", "slow"}:
+        add(findings, "error", "unsupported_video_mode", "dy 项目只支持 fast 或 slow 视频模式")
     if not re.search(r"@?[^\s，。；;]*确认图|confirmation[-_ ]?image|@图1", text, re.IGNORECASE):
         add(findings, "error", "missing_confirmation_image", "auto/fast 视频 prompt 缺少 @图1 单图身份引用或说明")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
@@ -225,6 +233,9 @@ def lint_text(text, path, route="anna", channel="auto"):
     conditional_hits = [term for term in CONDITIONAL_OR_PLACEHOLDER_TERMS if term in text]
     if conditional_hits:
         add(findings, "error", "conditional_or_placeholder_terms", f"prompt 含条件分支或占位符：{', '.join(conditional_hits)}")
+    role_card_hits = [term for term in ROLE_CARD_DECLARATION_TERMS if term in text]
+    if video_mode == "slow" and role_card_hits:
+        add(findings, "error", "slow_role_card_declaration", f"slow 视频 prompt 使用确认图作为 @图1，人物段不得残留 anna 多视角角色卡声明：{', '.join(role_card_hits)}")
     section_code, section_message = section_finding(text)
     if section_code:
         add(findings, "error", section_code, section_message)
@@ -248,6 +259,7 @@ def lint_text(text, path, route="anna", channel="auto"):
         "path": str(path),
         "route": "anna",
         "channel": "auto",
+        "video_mode": video_mode,
         "bytes": len(text.encode("utf-8")),
         "errors": errors,
         "warnings": warnings,
@@ -269,12 +281,12 @@ def write_reports(results, out_dir):
         f"- 通过：{sum(1 for r in results if r['decision'] == 'pass')}",
         f"- 失败：{sum(1 for r in results if r['decision'] == 'fail')}",
         "",
-        "| 结论 | 路线 | 通道 | 错误数 | 文件 | 主要发现 |",
-        "|---|---|---|---:|---|---|",
+        "| 结论 | 路线 | 通道 | 视频模式 | 错误数 | 文件 | 主要发现 |",
+        "|---|---|---|---|---:|---|---|",
     ]
     for item in results:
         top = "; ".join(f["message"] for f in item["findings"][:4]) or "无"
-        lines.append(f"| {item['decision']} | anna | auto | {item['errors']} | {Path(item['path']).name} | {top} |")
+        lines.append(f"| {item['decision']} | anna | auto | {item.get('video_mode', 'fast')} | {item['errors']} | {Path(item['path']).name} | {top} |")
     report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_json, report_md
 
@@ -284,6 +296,7 @@ def main():
     parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
+    parser.add_argument("--video-mode", choices=["fast", "slow"], default="fast")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")
     args = parser.parse_args()
 
@@ -293,7 +306,7 @@ def main():
         print(json.dumps({"error": "prompt 文件不存在", "missing": missing}, ensure_ascii=False), file=sys.stderr)
         return 2
 
-    results = [lint_text(file.read_text(encoding="utf-8", errors="replace"), file, args.route, args.channel) for file in files]
+    results = [lint_text(file.read_text(encoding="utf-8", errors="replace"), file, args.route, args.channel, args.video_mode) for file in files]
     out_dir = Path(args.out_dir) if args.out_dir else Path.cwd() / "TEMP/prompt-lint-runs" / datetime.now().strftime("%Y%m%d-%H%M%S")
     report_json, report_md = write_reports(results, out_dir)
     print(json.dumps({

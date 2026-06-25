@@ -56,7 +56,7 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 参考选择：没有用户指定参考时，从抖音收藏抽样；进入流程前先做 7 天去重。
-3. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；`grid-prompt.txt` 就是 Dreamina v1 的最终 vid prompt，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
+3. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；`grid-prompt.txt` 是 fast 的 Dreamina v1 最终 vid prompt，也是 slow prompt 的派生来源，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
 4. 视频提示词：执行者根据 `anna.png` 的角色身份和 `grid-prompt.txt` 直接提交 Dreamina；如保留 `vid-prompt-v1.txt`，必须是 `grid-prompt.txt` 的逐字副本。prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用，不得出现文件名、流程说明、合规说明、平台解释或“吸收/根据某文件”的表达。
 5. 视频生成：只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1` 后提交 Dreamina 视频。
 6. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音并设置 `内容由AI生成` 声明。
@@ -67,7 +67,7 @@
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - `slow` 在模块 01 后执行模块 02：执行者从十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段，得到 Kie 可直接执行的 `img prompt`；Kie Nano Banana Pro 1K 只上传 `anna.png` 作为 `@图1`，每批固定生成 `A-01` 单张确认图。
 - `slow` 必须在 A-01 确认图生成后硬停，展示确认图、输入来源、img prompt、TNS 收敛记录和是否建议使用；等待用户明确确认后，才能记录 `selected_slot=A-01`、`selected_confirmation_image` 和选择原因，并进入视频生成。
-- `slow` 视频生成直接使用同一份十段式 `grid-prompt.txt` 作为最终 `vid prompt`，只上传选中确认图作为 `@图1` 后提交 Dreamina 视频。
+- `slow` 视频生成只上传选中确认图作为 `@图1`；最终 `vid prompt` 从十段式 `grid-prompt.txt` 派生，只删除人物段中的 anna 多视角角色卡声明，其他内容保持一致。
 - 不因 `auto/fast` 失败自动切换到 `slow`，也不因 `slow` 失败自动切回 `auto/fast`。
 - slow 确认图若因 TNS/安全拦截未生成图片，只对 `A-01` 按 `v2-v5` 继续收敛；到 `v5` 仍未生成则停止，不生成第二张、不切换模式、不接入其他路线或兜底工具。
 
