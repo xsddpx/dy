@@ -82,7 +82,35 @@
       "source": "https://www.douyin.com/video/7649284559452321403",
       "title": "很好奇呀 #公交车 #窗外 #古的咪",
       "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-26T15:14:57.394050+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": null,
+      "canonical_url": "https://v.douyin.com/W3LGnS-hgR0",
+      "source": "https://v.douyin.com/W3LGnS-hgR0/"
+    },
+    {
+      "recorded_at": "2026-06-26T21:35:12.506957+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7641847114482580325",
+      "canonical_url": "https://www.douyin.com/video/7641847114482580325",
+      "source": "https://www.douyin.com/video/7641847114482580325",
+      "title": "20260627-0530-favorite-764184-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-26T21:57:37.863170+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7641847114482580325",
+      "canonical_url": "https://www.douyin.com/video/7641847114482580325",
+      "source": "https://www.douyin.com/video/7641847114482580325",
+      "title": "20260627-0530-favorite-764184-fast",
+      "author": "favorite_collection"
     }
   ],
-  "updated_at": "2026-06-26T11:56:07.034310+00:00"
+  "updated_at": "2026-06-26T21:57:37.863743+00:00"
 }
