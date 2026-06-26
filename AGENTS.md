@@ -12,6 +12,8 @@
 - 只保留 `anna` 单人路线；默认模式为 `auto/fast`。
 - 显式 `slow` 用于 Kie 确认图流程。
 - `auto` 就是 `fast`，表示：参考抽帧 -> grid prompt -> 直接用 `anna.png` 单图提交 Dreamina -> 抖音发布 -> 记录收尾；不执行中间生图和选择节点。
+- 默认每次执行前必须检查 `MATERIAL/anna-weekly-itinerary.json`；缺失、无效、未开始或过期时，必须先生成今天起连续 7 天的国内真实城市行程并保存为 active，无需用户确认。
+- 行程资产和参考选择细节以 `DOCS/MODULES/MODULE_01_REFERENCE.md` 为准；行程地点只是当天主题大方向，不是具体参考地点或 prompt 环境的硬锁。
 - `fast` 兼容触发词包括“快速通道”“跳过确认图”；这些都等同于 `auto/fast`，不再表示单独分支。
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用，表示：参考抽帧 -> 提示词 -> Kie Nano Banana Pro 1K 单张确认图 -> 确认图硬停确认 -> Dreamina 单图视频生成 -> 抖音发布 -> 记录收尾。
 - 项目的关键节点按模式区分：`fast` 只有视频生成之后的视频确认关键节点；`slow` 包含确认图生成后确认和视频生成后确认两个关键节点。用户说“关键节点”时，不得自行扩展到参考选择、提示词、发布前等其他流程节点。
@@ -30,7 +32,7 @@
 ## 文档边界
 
 - `DOCS/PROJECT.md` 是核心事实库，记录项目目标、资产、工具和长期边界。
-- img/vid prompt 的统一内容规范集中在 `DOCS/MODULES/MODULE_01_REFERENCE.md`；`auto/fast` 和 `slow` 的视频生成单图输入与提交边界集中在 `DOCS/MODULES/MODULE_03_DREAMINA_VIDEO.md`。
+- 行程资产、参考选择和 img/vid prompt 的统一内容规范集中在 `DOCS/MODULES/MODULE_01_REFERENCE.md`；`auto/fast` 和 `slow` 的视频生成单图输入与提交边界集中在 `DOCS/MODULES/MODULE_03_DREAMINA_VIDEO.md`。
 - 修改核心事实或提示词规则前必须先说明拟修改内容和原因；用户明确要求修改时，本次授权仅限其明确范围。
 
 ## 本地提示

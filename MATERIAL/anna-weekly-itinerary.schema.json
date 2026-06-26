@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-06-26T09:00:00+08:00",
+  "valid_from": "2026-06-26",
+  "valid_to": "2026-07-02",
+  "status": "active",
+  "days": [
+    {
+      "date": "2026-06-26",
+      "city": "城市名",
+      "location": "具体地点",
+      "season_weather_basis": "季节和天气依据",
+      "time_slot": "拍摄时间段",
+      "activity": "当天行程活动",
+      "shoot_scene": "可拍场景",
+      "outfit_direction": "穿搭方向",
+      "reference_keywords": ["参考主题关键词"],
+      "extended_scene_options": ["酒店", "机场", "游泳馆", "网球馆", "商场", "酒吧", "夜店"]
+    }
+  ]
+}
