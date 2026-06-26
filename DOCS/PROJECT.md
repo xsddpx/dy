@@ -19,7 +19,7 @@
 - 视觉卖点：夸张成熟身材、巨大胸部视觉体量、成熟曲线、修身穿搭、清晰腰线、上身辨识度。
 - 风格调性：纯欲反差、擦边吸引力、轻熟性感、克制诱惑感、活泼互动感与生活化动作。
 - 表情策略：参考优先，表情随动作、镜头距离和场景自然变化；微笑允许存在，但不得作为每条视频的默认模板或固定结尾。
-- 选题策略：Anna 是喜欢旅游、喜欢展示成熟身材线条的成年女性；每次日更先按今天起连续 7 天规划国内真实城市行程，按日期、季节、天气、城市片区、时间段、当天活动和旅行状态决定主题大方向。行程地点不是参考搜索或 prompt 场景的硬锁，具体画面可延展到酒店、机场、游泳馆、网球馆、商场、酒吧、夜店等与当天行程合理相关的场景。
+- 选题策略：Anna 是喜欢旅游、喜欢展示成熟身材线条的成年女性；默认复用当前 active 一周行程资产，按当天日期、季节、天气、城市片区、时间段、当天活动和旅行状态决定主题大方向。只有当天日期超出当前行程日期窗口，或行程资产缺失、无效、未开始时，才按今天起连续 7 天重新规划国内真实城市行程。行程地点不是参考搜索或 prompt 场景的硬锁，具体画面可延展到酒店、机场、游泳馆、网球馆、商场、酒吧、夜店等与当天行程合理相关的场景。
 - 合规要求：内部聚焦增长卖点；prompt 只写可见画面、动作和镜头语言，不写合规说明；发布文案必须保持平台可发布表达。严禁生成低俗、裸体及未成年感内容。
 
 ## 内容边界
@@ -34,7 +34,7 @@
 
 - 固定角色图：`MATERIAL/fixed-role/anna.png`，这是一张同一位成年女性的多视角、多表情角色参考图。
 - 参考去重账本：`MATERIAL/reference-history.json`
-- 一周行程资产：`MATERIAL/anna-weekly-itinerary.md` 和 `MATERIAL/anna-weekly-itinerary.json`；行程从运行当天起连续 7 天，生成后直接保存为 `status=active` 并用于当天任务，无需用户确认。
+- 一周行程资产：`MATERIAL/anna-weekly-itinerary.md` 和 `MATERIAL/anna-weekly-itinerary.json`；当前日期在 `valid_from` 到 `valid_to` 窗口内时持续复用，只有不可用或日期超出窗口时才从运行当天起重新生成连续 7 天行程，生成后直接保存为 `status=active` 并用于当天任务，无需用户确认。
 
 ## 本地环境
 
@@ -57,7 +57,7 @@
 ## 默认 auto/fast 流程
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
-2. 行程检查：运行 `python3 TOOLS/anna_itinerary.py` 检查 `MATERIAL/anna-weekly-itinerary.json`；缺失、无效、未开始或已超过 `valid_to` 时，按今天起连续 7 天重新规划国内真实城市行程，直接保存到 `MATERIAL/` 后继续。
+2. 行程窗口：读取当前 active 的 `MATERIAL/anna-weekly-itinerary.json` 并按当天日期匹配行程；资产缺失、无效、当天日期早于 `valid_from` 或已超过 `valid_to` 时，才按今天起连续 7 天重新规划国内真实城市行程，直接保存到 `MATERIAL/` 后继续。
 3. 参考选择：按当天行程大方向选择参考；用户指定参考优先，其次从抖音收藏中找匹配当天日期、季节、城市片区、旅行状态或活动氛围的参考；收藏没有合适主题时，才从抖音热门中挑选匹配参考。参考地点不必完全等同行程地点，只要能解释为当天行程附近、途中或延展活动；进入流程前先做 7 天去重。
 4. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；`grid-prompt.txt` 是 fast 的 Dreamina v1 最终 vid prompt，也是 slow prompt 的派生来源，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
 5. 视频提示词：执行者根据 `anna.png` 的角色身份和 `grid-prompt.txt` 直接提交 Dreamina；如保留 `vid-prompt-v1.txt`，必须是 `grid-prompt.txt` 的逐字副本。prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用，不得出现文件名、流程说明、合规说明、平台解释或“吸收/根据某文件”的表达。
@@ -78,7 +78,7 @@
 ## 硬阻断
 
 - 参考宫格未通过，不进入提示词或生成。
-- 一周行程资产缺失、无效、未开始或已超过 `valid_to` 时，不进入参考选择、提示词、生成或发布；必须先重新生成今天起连续 7 天行程并保存为 active。
+- 一周行程资产缺失、无效、当天日期早于 `valid_from` 或已超过 `valid_to` 时，不进入参考选择、提示词、生成或发布；必须先重新生成今天起连续 7 天行程并保存为 active。当天日期仍在当前 active 行程窗口内时，不重新规划。
 - `auto/fast` 缺少 `MATERIAL/fixed-role/anna.png`、`reference-grid-report.json` 通过记录、十段式 `grid-prompt.txt` 时，不进入视频生成。
 - `slow` 没有可用确认图或未记录选中确认图，不进入视频生成。
 - 视频生成只允许上传 `@图1` 单图；vid prompt 含第二张图片引用或 Dreamina 命令包含第二个 `--image` 时，不进入提交。
