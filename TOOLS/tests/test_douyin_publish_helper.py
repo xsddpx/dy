@@ -2,7 +2,9 @@
 import importlib.util
 import io
 import os
+import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest import mock
 
@@ -60,6 +62,42 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertTrue(MODULE.description_contains_tags("今天很好看 #纯欲 #穿搭", ["纯欲", "穿搭"]))
         self.assertFalse(MODULE.description_contains_tags("今天很好看 #纯欲", ["纯欲", "穿搭"]))
 
+    def test_compact_location_query_dedupes_blank_parts(self):
+        self.assertEqual(MODULE.compact_location_query("上海", " 武康路  与  安福路街区 ", "上海"), "上海 武康路 与 安福路街区")
+
+    def test_infer_location_query_prefers_cli_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = MODULE.infer_location_query(Path(tmp), "上海 外滩")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["query"], "上海 外滩")
+        self.assertEqual(result["source"], "cli")
+
+    def test_infer_location_query_reads_today_itinerary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "MATERIAL"
+            path.mkdir()
+            (path / "anna-weekly-itinerary.json").write_text(
+                """
+{
+  "status": "active",
+  "days": [
+    {
+      "date": "2026-06-27",
+      "city": "上海",
+      "location": "武康路与安福路街区",
+      "activity": "咖啡街拍"
+    }
+  ]
+}
+""".strip(),
+                encoding="utf-8",
+            )
+            result = MODULE.infer_location_query(root, today=date(2026, 6, 27))
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["query"], "上海 武康路与安福路街区")
+        self.assertEqual(result["source"], "itinerary")
+
     def test_normalize_cover_frame_aliases(self):
         self.assertEqual(MODULE.normalize_cover_frame(None), "recommended")
         self.assertEqual(MODULE.normalize_cover_frame("recommend"), "recommended")
@@ -91,6 +129,7 @@ class DouyinPublishHelperTest(unittest.TestCase):
                 MODULE.main()
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("--no-publish", stdout.getvalue())
+        self.assertIn("--location", stdout.getvalue())
         self.assertIn("--ai-cover-recommendation-timeout", stdout.getvalue())
 
     def test_resolve_cdp_url_prefers_cli_value(self):

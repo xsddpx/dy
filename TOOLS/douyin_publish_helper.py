@@ -17,7 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,7 @@ from run_record import append_artifact, append_event, refresh_markdown
 
 
 DEFAULT_UPLOAD_URL = "https://creator.douyin.com/creator-micro/content/upload"
+DEFAULT_ITINERARY_PATH = Path("MATERIAL/anna-weekly-itinerary.json")
 HARD_ASSISTANT_WORDS = ("违规", "禁止发布", "无法发布", "发布失败", "审核不通过", "请修改后发布")
 SOFT_ASSISTANT_WORDS = ("建议", "可优化", "推荐", "提示", "风险提醒")
 AI_DECLARATION_WORDS = ("内容由AI生成", "AI生成", "人工智能生成", "AIGC")
@@ -1887,6 +1888,7 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
         f"- AI智能推荐封面：{report.get('steps', {}).get('ai_cover_recommendation', {}).get('status')}",
         f"- 应用AI智能封面：{report.get('steps', {}).get('ai_cover_apply', {}).get('status')}",
         f"- 文案：{report.get('steps', {}).get('copywriting', {}).get('status')}",
+        f"- 位置：{report.get('steps', {}).get('location', {}).get('status')}",
         f"- 自主声明：{report.get('steps', {}).get('declaration', {}).get('status')}",
         f"- 发文助手：{report.get('steps', {}).get('assistant', {}).get('status')}",
         f"- 发布：{report.get('steps', {}).get('publish', {}).get('status')}",
@@ -1911,6 +1913,7 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
                 "video": report.get("video"),
                 "title": report.get("title"),
                 "tags": report.get("tags"),
+                "location": report.get("location"),
                 "final_url": report.get("final_url"),
                 "report_json": str(report_json),
                 "errors": report.get("errors", []),
@@ -1956,6 +1959,229 @@ def description_contains_tags(description: str, tags: list[str]) -> bool:
     return all(f"#{tag}" in compact or tag in compact for tag in tags)
 
 
+def compact_location_query(*parts: str | None) -> str:
+    seen: set[str] = set()
+    values: list[str] = []
+    for part in parts:
+        value = " ".join(str(part or "").split())
+        if not value or value in seen:
+            continue
+        values.append(value)
+        seen.add(value)
+    return " ".join(values).strip()
+
+
+def infer_location_query(root: Path, explicit: str | None = None, today: date | None = None) -> dict[str, Any]:
+    explicit_value = compact_location_query(explicit)
+    if explicit_value:
+        return {"ok": True, "query": explicit_value, "source": "cli"}
+
+    itinerary_path = root / DEFAULT_ITINERARY_PATH
+    if not itinerary_path.exists():
+        return {"ok": False, "query": "", "source": "itinerary", "reason": f"行程文件不存在：{itinerary_path}"}
+
+    try:
+        data = json.loads(itinerary_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"ok": False, "query": "", "source": "itinerary", "reason": f"行程文件读取失败：{exc}"}
+
+    target_date = (today or date.today()).isoformat()
+    day = next((item for item in data.get("days", []) if item.get("date") == target_date), None)
+    if not isinstance(day, dict):
+        return {"ok": False, "query": "", "source": "itinerary", "reason": f"行程中没有当天日期：{target_date}"}
+
+    query = compact_location_query(day.get("city"), day.get("location"))
+    if not query:
+        query = compact_location_query(day.get("city"), day.get("activity"), day.get("shoot_scene"))
+    return {
+        "ok": bool(query),
+        "query": query,
+        "source": "itinerary",
+        "date": target_date,
+        "city": day.get("city"),
+        "location": day.get("location"),
+        "activity": day.get("activity"),
+        "reason": "" if query else "当天行程缺少可用城市或地点",
+    }
+
+
+def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: int = 15) -> dict[str, Any]:
+    query = compact_location_query(query)
+    if not query:
+        return {"ok": False, "status": "skipped", "reason": "位置查询词为空"}
+    if not cdp_url:
+        return {"ok": False, "status": "skipped", "reason": "未配置 CDP，无法选择地理位置", "query": query}
+    import_error = playwright_import_error()
+    if import_error:
+        return {"ok": False, "status": "skipped", "reason": f"Python Playwright 不可用：{import_error}", "query": query}
+
+    from playwright.sync_api import sync_playwright
+
+    timeout_ms = max(5, timeout_sec) * 1000
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_ms)
+        pages = [page for context in browser.contexts for page in context.pages]
+        page = next((item for item in pages if is_video_publish_page(item.url)), None)
+        if page is None:
+            return {"ok": False, "status": "skipped", "reason": "没有找到抖音发布表单页", "query": query}
+        page.bring_to_front()
+
+        body_text = page.locator("body").inner_text(timeout=5000)
+        if not any(word in body_text for word in ("地理位置", "输入地理位置", "位置")):
+            return {
+                "ok": False,
+                "status": "skipped",
+                "reason": "页面未显示位置输入控件",
+                "query": query,
+                "text_sample": " ".join(body_text.split())[:800],
+            }
+
+        field_result = page.evaluate(
+            r'''
+() => {
+  function visible(el) {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 2 && r.height > 2;
+  }
+  function text(el) {
+    return [
+      el.innerText,
+      el.textContent,
+      el.value,
+      el.placeholder,
+      el.getAttribute('aria-label'),
+      el.getAttribute('title'),
+      el.getAttribute('data-placeholder')
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  }
+  const preferred = Array.from(document.querySelectorAll(
+      '#douyin_creator_pc_anchor_jump .semi-select, .anchor-component-Shp3mT .semi-select, .anchor-item-UTleEn .semi-select'
+    ))
+    .filter(visible)
+    .map((el) => ({el, t: text(el), r: el.getBoundingClientRect()}))
+    .filter((item) => /输入地理位置|地理位置/.test(item.t))
+    .sort((a, b) => (a.r.width * a.r.height) - (b.r.width * b.r.height));
+  let target = preferred[0];
+  if (!target) {
+    const fields = Array.from(document.querySelectorAll('input, textarea, [role=textbox], [role=combobox]'))
+      .filter(visible)
+      .map((el) => ({el, t: text(el), r: el.getBoundingClientRect()}))
+      .filter((item) => /地理位置|输入地理位置/.test(item.t))
+      .sort((a, b) => (a.r.top - b.r.top) || (a.r.left - b.r.left));
+    target = fields[0];
+  }
+  if (!target) {
+    const labels = Array.from(document.querySelectorAll('button, div, span, label'))
+      .filter(visible)
+      .map((el) => ({el, t: text(el), r: el.getBoundingClientRect()}))
+      .filter((item) => /输入地理位置|地理位置|^位置$/.test(item.t))
+      .filter((item) => item.r.width < 700 && item.r.height < 140)
+      .sort((a, b) => (a.r.top - b.r.top) || (a.r.left - b.r.left));
+    target = labels[0];
+  }
+  if (!target) return {ok: false, reason: '没有找到位置输入框或入口'};
+  target.el.scrollIntoView({block: 'center'});
+  const r = target.r;
+  return {ok: true, x: r.left + r.width / 2, y: r.top + r.height / 2, text: target.t.slice(0, 200)};
+}
+'''
+        )
+        if not field_result.get("ok"):
+            return {"ok": False, "status": "skipped", "query": query, **field_result}
+
+        raw_tokens = [token for token in query.replace("与", " ").replace("和", " ").split() if token]
+        attempts = [query]
+        ordered_tokens = raw_tokens[1:] + raw_tokens[:1]
+        for value in ordered_tokens:
+            if value not in attempts:
+                attempts.append(value)
+
+        page.mouse.click(field_result["x"], field_result["y"])
+        page.wait_for_timeout(400)
+        last_selection: dict[str, Any] = {}
+        last_snapshot = ""
+        last_anchor_snapshot = ""
+        last_attempt = ""
+
+        for attempt in attempts[:3]:
+            last_attempt = attempt
+            page.keyboard.press("Meta+A")
+            page.keyboard.type(attempt, delay=35)
+            page.wait_for_timeout(2500)
+
+            tokens = [token for token in attempt.replace("与", " ").replace("和", " ").split() if token]
+            selection = page.evaluate(
+                r'''
+(tokens) => {
+  function visible(el) {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 2 && r.height > 2;
+  }
+  function text(el) {
+    return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  const root = document.querySelector('.semi-popover') || document;
+  const candidates = Array.from(root.querySelectorAll('[role=option], .semi-select-option'))
+    .filter(visible)
+    .map((el) => ({el, t: text(el), r: el.getBoundingClientRect()}))
+    .filter((item) => item.t && item.t.length <= 180)
+    .filter((item) => item.r.top >= 0 && item.r.width >= 28 && item.r.width <= 900 && item.r.height >= 18 && item.r.height <= 80)
+    .filter((item) => tokens.some((token) => item.t.includes(token)))
+    .filter((item) => !/作品描述|发布设置|自主声明|添加标签|关联热点|发文助手|未搜索到相关位置/.test(item.t))
+    .sort((a, b) => (a.r.width * a.r.height) - (b.r.width * b.r.height) || (a.r.top - b.r.top) || (a.r.left - b.r.left));
+  const target = candidates[0];
+  if (!target) return {ok: false, reason: '没有找到匹配的位置建议'};
+  const r = target.r;
+  return {ok: true, x: r.left + r.width / 2, y: r.top + r.height / 2, text: target.t.slice(0, 180), count: candidates.length};
+}
+''',
+                tokens or [attempt],
+            )
+            last_selection = selection
+            if selection.get("ok"):
+                page.mouse.click(selection["x"], selection["y"])
+                page.wait_for_timeout(1000)
+            else:
+                page.wait_for_timeout(300)
+
+            last_snapshot = page.locator("body").inner_text(timeout=5000)
+            last_anchor_snapshot = page.evaluate(
+                r'''
+() => {
+  const el = document.querySelector('#douyin_creator_pc_anchor_jump');
+  return el ? (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+}
+'''
+            )
+            verified = bool(last_anchor_snapshot and "输入地理位置" not in last_anchor_snapshot and any(token in last_anchor_snapshot for token in tokens))
+            if verified:
+                return {
+                    "ok": True,
+                    "status": "set",
+                    "query": query,
+                    "attempt": attempt,
+                    "field": field_result,
+                    "selection": selection,
+                    "verified": True,
+                    "anchor_text": last_anchor_snapshot,
+                    "text_sample": " ".join(last_snapshot.split())[:1000],
+                }
+
+        return {
+            "ok": False,
+            "status": "attempted",
+            "query": query,
+            "attempt": last_attempt,
+            "field": field_result,
+            "selection": last_selection,
+            "verified": False,
+            "anchor_text": last_anchor_snapshot,
+            "text_sample": " ".join(last_snapshot.split())[:1000],
+        }
+
+
 def build_base_report(args: argparse.Namespace, video: Path, tags: list[str], warnings: list[str]) -> dict[str, Any]:
     return {
         "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -1965,6 +2191,7 @@ def build_base_report(args: argparse.Namespace, video: Path, tags: list[str], wa
         "title": args.title,
         "description": args.description,
         "tags": tags,
+        "location": getattr(args, "location", None),
         "upload_url": args.upload_url,
         "final_url": None,
         "steps": {
@@ -1973,6 +2200,7 @@ def build_base_report(args: argparse.Namespace, video: Path, tags: list[str], wa
             "ai_cover_recommendation": {"status": "pending"},
             "ai_cover_apply": {"status": "pending"},
             "copywriting": {"status": "pending"},
+            "location": {"status": "pending"},
             "declaration": {"status": "pending", "blocking": False},
             "assistant": {"status": "pending"},
             "publish": {"status": "pending"},
@@ -1998,6 +2226,8 @@ def main() -> int:
     parser.add_argument("--title", required=True, help="作品标题")
     parser.add_argument("--description", default="", help="作品简介")
     parser.add_argument("--tag", action="append", default=[], help="标签，可重复传入 4-5 个")
+    parser.add_argument("--location", default=None, help="发布位置查询词；不传则按当天行程城市和地点自动推导")
+    parser.add_argument("--no-location", action="store_true", help="跳过发布位置选择")
     parser.add_argument("--out-dir", default=None, help="报告输出目录，默认 TEMP/publish-runs/YYYYMMDD-HHMMSS")
     parser.add_argument("--upload-url", default=DEFAULT_UPLOAD_URL, help="抖音创作者中心上传页")
     parser.add_argument("--current-tab", action="store_true", help="接管当前已上传完成的发布表单，不重新打开上传页")
@@ -2018,6 +2248,7 @@ def main() -> int:
     parser.add_argument("--upload-timeout", type=int, default=300, help="等待上传/表单出现的秒数")
     parser.add_argument("--publish-timeout", type=int, default=90, help="点击发布后等待结果的秒数")
     parser.add_argument("--declaration-timeout", type=int, default=20, help="自主声明尝试秒数；失败会阻断发布")
+    parser.add_argument("--location-timeout", type=int, default=15, help="位置选择尝试秒数；失败不阻断发布")
     parser.add_argument(
         "--cover-frame",
         choices=["recommended", "middle", "ai-recommended", "none"],
@@ -2154,15 +2385,42 @@ return {
         else:
             report["warnings"].append(f"标签填写失败：{tag_result.get('reason')}")
 
+    if args.no_location:
+        report["steps"]["location"].update({"status": "skipped", "reason": "命令行指定 --no-location"})
+    else:
+        location_plan = infer_location_query(root, args.location)
+        report["location"] = location_plan
+        if not location_plan.get("ok"):
+            report["steps"]["location"].update({"status": "skipped", **location_plan})
+            report["warnings"].append(f"位置查询词推导失败：{location_plan.get('reason')}")
+        else:
+            try:
+                location_result = set_location_via_playwright(DOM_CDP_URL, location_plan["query"], args.location_timeout)
+            except Exception as exc:
+                location_result = {
+                    "ok": False,
+                    "status": "failed",
+                    "query": location_plan["query"],
+                    "reason": str(exc),
+                }
+            report["steps"]["location"].update(location_result)
+            if location_result.get("status") != "set":
+                report["warnings"].append(f"位置未设置：{location_result.get('reason') or location_result.get('status')}")
+
     declaration = try_set_ai_declaration(args.declaration_timeout)
     report["steps"]["declaration"].update(declaration)
     if declaration.get("status") != "set":
         return fail(report, out_dir, "自主声明未成功设置为内容由AI生成，按项目规则阻断发布", 6)
 
-    ai_cover = wait_for_ai_cover_recommendation(args.ai_cover_recommendation_timeout)
+    try:
+        ai_cover = wait_for_ai_cover_recommendation(args.ai_cover_recommendation_timeout)
+    except Exception as exc:
+        ai_cover = {"status": "failed", "reason": str(exc)}
     report["steps"]["ai_cover_recommendation"].update(ai_cover)
     if ai_cover.get("status") == "timeout":
         report["warnings"].append("Ai智能推荐封面等待超时；继续执行后续发布设置")
+    elif ai_cover.get("status") == "failed":
+        report["warnings"].append(f"Ai智能推荐封面检查失败；继续执行后续发布设置：{ai_cover.get('reason')}")
     elif ai_cover.get("status") in {"ready", "empty", "done"}:
         ai_cover_apply = apply_ai_cover_recommendation(DOM_CDP_URL, args.cover_timeout)
         report["steps"]["ai_cover_apply"].update(ai_cover_apply)

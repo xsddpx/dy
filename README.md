@@ -11,9 +11,8 @@
 5. `grid-prompt.txt` 直接作为 fast 的 Dreamina v1 最终 vid prompt；slow 视频只删除人物段中的 anna 多视角角色卡声明。
 6. Dreamina `multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png` 生成 5-6 秒竖屏视频。
 7. 下载并质检 MP4。
-8. 上传抖音，设置 `内容由AI生成` 声明并发布。
+8. 上传抖音，按当天行程大方向尽量选择差不多匹配的位置，设置 `内容由AI生成` 声明并发布。
 9. 记录产物、去重账本和发布状态。
-10. 用户要求复盘或累计足够新样本时，按 `DOCS/MODULES/MODULE_06_OPERATION_REVIEW.md` 读取作品表现并更新阶段性内容方向。
 
 ## 边界
 
@@ -21,8 +20,6 @@
 显式 `slow` 模式用于中间生图流程，不接入其他生成路线、角色或兜底工具。
 
 CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
-
-运营复盘不是发布硬节点；它只用于根据真实播放、互动、留存和粉丝数据校准下一阶段选题。
 
 ## 入口
 

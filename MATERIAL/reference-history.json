@@ -110,7 +110,25 @@
       "source": "https://www.douyin.com/video/7641847114482580325",
       "title": "20260627-0530-favorite-764184-fast",
       "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-27T02:41:13.141837+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7643456195617772608",
+      "canonical_url": "https://www.douyin.com/video/7643456195617772608",
+      "source": "https://www.douyin.com/video/7643456195617772608",
+      "title": "20260627-1035-favorite-764345-fast"
+    },
+    {
+      "recorded_at": "2026-06-27T02:46:15.988978+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7643456195617772608",
+      "canonical_url": "https://www.douyin.com/video/7643456195617772608",
+      "source": "https://www.douyin.com/video/7643456195617772608",
+      "title": "20260627-1035-favorite-764345-fast"
     }
   ],
-  "updated_at": "2026-06-26T21:57:37.863743+00:00"
+  "updated_at": "2026-06-27T02:46:15.989594+00:00"
 }

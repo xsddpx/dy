@@ -5,6 +5,7 @@
 - 上传 `OUTPUT/RUN_ID.mp4`。
 - 设置 `自主声明 -> 内容由AI生成`。
 - 填写标题、简介和标签。
+- 按当天行程大方向尽量添加发布位置。
 - 点击发布按钮并记录结果。
 
 ## 前置条件
@@ -33,6 +34,7 @@ sudo -H -u xsddpx python3 TOOLS/douyin_publish_helper.py OUTPUT/RUN_ID.mp4 \
   --tag "标签2" \
   --tag "标签3" \
   --tag "标签4" \
+  --location "上海 武康路与安福路街区" \
   --cdp-url http://127.0.0.1:9222 \
   --out-dir TEMP/RUN_ID/logs/publish \
   --record-jsonl TEMP/RUN_ID/RUN_ID-run-record.jsonl
@@ -41,6 +43,8 @@ sudo -H -u xsddpx python3 TOOLS/douyin_publish_helper.py OUTPUT/RUN_ID.mp4 \
 要求：
 
 - `--title` 必填；标签使用 tag 池随机抽取结果，建议 4-5 个。
+- 默认自动读取 `MATERIAL/anna-weekly-itinerary.json` 的当天 `city` 和 `location`，作为发布位置查询词；如果本次内容大方向更具体，可显式传入 `--location "城市 大概地点"` 覆盖。
+- 位置只需按当天行程大方向选择差不多匹配的 POI；页面未显示位置控件、搜索无结果或控件被平台动态替换时，记录 warning 后继续，不作为发布硬阻断。
 - 默认使用 `--upload-mode cdp`，不主动改用 `auto`、`dialog` 或 `--current-tab`。
 - 报告固定写入 `TEMP/RUN_ID/logs/publish/douyin-publish-report.json` 和 `.md`。
 
@@ -48,4 +52,4 @@ sudo -H -u xsddpx python3 TOOLS/douyin_publish_helper.py OUTPUT/RUN_ID.mp4 \
 
 - 点击发布按钮成功即判定本模块发布成功。
 - 发布后无需核对创作者中心内容列表。
-- 除发布按钮无法点击或 helper 无法完成点击外，本模块不设置其他阻断。
+- 除 `内容由AI生成` 声明失败、发布按钮无法点击或 helper 无法完成点击外，本模块不设置其他阻断。
