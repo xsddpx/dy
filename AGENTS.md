@@ -11,7 +11,7 @@
 - 本项目路径固定为 `/Users/Shared/codex/dy`。
 - 只保留 `anna` 单人路线；默认模式为 `auto/fast`。
 - 显式 `slow` 用于 Kie 确认图流程。
-- `auto` 就是 `fast`，表示：参考抽帧 -> grid prompt -> 直接用 `anna.png` 单图提交 Dreamina -> 抖音发布（按当天行程大方向尽量选择差不多匹配的位置）-> 记录收尾；不执行中间生图和选择节点。
+- `auto` 就是 `fast`，表示：参考抽帧 -> grid prompt -> 直接用 `anna.png` 单图提交 Dreamina -> 抖音发布 -> 记录收尾；不执行中间生图和选择节点。
 - 默认复用当前 active 的 `MATERIAL/anna-weekly-itinerary.json`；只有资产缺失、无效、当天日期早于 `valid_from` 或已超过 `valid_to` 时，才重新生成今天起连续 7 天的国内真实城市行程并保存为 active，无需用户确认。
 - 行程资产和参考选择细节以 `DOCS/MODULES/MODULE_01_REFERENCE.md` 为准；行程地点只是当天主题大方向，不是具体参考地点或 prompt 环境的硬锁。
 - `fast` 兼容触发词包括“快速通道”“跳过确认图”；这些都等同于 `auto/fast`，不再表示单独分支。

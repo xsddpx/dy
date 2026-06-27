@@ -11,7 +11,7 @@
 5. `grid-prompt.txt` 直接作为 fast 的 Dreamina v1 最终 vid prompt；slow 视频只删除人物段中的 anna 多视角角色卡声明。
 6. Dreamina `multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png` 生成 5-6 秒竖屏视频。
 7. 下载并质检 MP4。
-8. 上传抖音，按当天行程大方向尽量选择差不多匹配的位置，设置 `内容由AI生成` 声明并发布。
+8. 上传抖音，设置 `内容由AI生成` 声明并发布。
 9. 记录产物、去重账本和发布状态。
 
 ## 边界

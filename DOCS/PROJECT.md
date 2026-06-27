@@ -9,7 +9,7 @@
 - 显式模式：`slow`，用于 Kie 确认图流程。
 - 视频规格：9:16、720p、5-6 秒。
 - 生成工具：Dreamina CLI 负责视频；Kie API 仅在显式 `slow` 模式负责确认图。
-- 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`，并按当天行程大方向尽量选择差不多匹配的发布位置。
+- 发布渠道：抖音创作者中心，发布前必须设置 `自主声明 -> 内容由AI生成`。
 
 ## 核心卖点与方向
 
@@ -64,7 +64,7 @@
 - `DOCS/`：流程和规则。
 - `TOOLS/`：自动化脚本。
 - `MATERIAL/`：固定角色素材、去重账本和当前 active 一周行程资产。
-- `DOCS/MODULES/MODULE_06_OPERATION_REVIEW.md`：运营复盘唯一流程文档；默认日更发布不读取、不执行，只有用户明确要求复盘、查看作品表现、分析播放涨粉或更新内容方向时才读取。
+- `DOCS/MODULES/MODULE_06_OPERATION_REVIEW.md`：运营复盘唯一流程文档；非默认日更节点。
 
 ## 默认 auto/fast 流程
 
@@ -74,7 +74,7 @@
 4. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；`grid-prompt.txt` 是 fast 的 Dreamina v1 最终 vid prompt，也是 slow prompt 的派生来源，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
 5. 视频提示词：执行者根据 `anna.png` 的角色身份和 `grid-prompt.txt` 直接提交 Dreamina；如保留 `vid-prompt-v1.txt`，必须是 `grid-prompt.txt` 的逐字副本。prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用，不得出现文件名、流程说明、合规说明、平台解释或“吸收/根据某文件”的表达。
 6. 视频生成：只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1` 后提交 Dreamina 视频。
-7. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音，按当天行程大方向尽量选择差不多匹配的发布位置，并设置 `内容由AI生成` 声明。
+7. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，上传抖音，设置 `内容由AI生成` 声明；发布位置按模块 04 执行。
 8. 记录收尾：成功生成正式视频后写入去重账本；发布后只在运行记录中补充发布状态并刷新记录；不把本次运行状态作为下次默认续跑依据。
 
 ## 显式 slow 模式
