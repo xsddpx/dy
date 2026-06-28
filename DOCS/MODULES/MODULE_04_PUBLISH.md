@@ -44,6 +44,8 @@ sudo -H -u xsddpx python3 TOOLS/douyin_publish_helper.py OUTPUT/RUN_ID.mp4 \
 
 - `--title` 必填；标签使用 tag 池随机抽取结果，建议 4-5 个。
 - 默认自动读取 `MATERIAL/anna-weekly-itinerary.json` 的当天 `city` 和 `location`，作为发布位置查询词；如果本次内容大方向更具体，可显式传入 `--location "城市 大概地点"` 覆盖。
+- helper 会把复合位置拆成多个查询词重试，例如 `上海 武康路与安福路街区` 会依次尝试完整词、去掉城市后的地点词、`上海 武康路`、`上海 安福路`、`武康路`、`安福路街区`、`安福路` 等，优先选择命中具体街区或道路名的 POI。
+- 查询词含城市时，helper 会先尝试点击位置控件里的同名城市 tab，再搜索具体地点；只允许点击具体候选项，不点击候选外层容器。候选必须同时命中具体地点和城市/本地上下文，例如 `月光码头步行街 江苏省苏州市...`，避免把含有同名词的外地或海外 POI 误选为发布位置。
 - 位置只需按当天行程大方向选择差不多匹配的 POI；页面未显示位置控件、搜索无结果或控件被平台动态替换时，记录 warning 后继续，不作为发布硬阻断。
 - 默认使用 `--upload-mode cdp`，不主动改用 `auto`、`dialog` 或 `--current-tab`。
 - 报告固定写入 `TEMP/RUN_ID/logs/publish/douyin-publish-report.json` 和 `.md`。

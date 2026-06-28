@@ -65,6 +65,50 @@ class DouyinPublishHelperTest(unittest.TestCase):
     def test_compact_location_query_dedupes_blank_parts(self):
         self.assertEqual(MODULE.compact_location_query("上海", " 武康路  与  安福路街区 ", "上海"), "上海 武康路 与 安福路街区")
 
+    def test_location_query_attempts_split_compound_street_area(self):
+        attempts = MODULE.location_query_attempts("上海 武康路与安福路街区")
+        self.assertEqual(attempts[0], "上海 武康路与安福路街区")
+        self.assertIn("上海 武康路", attempts)
+        self.assertIn("上海 安福路", attempts)
+        self.assertIn("武康路", attempts)
+        self.assertIn("安福路街区", attempts)
+        self.assertIn("安福路", attempts)
+        self.assertEqual(attempts[-1], "上海")
+
+    def test_location_query_attempts_include_known_poi_substrings(self):
+        attempts = MODULE.location_query_attempts("苏州 金鸡湖月光码头与湖边步道")
+        self.assertIn("苏州 月光码头", attempts)
+        self.assertIn("月光码头", attempts)
+
+    def test_location_match_tokens_prefer_specific_poi_terms(self):
+        tokens = MODULE.location_match_tokens("上海 武康路与安福路街区", "上海 武康路")
+        self.assertEqual(tokens[0], "安福路街区")
+        self.assertIn("武康路", tokens)
+        self.assertIn("安福路", tokens)
+        self.assertNotIn("上海", tokens)
+
+    def test_location_city_hint_reads_leading_city(self):
+        self.assertEqual(MODULE.location_city_hint("苏州 金鸡湖月光码头"), "苏州")
+        self.assertIsNone(MODULE.location_city_hint("月光码头"))
+
+    def test_location_candidate_accepts_local_suzhou_poi(self):
+        self.assertTrue(
+            MODULE.location_candidate_is_plausible(
+                "月光码头步行街 江苏省苏州市吴中区观枫街1号",
+                "苏州 金鸡湖月光码头",
+                "月光码头",
+            )
+        )
+
+    def test_location_candidate_rejects_foreign_context_false_positive(self):
+        self.assertFalse(
+            MODULE.location_candidate_is_plausible(
+                "Afun-game767 首尔西大门区苏州工业园区星湖街328号创意产业园4-B601单元附近企业, 西大门区, 首尔, 韩国",
+                "苏州 苏州中心",
+                "苏州中心",
+            )
+        )
+
     def test_infer_location_query_prefers_cli_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = MODULE.infer_location_query(Path(tmp), "上海 外滩")

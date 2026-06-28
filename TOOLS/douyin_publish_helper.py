@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,13 @@ SOFT_ASSISTANT_WORDS = ("建议", "可优化", "推荐", "提示", "风险提醒
 AI_DECLARATION_WORDS = ("内容由AI生成", "AI生成", "人工智能生成", "AIGC")
 DEFAULT_CDP_URL = "http://127.0.0.1:9222"
 DOM_CDP_URL: str | None = None
+LOCATION_CONNECTOR_RE = re.compile(r"[与和、,/，]+")
+LOCATION_SUFFIXES = ("街区", "片区", "商圈", "附近", "周边", "一带")
+LOCATION_POI_SUBSTRINGS = ("月光码头", "苏州中心", "东方之门", "诚品生活", "金鸡湖")
+LOCATION_FOREIGN_CONTEXT_WORDS = ("韩国", "首尔", "济州", "釜山", "대한민국", "서울", "Busan", "Jeju")
+LOCATION_LOCAL_CONTEXT_BY_CITY = {
+    "苏州": ("江苏省苏州市", "苏州市", "苏州工业园区", "吴中区", "常熟市"),
+}
 
 
 def is_video_publish_page(url: str) -> bool:
@@ -1971,6 +1979,116 @@ def compact_location_query(*parts: str | None) -> str:
     return " ".join(values).strip()
 
 
+def unique_values(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = compact_location_query(value)
+        if not normalized or normalized in seen:
+            continue
+        result.append(normalized)
+        seen.add(normalized)
+    return result
+
+
+def split_location_tokens(value: str) -> list[str]:
+    tokens: list[str] = []
+    for part in compact_location_query(value).split():
+        for token in LOCATION_CONNECTOR_RE.split(part):
+            token = compact_location_query(token)
+            if token:
+                tokens.append(token)
+    return unique_values(tokens)
+
+
+def location_token_variants(token: str) -> list[str]:
+    token = compact_location_query(token)
+    if not token:
+        return []
+    compacted = token.replace(" ", "")
+    values = [token, compacted]
+    for suffix in LOCATION_SUFFIXES:
+        if compacted.endswith(suffix) and len(compacted) > len(suffix) + 1:
+            values.append(compacted[: -len(suffix)])
+    for substring in LOCATION_POI_SUBSTRINGS:
+        if substring in compacted and substring != compacted:
+            values.append(substring)
+    return unique_values(values)
+
+
+def location_query_attempts(query: str, max_attempts: int = 9) -> list[str]:
+    normalized = compact_location_query(query)
+    if not normalized:
+        return []
+
+    raw_parts = normalized.split()
+    tokens = split_location_tokens(normalized)
+    city = tokens[0] if len(tokens) > 1 and raw_parts and tokens[0] == raw_parts[0] else None
+    specific_tokens = tokens[1:] if city else tokens
+
+    attempts = [normalized]
+    if city and len(raw_parts) > 1:
+        attempts.append(compact_location_query(*raw_parts[1:]))
+
+    for token in specific_tokens:
+        for variant in location_token_variants(token):
+            if city:
+                attempts.append(compact_location_query(city, variant))
+    for token in specific_tokens:
+        attempts.extend(location_token_variants(token))
+    if city:
+        attempts.append(city)
+
+    return unique_values(attempts)[:max_attempts]
+
+
+def location_match_tokens(query: str, attempt: str) -> list[str]:
+    query_tokens = split_location_tokens(query)
+    city = query_tokens[0] if len(query_tokens) > 1 else None
+    values: list[str] = []
+    for token in split_location_tokens(attempt):
+        if token != city or len(query_tokens) == 1:
+            values.extend(location_token_variants(token))
+    for token in query_tokens:
+        if token != city or not values:
+            values.extend(location_token_variants(token))
+    return sorted(unique_values(values), key=len, reverse=True)
+
+
+def location_city_hint(query: str) -> str | None:
+    raw_parts = compact_location_query(query).split()
+    tokens = split_location_tokens(query)
+    if len(tokens) > 1 and raw_parts and tokens[0] == raw_parts[0]:
+        return tokens[0]
+    return None
+
+
+def location_local_contexts(city: str | None) -> list[str]:
+    if not city:
+        return []
+    return [city, *LOCATION_LOCAL_CONTEXT_BY_CITY.get(city, ())]
+
+
+def location_candidate_is_plausible(text: str, query: str, attempt: str) -> bool:
+    compact = "".join(str(text or "").split())
+    if not compact:
+        return False
+    tokens = location_match_tokens(query, attempt)
+    if not any(token and token.replace(" ", "") in compact for token in tokens):
+        return False
+
+    city = location_city_hint(query)
+    local_contexts = location_local_contexts(city)
+    if city and not any(ctx.replace(" ", "") in compact for ctx in local_contexts):
+        return False
+
+    has_foreign_context = any(word in compact for word in LOCATION_FOREIGN_CONTEXT_WORDS)
+    has_strong_local_context = any(ctx != city and ctx.replace(" ", "") in compact for ctx in local_contexts)
+    if has_foreign_context and city and not has_strong_local_context:
+        return False
+    return True
+
+
 def infer_location_query(root: Path, explicit: str | None = None, today: date | None = None) -> dict[str, Any]:
     explicit_value = compact_location_query(explicit)
     if explicit_value:
@@ -2082,7 +2200,7 @@ def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: in
   }
   if (!target) return {ok: false, reason: '没有找到位置输入框或入口'};
   target.el.scrollIntoView({block: 'center'});
-  const r = target.r;
+  const r = target.el.getBoundingClientRect();
   return {ok: true, x: r.left + r.width / 2, y: r.top + r.height / 2, text: target.t.slice(0, 200)};
 }
 '''
@@ -2090,30 +2208,26 @@ def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: in
         if not field_result.get("ok"):
             return {"ok": False, "status": "skipped", "query": query, **field_result}
 
-        raw_tokens = [token for token in query.replace("与", " ").replace("和", " ").split() if token]
-        attempts = [query]
-        ordered_tokens = raw_tokens[1:] + raw_tokens[:1]
-        for value in ordered_tokens:
-            if value not in attempts:
-                attempts.append(value)
-
-        page.mouse.click(field_result["x"], field_result["y"])
-        page.wait_for_timeout(400)
+        attempts = location_query_attempts(query)
+        city_hint = location_city_hint(query)
+        local_contexts = location_local_contexts(city_hint)
         last_selection: dict[str, Any] = {}
+        last_city_tab: dict[str, Any] = {}
         last_snapshot = ""
         last_anchor_snapshot = ""
         last_attempt = ""
+        attempted_queries: list[str] = []
 
-        for attempt in attempts[:3]:
+        for attempt in attempts:
             last_attempt = attempt
-            page.keyboard.press("Meta+A")
-            page.keyboard.type(attempt, delay=35)
-            page.wait_for_timeout(2500)
-
-            tokens = [token for token in attempt.replace("与", " ").replace("和", " ").split() if token]
-            selection = page.evaluate(
-                r'''
-(tokens) => {
+            attempted_queries.append(attempt)
+            page.mouse.click(field_result["x"], field_result["y"])
+            page.wait_for_timeout(300)
+            city_tab: dict[str, Any] = {"ok": False, "reason": "无城市提示词"}
+            if city_hint:
+                city_tab = page.evaluate(
+                    r'''
+(cityHint) => {
   function visible(el) {
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -2122,27 +2236,134 @@ def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: in
   function text(el) {
     return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
   }
-  const root = document.querySelector('.semi-popover') || document;
-  const candidates = Array.from(root.querySelectorAll('[role=option], .semi-select-option'))
+  const roots = Array.from(document.querySelectorAll('.semi-popover, .semi-select-dropdown, [role=listbox], [class*="popover"], [class*="dropdown"]'))
+    .filter(visible);
+  const candidates = [];
+  for (const root of roots) {
+    for (const el of Array.from(root.querySelectorAll('*'))) {
+      if (!visible(el)) continue;
+      const t = text(el);
+      const r = el.getBoundingClientRect();
+      if (t === cityHint && r.width >= 20 && r.width <= 80 && r.height >= 15 && r.height <= 40) {
+        candidates.push({el, t, r, cls: String(el.className || ''), role: el.getAttribute('role') || '', tag: el.tagName});
+      }
+    }
+  }
+  candidates.sort((a, b) => (a.r.top - b.r.top) || (a.r.left - b.r.left));
+  const target = candidates[0];
+  if (!target) return {ok: false, reason: '没有找到城市 tab', city: cityHint, count: 0};
+  target.el.click();
+  const r = target.r;
+  return {
+    ok: true,
+    city: cityHint,
+    text: target.t,
+    x: r.left + r.width / 2,
+    y: r.top + r.height / 2,
+    cls: target.cls.slice(0, 80),
+    role: target.role,
+    tag: target.tag,
+    count: candidates.length
+  };
+}
+''',
+                    city_hint,
+                )
+                last_city_tab = city_tab
+                page.wait_for_timeout(500)
+                page.mouse.click(field_result["x"], field_result["y"])
+                page.wait_for_timeout(200)
+            page.keyboard.press("Meta+A")
+            page.keyboard.press("Backspace")
+            page.keyboard.type(attempt, delay=35)
+            page.wait_for_timeout(1800)
+
+            tokens = location_match_tokens(query, attempt)
+            selection = page.evaluate(
+                r'''
+(params) => {
+  function visible(el) {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 2 && r.height > 2;
+  }
+  function text(el) {
+    return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  const normalizedTokens = (params.tokens || [])
+    .map((token) => String(token || '').replace(/\s+/g, '').trim())
+    .filter((token) => token.length >= 2);
+  const cityHint = String(params.cityHint || '').replace(/\s+/g, '').trim();
+  const localContexts = (params.localContexts || [])
+    .map((token) => String(token || '').replace(/\s+/g, '').trim())
+    .filter(Boolean);
+  const foreignContexts = (params.foreignContexts || [])
+    .map((token) => String(token || '').replace(/\s+/g, '').trim())
+    .filter(Boolean);
+  const roots = Array.from(document.querySelectorAll('.semi-popover, .semi-select-dropdown, [role=listbox]'))
+    .filter(visible);
+  const seen = new Set();
+  const elements = [];
+  for (const root of roots) {
+    for (const el of Array.from(root.querySelectorAll('[role=option], .semi-select-option, .semi-cascader-option, .semi-dropdown-item'))) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      elements.push(el);
+    }
+  }
+  const candidates = elements
     .filter(visible)
-    .map((el) => ({el, t: text(el), r: el.getBoundingClientRect()}))
+    .map((el) => {
+      const t = text(el);
+      const compact = t.replace(/\s+/g, '');
+      const hits = normalizedTokens.filter((token) => compact.includes(token));
+      const localHits = localContexts.filter((token) => compact.includes(token));
+      const hasForeignContext = foreignContexts.some((token) => compact.includes(token));
+      const hasStrongLocalContext = localHits.some((token) => token !== cityHint);
+      const r = el.getBoundingClientRect();
+      return {
+        el,
+        t,
+        r,
+        hits,
+        localHits,
+        hasForeignContext,
+        hasStrongLocalContext,
+        score: hits.reduce((sum, token) => sum + token.length, 0) * 100 + localHits.length * 25 - compact.length
+      };
+    })
     .filter((item) => item.t && item.t.length <= 180)
     .filter((item) => item.r.top >= 0 && item.r.width >= 28 && item.r.width <= 900 && item.r.height >= 18 && item.r.height <= 80)
-    .filter((item) => tokens.some((token) => item.t.includes(token)))
+    .filter((item) => item.hits.length > 0)
+    .filter((item) => !cityHint || item.localHits.length > 0)
+    .filter((item) => !(item.hasForeignContext && cityHint && !item.hasStrongLocalContext))
     .filter((item) => !/作品描述|发布设置|自主声明|添加标签|关联热点|发文助手|未搜索到相关位置/.test(item.t))
-    .sort((a, b) => (a.r.width * a.r.height) - (b.r.width * b.r.height) || (a.r.top - b.r.top) || (a.r.left - b.r.left));
+    .sort((a, b) => b.score - a.score || (a.r.top - b.r.top) || (a.r.left - b.r.left));
   const target = candidates[0];
   if (!target) return {ok: false, reason: '没有找到匹配的位置建议'};
   const r = target.r;
-  return {ok: true, x: r.left + r.width / 2, y: r.top + r.height / 2, text: target.t.slice(0, 180), count: candidates.length};
+  return {
+    ok: true,
+    x: r.left + r.width / 2,
+    y: r.top + r.height / 2,
+    text: target.t.slice(0, 180),
+    matched_tokens: target.hits,
+    local_context_hits: target.localHits,
+    count: candidates.length
+  };
 }
 ''',
-                tokens or [attempt],
+                {
+                    "tokens": tokens or [attempt],
+                    "cityHint": city_hint,
+                    "localContexts": local_contexts,
+                    "foreignContexts": list(LOCATION_FOREIGN_CONTEXT_WORDS),
+                },
             )
             last_selection = selection
             if selection.get("ok"):
                 page.mouse.click(selection["x"], selection["y"])
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(1200)
             else:
                 page.wait_for_timeout(300)
 
@@ -2155,7 +2376,15 @@ def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: in
 }
 '''
             )
-            verified = bool(last_anchor_snapshot and "输入地理位置" not in last_anchor_snapshot and any(token in last_anchor_snapshot for token in tokens))
+            selected_text = str(selection.get("text") or "")
+            verified = bool(
+                last_anchor_snapshot
+                and "输入地理位置" not in last_anchor_snapshot
+                and (
+                    any(token in last_anchor_snapshot for token in tokens)
+                    or any(token in selected_text for token in tokens)
+                )
+            )
             if verified:
                 return {
                     "ok": True,
@@ -2163,7 +2392,9 @@ def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: in
                     "query": query,
                     "attempt": attempt,
                     "field": field_result,
+                    "city_tab": city_tab,
                     "selection": selection,
+                    "attempts": attempted_queries,
                     "verified": True,
                     "anchor_text": last_anchor_snapshot,
                     "text_sample": " ".join(last_snapshot.split())[:1000],
@@ -2174,7 +2405,9 @@ def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: in
             "status": "attempted",
             "query": query,
             "attempt": last_attempt,
+            "attempts": attempted_queries,
             "field": field_result,
+            "city_tab": last_city_tab,
             "selection": last_selection,
             "verified": False,
             "anchor_text": last_anchor_snapshot,
