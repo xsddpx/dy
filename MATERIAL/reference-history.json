@@ -128,7 +128,116 @@
       "canonical_url": "https://www.douyin.com/video/7643456195617772608",
       "source": "https://www.douyin.com/video/7643456195617772608",
       "title": "20260627-1035-favorite-764345-fast"
+    },
+    {
+      "recorded_at": "2026-06-27T05:20:56.449329+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7653852578946563301",
+      "canonical_url": "https://www.douyin.com/video/7653852578946563301",
+      "source": "https://www.douyin.com/video/7653852578946563301",
+      "title": "20260627-1309-favorite-765385-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-27T05:29:53.802148+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7653852578946563301",
+      "canonical_url": "https://www.douyin.com/video/7653852578946563301",
+      "source": "https://www.douyin.com/video/7653852578946563301",
+      "title": "20260627-1309-favorite-765385-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-27T09:56:19.378954+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7637524583155058344",
+      "canonical_url": "https://www.douyin.com/video/7637524583155058344",
+      "source": "https://www.douyin.com/video/7637524583155058344",
+      "title": "20260627-1748-favorite-763752-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-27T10:33:14.977365+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7637524583155058344",
+      "canonical_url": "https://www.douyin.com/video/7637524583155058344",
+      "source": "https://www.douyin.com/video/7637524583155058344",
+      "title": "20260627-1748-favorite-763752-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-27T23:15:50.720263+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7543503179481664819",
+      "canonical_url": "https://www.douyin.com/video/7543503179481664819",
+      "source": "https://www.douyin.com/video/7543503179481664819",
+      "title": "20260628-0718-favorite-754350-fast"
+    },
+    {
+      "recorded_at": "2026-06-28T00:51:39.666007+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7655859715880127754",
+      "canonical_url": "https://www.douyin.com/video/7655859715880127754",
+      "source": "https://www.douyin.com/video/7655859715880127754",
+      "title": "20260628-0842-favorite-765585-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-28T01:17:39.354367+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7655567616819724261",
+      "canonical_url": "https://www.douyin.com/video/7655567616819724261",
+      "source": "https://www.douyin.com/video/7655567616819724261",
+      "title": "20260628-0911-favorite-765556-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-28T01:23:12.781906+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7655567616819724261",
+      "canonical_url": "https://www.douyin.com/video/7655567616819724261",
+      "source": "https://www.douyin.com/video/7655567616819724261",
+      "title": "20260628-0911-favorite-765556-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-28T03:02:17.911913+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7651619671669567995",
+      "canonical_url": "https://www.douyin.com/video/7651619671669567995",
+      "source": "https://www.douyin.com/video/7651619671669567995",
+      "title": "20260628-0936-favorite-765161-slow",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-28T09:59:51.369672+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7629256836419946570",
+      "canonical_url": "https://www.douyin.com/video/7629256836419946570",
+      "source": "https://www.douyin.com/video/7629256836419946570",
+      "title": "20260628-1759-favorite-762925-fast",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-28T10:50:53.419501+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7629256836419946570",
+      "canonical_url": "https://www.douyin.com/video/7629256836419946570",
+      "source": "https://www.douyin.com/video/7629256836419946570",
+      "title": "20260628-1759-favorite-762925-fast",
+      "author": "favorite_collection"
     }
   ],
-  "updated_at": "2026-06-27T02:46:15.989594+00:00"
+  "updated_at": "2026-06-28T10:50:53.420054+00:00"
 }

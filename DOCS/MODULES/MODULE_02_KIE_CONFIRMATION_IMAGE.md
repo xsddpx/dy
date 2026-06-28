@@ -7,7 +7,7 @@
 - Kie `gpt-image-2-image-to-image` 只上传 `MATERIAL/fixed-role/anna.png`。
 - 每批固定只有一个 `*-01` 槽位，首批为 `A-01`。
 - 当前批次确认图生成后必须硬停，等待用户明确确认是否使用该图。
-- 用户说“换一个”“换一张”或明确拒绝当前确认图时，在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如 `B-01`；不得进入 Dreamina，不得切换模式，不得更换参考。
+- 用户说“换一个”“换一张”或明确拒绝当前确认图时，默认在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如 `B-01`；不得进入 Dreamina，不得切换模式，不得更换参考。只有用户明确要求“并发 3 张”“一次生成 3 张”等并发换图时，才记录当前槽位 rejected，并在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下并发生成后续三个单槽位批次，例如 `F-01`、`G-01`、`H-01`；每个批次仍只有一个 `*-01` 槽位。
 
 ## 输入与 @ 引用
 
@@ -66,7 +66,7 @@ python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --b
 - 输入来源必须说明 Kie 视觉输入只有 `MATERIAL/fixed-role/anna.png`，模块 01 的宫格或帧图仅作为人工视觉分析来源，最终 img prompt 由 `grid-prompt.txt` 删除动画和音乐两段得到。
 - 建议使用不等于用户确认；未获用户明确确认前，不得写入最终选图记录，不得进入 Dreamina 视频生成。
 - 用户确认使用后，记录 `selected_slot`、`selected_confirmation_image`、选择原因和确认时间。
-- 用户拒绝当前槽位，或说“换一个”“换一张”时，记录当前槽位为 rejected，并生成下一批单槽位确认图；换图不改变参考、不改变 `grid-prompt.txt`、不进入 Dreamina。只有用户明确说停止时，才停止当前 slow 流程。
+- 用户拒绝当前槽位，或说“换一个”“换一张”时，记录当前槽位为 rejected，并生成下一批单槽位确认图；只有用户明确要求并发换图时，才一次并发生成后续三个单槽位批次。换图不改变参考、不改变 `grid-prompt.txt`、不进入 Dreamina。只有用户明确说停止时，才停止当前 slow 流程。
 
 ## 通过标准
 

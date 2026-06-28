@@ -19,7 +19,7 @@
 - 视觉卖点：夸张成熟身材、巨大胸部视觉体量、成熟曲线、修身穿搭、清晰腰线、上身辨识度。
 - 风格调性：纯欲反差、擦边吸引力、轻熟性感、克制诱惑感、活泼互动感与生活化动作。
 - 表情策略：参考优先，表情随动作、镜头距离和场景自然变化；微笑允许存在，但不得作为每条视频的默认模板或固定结尾。
-- 选题策略：Anna 是喜欢旅游、喜欢展示成熟身材线条的成年女性；默认复用当前 active 一周行程资产，按当天日期、季节、天气、城市片区、时间段、当天活动和旅行状态决定主题大方向。只有当天日期超出当前行程日期窗口，或行程资产缺失、无效、未开始时，才按今天起连续 7 天重新规划国内真实城市行程。行程地点不是参考搜索或 prompt 场景的硬锁，具体画面可延展到酒店、机场、游泳馆、网球馆、商场、酒吧、夜店等与当天行程合理相关的场景。
+- 选题策略：Anna 是喜欢旅游、喜欢展示成熟身材线条的成年女性；默认复用当前 active 一周行程资产，按当天日期、季节、天气、城市片区、白天/晚上双时段活动和旅行状态决定主题大方向。只有当天日期超出当前行程日期窗口，或行程资产缺失、无效、未开始时，才按今天起连续 7 天重新规划国内真实城市行程。行程地点不是参考搜索或 prompt 场景的硬锁，具体画面可延展到酒店、机场、游泳馆、网球馆、商场、酒吧、夜店等与当天行程合理相关的场景。
 - 合规要求：内部聚焦增长卖点；prompt 只写可见画面、动作和镜头语言，不写合规说明；发布文案必须保持平台可发布表达。严禁生成低俗、裸体及未成年感内容。
 
 ## 内容增长方向
@@ -45,7 +45,7 @@
 
 - 固定角色图：`MATERIAL/fixed-role/anna.png`，这是一张同一位成年女性的多视角、多表情角色参考图。
 - 参考去重账本：`MATERIAL/reference-history.json`
-- 一周行程资产：`MATERIAL/anna-weekly-itinerary.md` 和 `MATERIAL/anna-weekly-itinerary.json`；当前日期在 `valid_from` 到 `valid_to` 窗口内时持续复用，只有不可用或日期超出窗口时才从运行当天起重新生成连续 7 天行程，生成后直接保存为 `status=active` 并用于当天任务，无需用户确认。
+- 一周行程资产：`MATERIAL/anna-weekly-itinerary.md` 和 `MATERIAL/anna-weekly-itinerary.json`；当前日期在 `valid_from` 到 `valid_to` 窗口内时持续复用，只有不可用或日期超出窗口时才从运行当天起重新生成连续 7 天行程，生成后直接保存为 `status=active` 并用于当天任务，无需用户确认。生成或重建行程时，每天不得写具体钟点，`time_slot` 统一写 `白天；晚上`，并分别写清白天和晚上可拍活动、场景、穿搭方向和参考关键词。
 
 ## 本地环境
 
@@ -53,7 +53,7 @@
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - auto/fast 视频：`dreamina multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png`，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
-- slow 确认图：Kie `gpt-image-2-image-to-image`，PNG 原图下载归档；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1`，每批只生成一个 `*-01` 单张确认图，首批为 `A-01`，用户要求换图时在同一 RUN 内递增到 `B-01`、`C-01`；slow 视频只上传经用户确认的 Kie 原始确认图。
+- slow 确认图：Kie `gpt-image-2-image-to-image`，PNG 原图下载归档；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1`，每批只生成一个 `*-01` 单张确认图，首批为 `A-01`。用户普通要求换图时在同一 RUN 内递增到下一批，如 `B-01`、`C-01`；只有用户明确要求并发 3 张或一次生成 3 张时，才记录当前槽位 rejected，并在同一 RUN 内并发生成后续三个单槽位批次，如 `F-01`、`G-01`、`H-01`。slow 视频只上传经用户确认的 Kie 原始确认图。
 - TNS/安全拦截导致图片或视频未生成时，允许在当前模式、当前生成节点内从 `v1` 收敛到 `v5`；`v1` 是首次提交，`v2-v5` 是最多 4 次逐步收敛。
 - TNS 收敛只适用于生成工具明确返回 TNS/安全拦截且没有生成产物的情况；网络、登录、积分、参数错误、上传失败、超时等仍按硬阻断处理。
 
@@ -70,7 +70,7 @@
 
 1. 预检与建档：读取项目文档，检查 CDP Chrome、Kie API key、Dreamina 视频生成、发布登录态、角色素材、`TEMP/` 和 `OUTPUT/`。
 2. 行程窗口：读取当前 active 的 `MATERIAL/anna-weekly-itinerary.json` 并按当天日期匹配行程；资产缺失、无效、当天日期早于 `valid_from` 或已超过 `valid_to` 时，才按今天起连续 7 天重新规划国内真实城市行程，直接保存到 `MATERIAL/` 后继续。
-3. 参考选择：按当天行程大方向选择参考；用户指定参考优先，其次从抖音收藏中找匹配当天日期、季节、城市片区、旅行状态或活动氛围的参考；收藏没有合适主题时，才从抖音热门中挑选匹配参考。参考地点不必完全等同行程地点，只要能解释为当天行程附近、途中或延展活动；同等可用参考中优先匹配当前阶段性增长方向；进入流程前先做 7 天去重。
+3. 参考选择：按当天行程大方向选择参考；用户指定参考优先，其次从抖音收藏中找匹配当天日期、季节、城市片区、白天/晚上方向、旅行状态或活动氛围的参考；收藏没有合适主题时，才从抖音热门中挑选匹配参考。参考地点不必完全等同行程地点，只要能解释为当天行程附近、途中或延展活动；同等可用参考中优先匹配当前阶段性增长方向；进入流程前先做 7 天去重。
 4. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；`grid-prompt.txt` 是 fast 的 Dreamina v1 最终 vid prompt，也是 slow prompt 的派生来源，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
 5. 视频提示词：执行者根据 `anna.png` 的角色身份和 `grid-prompt.txt` 直接提交 Dreamina；如保留 `vid-prompt-v1.txt`，必须是 `grid-prompt.txt` 的逐字副本。prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用，不得出现文件名、流程说明、合规说明、平台解释或“吸收/根据某文件”的表达。
 6. 视频生成：只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1` 后提交 Dreamina 视频。
@@ -82,7 +82,7 @@
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - `slow` 在模块 01 后执行模块 02：执行者从十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段，得到 Kie 可直接执行的 `img prompt`；Kie `gpt-image-2-image-to-image` 只上传 `anna.png` 作为 `@图1`，每批固定生成一个 `*-01` 单张确认图。
 - `slow` 必须在每批确认图生成后硬停，展示确认图、输入来源、img prompt、TNS 收敛记录和是否建议使用；等待用户明确确认后，才能记录 `selected_slot`、`selected_confirmation_image` 和选择原因，并进入视频生成。
-- 用户说“换一个”“换一张”或明确拒绝当前确认图时，当前确认图不得进入 Dreamina；在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如从 `A-01` 递增到 `B-01`。
+- 用户说“换一个”“换一张”或明确拒绝当前确认图时，当前确认图不得进入 Dreamina；默认在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如从 `A-01` 递增到 `B-01`。只有用户明确要求“并发 3 张”“一次生成 3 张”等并发换图时，才记录当前槽位 rejected，并在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下并发生成后续三个单槽位批次；每个批次仍只有一个 `*-01` 槽位。
 - `slow` 视频生成只上传选中确认图作为 `@图1`；最终 `vid prompt` 从十段式 `grid-prompt.txt` 派生，只删除人物段中的 anna 多视角角色卡声明，其他内容保持一致。
 - 不因 `auto/fast` 失败自动切换到 `slow`，也不因 `slow` 失败自动切回 `auto/fast`。
 - slow 确认图若因 TNS/安全拦截未生成图片，只对当前槽位按 `v2-v5` 继续收敛；到 `v5` 仍未生成则停止，不切换模式、不接入其他路线或兜底工具。TNS 收敛失败不得当作“换一个”自动进入下一批。
