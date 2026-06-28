@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate one confirmation image slot with Kie Nano Banana Pro."""
+"""Generate one confirmation image slot with Kie GPT Image 2."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ import requests
 CREATE_TASK_URL = "https://api.kie.ai/api/v1/jobs/createTask"
 QUERY_TASK_URL = "https://api.kie.ai/api/v1/jobs/recordInfo"
 FILE_UPLOAD_URL = "https://kieai.redpandaai.co/api/file-stream-upload"
-MODEL = "nano-banana-pro"
-MODEL_VERSION = "nano-banana-pro-1K"
+MODEL = "gpt-image-2-image-to-image"
+MODEL_VERSION = "gpt-image-2-image-to-image"
 DONE_STATES = {"success", "fail"}
 PENDING_STATES = {"waiting", "queuing", "generating"}
 
@@ -130,15 +130,14 @@ def create_task(
     callback_url: str | None,
     timeout: int,
 ) -> str:
+    model_input = {
+        "prompt": prompt,
+        "input_urls": image_urls,
+        "aspect_ratio": aspect_ratio,
+    }
     body: dict[str, Any] = {
         "model": MODEL,
-        "input": {
-            "prompt": prompt,
-            "image_input": image_urls,
-            "aspect_ratio": aspect_ratio,
-            "resolution": resolution,
-            "output_format": output_format,
-        },
+        "input": json.dumps(model_input, ensure_ascii=False),
     }
     if callback_url:
         body["callBackUrl"] = callback_url
@@ -277,9 +276,8 @@ def run_generation(args: argparse.Namespace) -> dict[str, Any]:
         "prompt_note": args.prompt_note,
         "kie": {
             "model": MODEL,
-            "resolution": args.resolution,
             "aspect_ratio": args.aspect_ratio,
-            "output_format": args.output_format,
+            "local_extension": args.output_format,
             "result_url": result_urls[0],
             "role_upload": role_upload,
             "credits_consumed": task.get("creditsConsumed"),
@@ -299,7 +297,7 @@ def run_generation(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="使用 Kie Nano Banana Pro 1K 生成单个确认图槽位。")
+    parser = argparse.ArgumentParser(description="使用 Kie GPT Image 2 生成单个确认图槽位。")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--stamp", required=True)
     parser.add_argument("--batch", required=True)
@@ -316,8 +314,8 @@ def main() -> int:
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--upload-path", default=None)
     parser.add_argument("--callback-url", default=None)
-    parser.add_argument("--aspect-ratio", default="9:16")
-    parser.add_argument("--resolution", default="1K")
+    parser.add_argument("--aspect-ratio", default="auto")
+    parser.add_argument("--resolution", default=None, help="兼容旧调用；gpt-image-2-image-to-image 默认不提交该参数")
     parser.add_argument("--output-format", default="png")
     parser.add_argument("--poll-seconds", type=float, default=3.0)
     parser.add_argument("--max-wait-seconds", type=int, default=900)

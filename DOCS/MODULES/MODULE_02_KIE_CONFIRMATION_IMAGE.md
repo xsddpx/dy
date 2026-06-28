@@ -4,7 +4,7 @@
 
 - 本模块只属于显式 `slow` 模式，不属于默认 `/dy`、`dy`、`今天日更` 的 `auto/fast` 流程。
 - 从模块 01 的十段式 `grid-prompt.txt` 派生 img prompt，生成一张 Kie 确认图。
-- Kie Nano Banana Pro 1K 只上传 `MATERIAL/fixed-role/anna.png`。
+- Kie `gpt-image-2-image-to-image` 只上传 `MATERIAL/fixed-role/anna.png`。
 - 每批固定只有一个 `*-01` 槽位，首批为 `A-01`。
 - 当前批次确认图生成后必须硬停，等待用户明确确认是否使用该图。
 - 用户说“换一个”“换一张”或明确拒绝当前确认图时，在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如 `B-01`；不得进入 Dreamina，不得切换模式，不得更换参考。
@@ -20,9 +20,9 @@
 ## Kie 配置
 
 - 本地 `.env` 必须配置 `KIE_API_KEY`，不得提交 `.env`。
-- 确认图模型固定为 `nano-banana-pro`。
-- 输出规格固定为 `aspect_ratio=9:16`、`resolution=1K`、`output_format=png`。
-- 本地角色图先通过 Kie File Stream Upload 获得临时 URL，再传入 `image_input`。
+- 确认图模型固定为 Kie `gpt-image-2-image-to-image`。
+- Kie 提交参数使用 `input_urls` 传入角色图临时 URL，`aspect_ratio=auto`；竖屏画面由 img prompt 的竖屏构图、车门/站台构图要求锁定。
+- 本地角色图先通过 Kie File Stream Upload 获得临时 URL，再传入 `input_urls`。
 - Kie 临时 URL 有时效，生成成功后必须立即下载原始确认图到 `TEMP/RUN_ID/confirm-BATCH-HHMMSS/raw/`，后续只使用本地文件路径。
 
 ## img prompt
@@ -40,7 +40,7 @@ img prompt 的内容规范只看模块 01，不在本模块维护单独模板。
 - `grid-prompt.txt` 已按模块 01 完成；如发现内容不够具体，只回到模块 01 修改。
 - `SLOT-img-prompt-v1.txt` 只删除动画和音乐两段，其余文本与 `grid-prompt.txt` 保持一致。
 - img prompt 不再包含动画段、音乐段、第二张图片引用、参考宫格输入语义或内部说明。
-- Kie `image_input` 只包含 `MATERIAL/fixed-role/anna.png` 对应的临时 URL。
+- Kie `input_urls` 只包含 `MATERIAL/fixed-role/anna.png` 对应的临时 URL。
 
 ## 命令
 
@@ -49,7 +49,7 @@ python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --
 python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch BATCH --topic TOPIC --out-dir TEMP/RUN_ID/confirm-BATCH-HHMMSS --entry @TEMP/RUN_ID/confirm-BATCH-HHMMSS/SLOT-entry.json
 ```
 
-`kie_confirmation_image.py` 为当前槽位生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `nano-banana-pro-1K`。失败时仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
+`kie_confirmation_image.py` 为当前槽位生成一个 entry JSON，`submit_id` 对应 Kie `taskId`，`model_version` 固定为 `gpt-image-2-image-to-image`。失败时仍写 entry JSON，并记录失败原因，供 manifest 保留占位。
 
 ## TNS 收敛
 
@@ -70,7 +70,7 @@ python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --b
 
 ## 通过标准
 
-- Kie `image_input` 只包含 `MATERIAL/fixed-role/anna.png` 对应的临时 URL。
+- Kie `input_urls` 只包含 `MATERIAL/fixed-role/anna.png` 对应的临时 URL。
 - img prompt 已由十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段得到，并可作为 Kie 直接执行的文本。
 - 当前 `*-01` 是本批唯一槽位；如发生 TNS 收敛，已保留 `v1-v5` 版本记录。
 - `confirmation-manifest.json/md` 已生成，且只包含当前批次的单个 `*-01` 槽位。

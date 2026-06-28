@@ -71,8 +71,8 @@ class KieConfirmationImageTest(unittest.TestCase):
             "api_key": "test-token",
             "upload_path": None,
             "callback_url": None,
-            "aspect_ratio": "9:16",
-            "resolution": "1K",
+            "aspect_ratio": "auto",
+            "resolution": None,
             "output_format": "png",
             "poll_seconds": 0,
             "max_wait_seconds": 1,
@@ -84,11 +84,11 @@ class KieConfirmationImageTest(unittest.TestCase):
     def test_success_generates_entry_and_downloads_image(self):
         post_responses = [
             FakeResponse({"success": True, "code": 200, "data": {"downloadUrl": "https://tmp/role.png", "fileName": "role.png"}}),
-            FakeResponse({"code": 200, "msg": "success", "data": {"taskId": "task_nano-banana-pro_1234567890"}}),
+            FakeResponse({"code": 200, "msg": "success", "data": {"taskId": "task_gpt-image-2_1234567890"}}),
         ]
         get_responses = [
-            FakeResponse({"code": 200, "data": {"taskId": "task_nano-banana-pro_1234567890", "state": "generating"}}),
-            FakeResponse({"code": 200, "data": {"taskId": "task_nano-banana-pro_1234567890", "state": "success", "resultJson": json.dumps({"resultUrls": ["https://result/image.png"]})}}),
+            FakeResponse({"code": 200, "data": {"taskId": "task_gpt-image-2_1234567890", "state": "generating"}}),
+            FakeResponse({"code": 200, "data": {"taskId": "task_gpt-image-2_1234567890", "state": "success", "resultJson": json.dumps({"resultUrls": ["https://result/image.png"]})}}),
             FakeResponse(status_code=200, content=PNG_1X1),
         ]
         with mock.patch.object(MODULE.requests, "post", side_effect=post_responses) as post, \
@@ -97,15 +97,15 @@ class KieConfirmationImageTest(unittest.TestCase):
 
         self.assertEqual(post.call_count, 2)
         create_body = post.call_args_list[1].kwargs["json"]
-        self.assertEqual(create_body["model"], "nano-banana-pro")
-        self.assertEqual(create_body["input"]["image_input"], ["https://tmp/role.png"])
-        self.assertEqual(create_body["input"]["aspect_ratio"], "9:16")
-        self.assertEqual(create_body["input"]["resolution"], "1K")
+        self.assertEqual(create_body["model"], "gpt-image-2-image-to-image")
+        create_input = json.loads(create_body["input"])
+        self.assertEqual(create_input["input_urls"], ["https://tmp/role.png"])
+        self.assertEqual(create_input["aspect_ratio"], "auto")
         self.assertEqual(get.call_count, 3)
         entry = json.loads(Path(result["entry_json"]).read_text(encoding="utf-8"))
         self.assertEqual(entry["status"], "success")
-        self.assertEqual(entry["submit_id"], "task_nano-banana-pro_1234567890")
-        self.assertEqual(entry["model_version"], "nano-banana-pro-1K")
+        self.assertEqual(entry["submit_id"], "task_gpt-image-2_1234567890")
+        self.assertEqual(entry["model_version"], "gpt-image-2-image-to-image")
         self.assertTrue(Path(entry["image_path"]).exists())
         self.assertIn("role_upload", entry["kie"])
         self.assertNotIn("reference_upload", entry["kie"])

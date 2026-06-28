@@ -47,7 +47,7 @@ class ConfirmationManifestTest(unittest.TestCase):
                 "submit_id": "11111111-dddd",
                 "status": "success",
                 "image_path": str(self.image1),
-                "model_version": "nano-banana-pro-1K",
+                "model_version": "gpt-image-2-image-to-image",
             },
         ])
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)

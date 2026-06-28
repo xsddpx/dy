@@ -53,7 +53,7 @@
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - auto/fast 视频：`dreamina multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png`，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
-- slow 确认图：`nano-banana-pro`，9:16，1K，PNG；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1`，每批只生成一个 `*-01` 单张确认图，首批为 `A-01`，用户要求换图时在同一 RUN 内递增到 `B-01`、`C-01`；slow 视频只上传经用户确认的 Kie 原始确认图。
+- slow 确认图：Kie `gpt-image-2-image-to-image`，PNG 原图下载归档；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1`，每批只生成一个 `*-01` 单张确认图，首批为 `A-01`，用户要求换图时在同一 RUN 内递增到 `B-01`、`C-01`；slow 视频只上传经用户确认的 Kie 原始确认图。
 - TNS/安全拦截导致图片或视频未生成时，允许在当前模式、当前生成节点内从 `v1` 收敛到 `v5`；`v1` 是首次提交，`v2-v5` 是最多 4 次逐步收敛。
 - TNS 收敛只适用于生成工具明确返回 TNS/安全拦截且没有生成产物的情况；网络、登录、积分、参数错误、上传失败、超时等仍按硬阻断处理。
 
@@ -80,7 +80,7 @@
 ## 显式 slow 模式
 
 - `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
-- `slow` 在模块 01 后执行模块 02：执行者从十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段，得到 Kie 可直接执行的 `img prompt`；Kie Nano Banana Pro 1K 只上传 `anna.png` 作为 `@图1`，每批固定生成一个 `*-01` 单张确认图。
+- `slow` 在模块 01 后执行模块 02：执行者从十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段，得到 Kie 可直接执行的 `img prompt`；Kie `gpt-image-2-image-to-image` 只上传 `anna.png` 作为 `@图1`，每批固定生成一个 `*-01` 单张确认图。
 - `slow` 必须在每批确认图生成后硬停，展示确认图、输入来源、img prompt、TNS 收敛记录和是否建议使用；等待用户明确确认后，才能记录 `selected_slot`、`selected_confirmation_image` 和选择原因，并进入视频生成。
 - 用户说“换一个”“换一张”或明确拒绝当前确认图时，当前确认图不得进入 Dreamina；在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如从 `A-01` 递增到 `B-01`。
 - `slow` 视频生成只上传选中确认图作为 `@图1`；最终 `vid prompt` 从十段式 `grid-prompt.txt` 派生，只删除人物段中的 anna 多视角角色卡声明，其他内容保持一致。
