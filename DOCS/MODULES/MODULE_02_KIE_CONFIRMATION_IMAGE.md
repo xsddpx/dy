@@ -3,17 +3,14 @@
 ## 职责
 
 - 本模块只属于显式 `slow` 模式，不属于默认 `/dy`、`dy`、`今天日更` 的 `auto/fast` 流程。
-- 从模块 01 的十段式 `grid-prompt.txt` 派生 img prompt，生成一张 Kie 确认图。
-- Kie `gpt-image-2-image-to-image` 只上传 `MATERIAL/fixed-role/anna.png`。
-- 每批固定只有一个 `*-01` 槽位，首批为 `A-01`。
+- 从模块 01 的十段式 `grid-prompt.txt` 派生 img prompt；Kie 只上传 `anna.png`，每批生成一个 `*-01` 槽位，首批为 `A-01`。
 - 当前批次确认图生成后必须硬停，等待用户明确确认是否使用该图。
 - 用户说“换一个”“换一张”或明确拒绝当前确认图时，默认在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如 `B-01`；不得进入 Dreamina，不得切换模式，不得更换参考。只有用户明确要求“并发 3 张”“一次生成 3 张”等并发换图时，才记录当前槽位 rejected，并在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下并发生成后续三个单槽位批次，例如 `F-01`、`G-01`、`H-01`；每个批次仍只有一个 `*-01` 槽位。
 
 ## 输入与 @ 引用
 
 - Kie 生图只上传 `MATERIAL/fixed-role/anna.png`，在 prompt 中用 `@图1` 指代。
-- `@图1` 是同一位成年女性的多视角、多表情角色参考图，不是多人合照或多角色拼图。
-- `@图1` 提供人物身份、五官、脸型、发型、神态和稳定身材比例；左下大脸和正面脸优先作为身份锚点，侧面、背面和表情小图只作为辅助参考。
+- `@图1` 是同一位成年女性的多视角角色图；左下大脸和正面脸作为主要身份锚点，其余视角只辅助保持人物一致性。
 - 模块 01 的 `reference-grid.jpg` 或帧图只作为人工视觉分析来源，最终画面描述集中写入 `grid-prompt.txt`；参考宫格、参考帧或其他参考图不得作为 Kie 视觉输入。
 - 确认图阶段每次 Kie 提交不得提交第二张图片，也不得在 img prompt 中引用第二张图片。
 
@@ -21,7 +18,7 @@
 
 - 本地 `.env` 必须配置 `KIE_API_KEY`，不得提交 `.env`。
 - 确认图模型固定为 Kie `gpt-image-2-image-to-image`。
-- Kie 提交参数使用 `input_urls` 传入角色图临时 URL，`aspect_ratio=auto`；竖屏画面由 img prompt 的竖屏构图、车门/站台构图要求锁定。
+- Kie 提交参数使用 `input_urls` 传入角色图临时 URL，`aspect_ratio=auto`；画面方向和构图由本次 img prompt 的可见场景描述锁定。
 - 本地角色图先通过 Kie File Stream Upload 获得临时 URL，再传入 `input_urls`。
 - Kie 临时 URL 有时效，生成成功后必须立即下载原始确认图到 `TEMP/RUN_ID/confirm-BATCH-HHMMSS/raw/`，后续只使用本地文件路径。
 
@@ -32,15 +29,6 @@ img prompt 的内容规范只看模块 01，不在本模块维护单独模板。
 - 本模块只执行阶段裁剪：从 `TEMP/RUN_ID/grid-prompt.txt` 删除完整的 `整体动画：` 段和完整的 `背景音乐：` 段，得到当前槽位的 `TEMP/RUN_ID/SLOT-img-prompt-v1.txt`，例如 `A-01-img-prompt-v1.txt` 或 `B-01-img-prompt-v1.txt`。
 - 除删除上述两段外，其余段落不得在模块 02 临时重组、补写或改写。
 - 派生结果必须仍是 Kie 可直接执行的静态画面描述；如果删除后出现断裂、矛盾、动态动作过强、第二张图片引用或内部说明，必须回到模块 01 重写 `grid-prompt.txt` 后重新派生。
-
-## 生成前自检
-
-提交 Kie 前，执行者必须检查最终 img prompt：
-
-- `grid-prompt.txt` 已按模块 01 完成；如发现内容不够具体，只回到模块 01 修改。
-- `SLOT-img-prompt-v1.txt` 只删除动画和音乐两段，其余文本与 `grid-prompt.txt` 保持一致。
-- img prompt 不再包含动画段、音乐段、第二张图片引用、参考宫格输入语义或内部说明。
-- Kie `input_urls` 只包含 `MATERIAL/fixed-role/anna.png` 对应的临时 URL。
 
 ## 命令
 
@@ -71,7 +59,7 @@ python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --b
 ## 通过标准
 
 - Kie `input_urls` 只包含 `MATERIAL/fixed-role/anna.png` 对应的临时 URL。
-- img prompt 已由十段式 `grid-prompt.txt` 删除 `整体动画：` 和 `背景音乐：` 两段得到，并可作为 Kie 直接执行的文本。
+- img prompt 只比 `grid-prompt.txt` 少动画和音乐两段，不含第二张图片引用、宫格输入语义或内部说明；不通过时回到模块 01 修改。
 - 当前 `*-01` 是本批唯一槽位；如发生 TNS 收敛，已保留 `v1-v5` 版本记录。
 - `confirmation-manifest.json/md` 已生成，且只包含当前批次的单个 `*-01` 槽位。
 - 当前槽位原始确认图已下载到本地；展示时优先使用原始确认图，内部视觉检查如需代理图则仅用于检查，不作为正式产物。

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "updated_at": "2026-06-29T01:45:00+00:00",
+  "entries": [
+    {
+      "recorded_at": "2026-06-29T01:45:00+00:00",
+      "route": "anna",
+      "status": "blocked_by_user",
+      "video_id": "7642711037176067494",
+      "canonical_url": "https://www.douyin.com/video/7642711037176067494",
+      "source": "https://www.douyin.com/video/7642711037176067494",
+      "title": "20260629-0920-favorite-764271-tea",
+      "author": "favorite_collection",
+      "reason": "用户要求这些参考以后都不要使用"
+    },
+    {
+      "recorded_at": "2026-06-29T01:45:00+00:00",
+      "route": "anna",
+      "status": "blocked_by_user",
+      "video_id": "7639990189171326847",
+      "canonical_url": "https://www.douyin.com/video/7639990189171326847",
+      "source": "https://www.douyin.com/video/7639990189171326847",
+      "title": "20260629-0930-favorite-763999-sisterfit",
+      "author": "favorite_collection",
+      "reason": "用户要求这些参考以后都不要使用"
+    }
+  ]
+}

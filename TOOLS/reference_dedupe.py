@@ -73,6 +73,26 @@ def safe_load_history(path):
     return data
 
 
+def safe_load_blocklist(path):
+    if not path.exists():
+        return {"version": 1, "entries": []}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"blocklist json is invalid: {path}") from exc
+
+    if isinstance(data, list):
+        return {"version": 1, "entries": data}
+    if not isinstance(data, dict):
+        raise ValueError(f"blocklist root must be object or list: {path}")
+    entries = data.get("entries")
+    if entries is None:
+        data["entries"] = []
+    elif not isinstance(entries, list):
+        raise ValueError(f"blocklist entries must be a list: {path}")
+    return data
+
+
 def write_history(path, history):
     path.parent.mkdir(parents=True, exist_ok=True)
     history["version"] = 1
@@ -191,6 +211,24 @@ def find_duplicate(history, canonical, now, window_days):
     return matches[0] if matches else None
 
 
+def find_blocked(blocklist, canonical):
+    for entry in blocklist.get("entries", []):
+        if entry.get("enabled") is False:
+            continue
+        if entry_key(entry) == canonical["match_key"]:
+            return {
+                "route": entry.get("route"),
+                "status": entry.get("status") or "blocked",
+                "reason": entry.get("reason"),
+                "title": entry.get("title"),
+                "author": entry.get("author"),
+                "canonical_url": entry.get("canonical_url"),
+                "video_id": entry.get("video_id"),
+                "recorded_at": entry.get("recorded_at"),
+            }
+    return None
+
+
 def prune_entries(history, now, retention_days):
     cutoff = now - timedelta(days=retention_days)
     kept = []
@@ -205,17 +243,22 @@ def handle_check(args):
     now = parse_time(args.now, utc_now())
     canonical = canonicalize(args.reference)
     history = safe_load_history(args.history)
+    blocklist = safe_load_blocklist(args.blocklist)
+    blocked = find_blocked(blocklist, canonical)
     duplicate = find_duplicate(history, canonical, now, args.window_days)
     result = {
+        "blocked": bool(blocked),
         "duplicate": bool(duplicate),
         "window_days": args.window_days,
         "history": str(args.history),
+        "blocklist": str(args.blocklist),
         "reference": canonical,
+        "blocked_entry": blocked,
         "matched_entry": duplicate,
-        "decision": "skip_autonomous" if duplicate else "use",
+        "decision": "skip_autonomous" if blocked or duplicate else "use",
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 1 if duplicate else 0
+    return 1 if blocked or duplicate else 0
 
 
 def handle_record(args):
@@ -251,6 +294,7 @@ def handle_record(args):
 def build_parser():
     root = Path.cwd()
     default_history = root / "MATERIAL/reference-history.json"
+    default_blocklist = root / "MATERIAL/reference-blocklist.json"
 
     parser = argparse.ArgumentParser(description="检查并记录 7 天内参考视频精确复用。")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -258,6 +302,7 @@ def build_parser():
     check = subparsers.add_parser("check", help="检查参考视频是否在时间窗内用过")
     check.add_argument("reference", help="抖音视频 URL、视频 ID，或其他可规范化 URL")
     check.add_argument("--history", type=Path, default=default_history, help="历史账本路径")
+    check.add_argument("--blocklist", type=Path, default=default_blocklist, help="永久禁用参考账本路径")
     check.add_argument("--window-days", type=float, default=7.0, help="去重时间窗，默认 7 天")
     check.add_argument("--now", default=None, help=argparse.SUPPRESS)
     check.set_defaults(func=handle_check)

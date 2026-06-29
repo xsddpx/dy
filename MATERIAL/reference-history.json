@@ -237,7 +237,74 @@
       "source": "https://www.douyin.com/video/7629256836419946570",
       "title": "20260628-1759-favorite-762925-fast",
       "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T01:22:27.082804+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7642711037176067494",
+      "canonical_url": "https://www.douyin.com/video/7642711037176067494",
+      "source": "https://www.douyin.com/video/7642711037176067494",
+      "title": "20260629-0920-favorite-764271-tea",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T01:37:22.497059+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7639990189171326847",
+      "canonical_url": "https://www.douyin.com/video/7639990189171326847",
+      "source": "https://www.douyin.com/video/7639990189171326847",
+      "title": "20260629-0930-favorite-763999-sisterfit",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T01:51:52.495595+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7624847473781521343",
+      "canonical_url": "https://www.douyin.com/video/7624847473781521343",
+      "source": "https://www.douyin.com/video/7624847473781521343",
+      "title": "20260629-0955-favorite-762484-yujiefit",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T02:06:21.247235+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7640379864377444937",
+      "canonical_url": "https://www.douyin.com/video/7640379864377444937",
+      "source": "https://www.douyin.com/video/7640379864377444937",
+      "title": "#宝妈 #居家瑜伽服穿搭 - 抖音"
+    },
+    {
+      "recorded_at": "2026-06-29T02:19:04.951432+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7623321341685452614",
+      "canonical_url": "https://www.douyin.com/video/7623321341685452614",
+      "source": "https://www.douyin.com/video/7623321341685452614",
+      "title": "你说我们星座不相配 相处会针锋相对 - 抖音"
+    },
+    {
+      "recorded_at": "2026-06-29T02:37:31.865296+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7647340817040488699",
+      "canonical_url": "https://www.douyin.com/video/7647340817040488699",
+      "source": "https://www.douyin.com/video/7647340817040488699",
+      "title": "#随拍 - 抖音"
+    },
+    {
+      "recorded_at": "2026-06-29T02:42:32.771099+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7647340817040488699",
+      "canonical_url": "https://www.douyin.com/video/7647340817040488699",
+      "source": "https://www.douyin.com/video/7647340817040488699",
+      "title": "20260629-1025-favorite-764734-mirrorfit",
+      "author": "favorite_collection"
     }
   ],
-  "updated_at": "2026-06-28T10:50:53.420054+00:00"
+  "updated_at": "2026-06-29T02:42:32.771515+00:00"
 }

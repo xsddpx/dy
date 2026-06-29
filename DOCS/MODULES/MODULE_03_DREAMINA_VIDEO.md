@@ -5,6 +5,7 @@
 - 在默认 `auto/fast` 模式下，上传 `anna.png`，直接使用模块 01 的 `grid-prompt.txt` 作为最终 vid prompt。
 - 在显式 `slow` 模式下，上传模块 02 用户确认后的 Kie 原始图，从 `grid-prompt.txt` 删除人物段中的 anna 多视角角色卡声明后作为最终 vid prompt。
 - 提交 Dreamina `multimodal2video` 并下载正式 MP4。
+- 按模式执行视频后的发布确认规则。
 
 ## prompt 边界
 
@@ -14,10 +15,7 @@
 - `slow` 的 `vid-prompt-v1.txt` 从 `grid-prompt.txt` 派生，只删除人物段中“@图1 是同一位成年女性的多视角、多表情角色参考图...”这类角色卡声明；其余人物身份一致性文本和其他九段必须保持一致。
 - `auto/fast` 视频阶段只上传 `MATERIAL/fixed-role/anna.png`，并在 prompt 中用 `@图1` 指代。
 - `slow` 视频阶段只上传模块 02 选中的 Kie 原始图，并在 prompt 中用 `@图1` 指代。
-- 视频阶段 `@图1` 指代当前模式唯一上传的图片：`auto/fast` 中是 `anna.png`，`slow` 中是选中的 Kie 原始图。
 - 视频阶段不把 `reference-grid.jpg`、参考帧或参考图作为输入；参考宫格只作为模块 01 的人工分析来源。
-- `auto` 就是 `fast`，是默认模式；“快速通道”和“跳过确认图”只是 `fast` 的兼容叫法。
-- `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
 - Dreamina 视频阶段的图片指代统一使用 `@` 方式，不做脚本转换。
 - 最终 vid prompt 必须先通过 `prompt_lint.py`；fast 使用默认 `--video-mode fast`，slow 必须使用 `--video-mode slow`，不通过时回到模块 01 重写或按 slow 派生规则删除角色卡声明，不得在视频阶段临时拼接或解释。
 
@@ -58,6 +56,12 @@ dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png
 
 任何模式遇到非 TNS/安全拦截的生成失败，或 TNS/安全拦截收敛到 `v5` 后仍未生成时，都不自动切换到另一个模式；停止并报告 Dreamina 返回状态、已使用输入、`vid prompt` 路径、最高尝试版本和可选下一步。
 
+## 视频后的确认规则
+
+- `auto/fast` 默认不设视频确认节点：MP4 通过可解码、竖屏和时长校验后直接进入模块 04。
+- 用户明确要求视频确认、只生成不发布或发布前确认时，fast 在本模块硬停，展示视频、首中尾帧、vid prompt、TNS 记录和是否建议发布；未获确认不得进入模块 04。
+- `slow` 固定在本模块硬停并展示上述内容；未获用户明确发布确认不得进入模块 04。
+
 ## 重试
 
 - Dreamina 命令包含第二个 `--image`、把 `reference-grid.jpg` 作为输入，或 vid prompt 含第二张图片引用时，不得提交 Dreamina；已提交的视频节点一律弃用，不下载、不质检、不发布。
@@ -71,9 +75,7 @@ dreamina multimodal2video --image TEMP/RUN_ID/confirm-A-HHMMSS/A-01/SELECTED.png
 
 ## 通过标准
 
-- `auto/fast` Dreamina 命令只上传 `MATERIAL/fixed-role/anna.png`；`slow` Dreamina 命令只上传选中图。
-- `auto/fast` Dreamina vid prompt 使用 `@图1` 指代 `anna.png`；`slow` 使用 `@图1` 指代选中图；两种模式都不得把参考宫格写成图片输入。
-- `auto/fast` vid prompt 直接来自模块 01 的 `grid-prompt.txt`，`vid-prompt-v1.txt` 如存在则与其逐字一致，并已通过 `prompt_lint.py --video-mode fast`。
-- `slow` vid prompt 从模块 01 的 `grid-prompt.txt` 派生，只删除人物段中的 anna 多视角角色卡声明，并已通过 `prompt_lint.py --video-mode slow`。
-- vid prompt 不含第二张图片引用，不引入参考图视觉输入语义。
+- Dreamina 只收到当前模式的唯一图片；fast prompt 与 `grid-prompt.txt` 一致，slow prompt 只删除人物段角色卡声明，且通过对应 lint。
+- vid prompt 不含第二张图片引用或参考图视觉输入语义。
 - 下载到的 MP4 可解码、竖屏、约 5-6 秒，并整理为 `OUTPUT/RUN_ID.mp4`。
+- fast 默认可直接进入模块 04；fast 显式确认任务和 slow 已取得用户发布确认后才可进入模块 04。

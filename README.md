@@ -1,6 +1,6 @@
 # dy
 
-`/Users/Shared/codex/dy` 是 `anna auto/fast` 抖音日更项目，默认执行单图视频生成发布链路。
+`/Users/Shared/codex/dy` 是 `anna auto/fast` 双平台日更项目，默认执行单图视频生成并同步发布到抖音和快手。
 
 ## 固定流程
 
@@ -11,8 +11,8 @@
 5. `grid-prompt.txt` 直接作为 fast 的 Dreamina v1 最终 vid prompt；slow 视频只删除人物段中的 anna 多视角角色卡声明。
 6. Dreamina `multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png` 生成 5-6 秒竖屏视频。
 7. 下载并质检 MP4。
-8. 上传抖音，设置 `内容由AI生成` 声明并发布。
-9. 记录产物、去重账本和发布状态。
+8. 同步上传抖音和快手，两个平台都设置 `内容由AI生成` 声明并发布。
+9. 记录产物、去重账本、抖音/快手发布状态和双平台整体状态。
 
 ## 边界
 
