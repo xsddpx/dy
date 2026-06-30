@@ -54,49 +54,6 @@ class RunRecordTest(unittest.TestCase):
             self.assertEqual(summary["final_status_by_stage"]["reference"]["status"], "pass")
             self.assertEqual(summary["key_artifacts"][0]["path"], "TEMP/任务A/reference-grid.jpg")
 
-    def test_face_similarity_summary_contains_required_fields(self):
-        report = {
-            "decision": "reference",
-            "reference_slot": "A-02",
-            "reference_confirmation_image": "TEMP/run/confirm/A-02.png",
-            "slots": [
-                {
-                    "slot": "A-01",
-                    "face_similarity_min_percent": 82.0,
-                    "adjusted_threshold_min_percent": 75.0,
-                    "auto_select_reason": "pass",
-                },
-                {
-                    "slot": "A-02",
-                    "face_similarity_min_percent": 91.25,
-                    "adjusted_threshold_min_percent": 63.5,
-                    "auto_select_reason": "pass",
-                },
-            ],
-        }
-        summary = RUN_RECORD.face_similarity_summary(report)
-        self.assertEqual(summary["decision"], "reference")
-        self.assertEqual(summary["selected_slot"], "A-02")
-        self.assertEqual(summary["reference_slot"], "A-02")
-        self.assertEqual(summary["adjusted_threshold_min_percent"], 63.5)
-        self.assertEqual(summary["best_similarity_percent"], 91.25)
-
-        with tempfile.TemporaryDirectory() as tmp:
-            record = Path(tmp) / "run" / "run-run-record.jsonl"
-            RUN_RECORD.append_event(
-                record,
-                stage="confirmation",
-                event="face_similarity",
-                status="reference",
-                summary="人脸相似度参考 reference，参考槽位 A-02",
-                data=summary,
-            )
-            md = RUN_RECORD.refresh_markdown(record)
-            text = md.read_text(encoding="utf-8")
-            self.assertIn("参考槽位：A-02", text)
-            self.assertIn("动态阈值：63.5%", text)
-            self.assertIn("候选最高分：91.25%", text)
-
     def test_append_cli_accepts_json_data(self):
         with tempfile.TemporaryDirectory() as tmp:
             record = Path(tmp) / "run" / "run-run-record.jsonl"

@@ -27,50 +27,19 @@ GOOD_PROMPT = (
     "其他：皮肤真实，不要刻意磨皮美化，写实摄影风格，真实人物质感，自然光影，真实皮肤纹理，细腻毛孔，轻微皮肤瑕疵，真实面部结构，真实眼神反光，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实空气感，真实色彩，不夸张，不塑料感，不磨皮，不网红滤镜，不过度锐化，不AI感，穿搭轮廓清晰，腰线可见，构图稳定，单一连续画面，不生成拼图、分屏、多格、上下或左右双画面、多姿势拼贴，画面物理真实。"
 )
 
-SLOW_PROMPT = GOOD_PROMPT.replace(
-    "@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
-    "以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。",
-    "",
-)
-
-
 class PromptLintFlowTest(unittest.TestCase):
-    def lint(self, text, route="anna", channel="auto", video_mode="fast"):
-        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel, video_mode)
+    def lint(self, text, route="anna", channel="auto"):
+        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel)
 
     def test_auto_anna_with_ten_section_prompt_passes(self):
         result = self.lint(GOOD_PROMPT)
         self.assertEqual(result["decision"], "pass", result["findings"])
         self.assertEqual(result["route"], "anna")
         self.assertEqual(result["channel"], "auto")
-        self.assertEqual(result["video_mode"], "fast")
-
-    def test_slow_prompt_without_role_card_declaration_passes(self):
-        result = self.lint(SLOW_PROMPT, video_mode="slow")
-        self.assertEqual(result["decision"], "pass", result["findings"])
-
-    def test_slow_prompt_with_role_card_declaration_fails(self):
-        result = self.lint(GOOD_PROMPT, video_mode="slow")
-        self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "slow_role_card_declaration" for f in result["findings"]), result["findings"])
+        self.assertEqual(result["mode"], "fast")
 
     def test_derive_fast_copies_grid_prompt(self):
         self.assertEqual(PROMPT_LINT.derive_prompt(GOOD_PROMPT, "fast"), GOOD_PROMPT + "\n")
-
-    def test_derive_slow_img_removes_animation_and_music(self):
-        derived = PROMPT_LINT.derive_prompt(GOOD_PROMPT, "slow-img")
-        self.assertNotIn("整体动画：", derived)
-        self.assertNotIn("背景音乐：", derived)
-        self.assertIn("人物：", derived)
-        self.assertIn("其他：", derived)
-        result = PROMPT_LINT.lint_derived_prompt(derived, Path("A-01-img-prompt-v1.txt"), "slow-img")
-        self.assertEqual(result["decision"], "pass", result["findings"])
-
-    def test_derive_slow_vid_removes_role_card_only(self):
-        derived = PROMPT_LINT.derive_prompt(GOOD_PROMPT, "slow-vid")
-        self.assertEqual(derived, SLOW_PROMPT + "\n")
-        result = self.lint(derived, video_mode="slow")
-        self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_derive_main_writes_output(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -79,14 +48,14 @@ class PromptLintFlowTest(unittest.TestCase):
             source.write_text(GOOD_PROMPT, encoding="utf-8")
             stdout = io.StringIO()
             with redirect_stdout(stdout):
-                code = PROMPT_LINT.main(["derive", str(source), "--mode", "slow-vid", "--out", str(out)])
+                code = PROMPT_LINT.main(["derive", str(source), "--mode", "fast", "--out", str(out)])
             self.assertEqual(code, 0, stdout.getvalue())
-            self.assertEqual(out.read_text(encoding="utf-8"), SLOW_PROMPT + "\n")
+            self.assertEqual(out.read_text(encoding="utf-8"), GOOD_PROMPT + "\n")
 
-    def test_without_confirmation_image_fails(self):
+    def test_without_role_image_fails(self):
         result = self.lint("室内镜前自然移动。")
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "missing_confirmation_image" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "missing_role_image" for f in result["findings"]), result["findings"])
 
     def test_non_anna_or_non_auto_fails(self):
         self.assertEqual(self.lint(GOOD_PROMPT, route="other")["decision"], "fail")

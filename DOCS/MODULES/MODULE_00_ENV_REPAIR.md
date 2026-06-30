@@ -14,7 +14,6 @@
 - CDP Chrome 无法启动、端口不可用、用户目录不匹配或 Playwright 无法接管。
 - 抖音或快手创作者中心登录态失效、验证码、账号安全验证、平台风控入口阻断。
 - Dreamina CLI 登录、积分查询、上传、下载、网络代理或命令依赖异常。
-- 显式 `slow` 模式中的 Kie API key、接口权限、下载或网络代理异常。
 - Python、Playwright、浏览器依赖、文件权限、`TEMP/`、`OUTPUT/`、固定素材读写异常。
 - 代理设置异常；本机网络必须保持代理可用，不临时断开代理。
 
@@ -67,12 +66,6 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 - Dreamina 明确返回 TNS/安全拦截不属于环境问题。
 - 网络异常先检查代理，不临时断开代理。
 - 查询结果出现传输类错误时，优先复用同一个 `submit_id` 重查，不先重提生成。
-
-### Kie
-
-- 只有显式 `slow` 模式进入 Kie 确认图流程时，或 Kie 报错时，才检查 Kie API key。
-- `auto/fast` 默认不检查 Kie API key。
-- 不把 Kie 失败当作切换到 fast 或其他生成路线的理由。
 
 ### 文件与依赖
 

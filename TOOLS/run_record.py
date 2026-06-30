@@ -97,29 +97,6 @@ def record_summary_path(record_jsonl: str | Path, summary_path: str | Path | Non
     return jsonl_path.parent / "logs" / "summary" / f"{run_id}-summary.json"
 
 
-def _format_value(value: Any) -> str:
-    if value is None:
-        return "未记录"
-    if isinstance(value, float):
-        return f"{value:.2f}".rstrip("0").rstrip(".")
-    return str(value)
-
-
-def _face_similarity_lines(event: dict[str, Any]) -> list[str]:
-    data = event.get("data") or {}
-    slot = data.get("reference_slot") or data.get("selected_slot")
-    image = data.get("reference_confirmation_image") or data.get("selected_confirmation_image")
-    return [
-        f"- 结论：{_format_value(data.get('decision') or event.get('status'))}",
-        f"- 参考槽位：{_format_value(slot)}",
-        f"- 参考确认图：{_format_value(image)}",
-        f"- 动态阈值：{_format_value(data.get('adjusted_threshold_min_percent'))}%",
-        f"- 候选最高分：{_format_value(data.get('best_similarity_percent'))}%",
-        f"- 跳过人脸槽位：{_format_value(data.get('face_gate_skipped_slots'))}",
-        f"- 原因：{_format_value(data.get('reason'))}",
-    ]
-
-
 def _artifact_bucket(event: dict[str, Any]) -> str:
     data = event.get("data") or {}
     artifact_path = str(data.get("path") or "")
@@ -221,11 +198,6 @@ def refresh_markdown(record_jsonl: str | Path, md_path: str | Path | None = None
             summary = event.get("summary") or event.get("event") or ""
             lines.append(f"- {stage}：{status}；{summary}")
 
-    face_events = [event for event in events if event.get("event") == "face_similarity"]
-    if face_events:
-        lines.extend(["", "## 人脸相似度"])
-        lines.extend(_face_similarity_lines(face_events[-1]))
-
     summary_json = write_summary_json(record_jsonl, events, run_id)
     lines.extend(["", "## 摘要 JSON", f"- {summary_json}"])
 
@@ -264,47 +236,6 @@ def refresh_markdown(record_jsonl: str | Path, md_path: str | Path | None = None
 
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return target
-
-
-def face_similarity_summary(report: dict[str, Any]) -> dict[str, Any]:
-    slots = report.get("slots") or []
-    best = None
-    for slot in slots:
-        score = slot.get("face_similarity_min_percent")
-        if score is None:
-            continue
-        if best is None or float(score) > float(best.get("face_similarity_min_percent") or -1):
-            best = slot
-
-    selected = None
-    selected_slot = report.get("reference_slot") or report.get("selected_slot")
-    for slot in slots:
-        if slot.get("slot") == selected_slot:
-            selected = slot
-            break
-    skipped_slots = []
-    for slot in slots:
-        if slot.get("face_gate_skipped"):
-            skipped_slots.append(slot.get("slot"))
-
-    reason = None
-    if selected:
-        reason = selected.get("auto_select_reason")
-    elif report.get("errors"):
-        reason = "; ".join(str(item) for item in report.get("errors") or [])
-
-    return {
-        "decision": report.get("decision"),
-        "selected_slot": selected_slot,
-        "selected_confirmation_image": report.get("reference_confirmation_image") or report.get("selected_confirmation_image"),
-        "reference_slot": report.get("reference_slot"),
-        "reference_confirmation_image": report.get("reference_confirmation_image"),
-        "adjusted_threshold_min_percent": (selected or {}).get("adjusted_threshold_min_percent"),
-        "best_similarity_percent": (best or {}).get("face_similarity_min_percent"),
-        "face_gate_skipped_slots": ", ".join(str(item) for item in skipped_slots) if skipped_slots else None,
-        "reason": reason,
-        "report": report.get("report") or report.get("report_json"),
-    }
 
 
 def main() -> int:

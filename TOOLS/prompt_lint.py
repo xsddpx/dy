@@ -125,25 +125,6 @@ NON_MUSIC_SOUND_TERMS = [
     "喘息",
     "音效",
 ]
-ROLE_CARD_DECLARATION_TERMS = [
-    "多视角、多表情角色参考图",
-    "左下大脸和正面脸",
-    "侧面、背面和表情小图",
-]
-ROLE_CARD_DECLARATION_TEXT = (
-    "@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
-    "以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。"
-)
-IMG_SECTION_LABELS = [
-    "人物",
-    "视频类型",
-    "穿搭",
-    "姿态镜头",
-    "环境",
-    "卖点与锁定",
-    "表情节奏",
-    "其他",
-]
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
 SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
 SECTION_RE_TEMPLATE = r"(^|[。！？!?；;\n])\s*({label})："
@@ -234,16 +215,14 @@ def image_one_clothing_conflict(text):
     return [pattern for pattern in patterns if pattern in compact]
 
 
-def lint_text(text, path, route="anna", channel="auto", video_mode="fast"):
+def lint_text(text, path, route="anna", channel="auto"):
     findings = []
     if route != "anna":
         add(findings, "error", "unsupported_route", "dy 项目只支持 anna 路线")
     if channel != "auto":
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
-    if video_mode not in {"fast", "slow"}:
-        add(findings, "error", "unsupported_video_mode", "dy 项目只支持 fast 或 slow 视频模式")
-    if not re.search(r"@?[^\s，。；;]*确认图|confirmation[-_ ]?image|@图1", text, re.IGNORECASE):
-        add(findings, "error", "missing_confirmation_image", "auto/fast 视频 prompt 缺少 @图1 单图身份引用或说明")
+    if "@图1" not in text:
+        add(findings, "error", "missing_role_image", "auto/fast 视频 prompt 缺少 @图1 单图身份引用或说明")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
@@ -256,9 +235,6 @@ def lint_text(text, path, route="anna", channel="auto", video_mode="fast"):
     conditional_hits = [term for term in CONDITIONAL_OR_PLACEHOLDER_TERMS if term in text]
     if conditional_hits:
         add(findings, "error", "conditional_or_placeholder_terms", f"prompt 含条件分支或占位符：{', '.join(conditional_hits)}")
-    role_card_hits = [term for term in ROLE_CARD_DECLARATION_TERMS if term in text]
-    if video_mode == "slow" and role_card_hits:
-        add(findings, "error", "slow_role_card_declaration", f"slow 视频 prompt 使用确认图作为 @图1，人物段不得残留 anna 多视角角色卡声明：{', '.join(role_card_hits)}")
     section_code, section_message = section_finding(text)
     if section_code:
         add(findings, "error", section_code, section_message)
@@ -282,7 +258,7 @@ def lint_text(text, path, route="anna", channel="auto", video_mode="fast"):
         "path": str(path),
         "route": "anna",
         "channel": "auto",
-        "video_mode": video_mode,
+        "mode": "fast",
         "bytes": len(text.encode("utf-8")),
         "errors": errors,
         "warnings": warnings,
@@ -292,77 +268,20 @@ def lint_text(text, path, route="anna", channel="auto", video_mode="fast"):
     }
 
 
-def remove_sections(text, labels_to_remove):
-    _, missing, spans = section_spans(text, REQUIRED_SECTION_LABELS)
-    if missing:
-        raise ValueError(f"源 prompt 缺少十段标签：{', '.join(missing)}")
-    remove_ranges = [(start, end) for label, start, _, end in spans if label in labels_to_remove]
-    output = text
-    for start, end in sorted(remove_ranges, reverse=True):
-        output = output[:start].rstrip() + "\n" + output[end:].lstrip()
-    return output.strip() + "\n"
-
-
-def remove_role_card_declaration(text):
-    if ROLE_CARD_DECLARATION_TEXT in text:
-        return text.replace(ROLE_CARD_DECLARATION_TEXT, "", 1)
-
-    pattern = re.compile(
-        r"@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
-        r".{0,120}?侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。"
-    )
-    derived, count = pattern.subn("", text, count=1)
-    if count:
-        return derived
-    raise ValueError("源 prompt 的人物段未找到 anna 多视角角色卡声明，无法机械派生 slow 视频 prompt")
-
-
-def lint_img_prompt(text, path):
-    findings = []
-    section_code, section_message = section_finding(text, IMG_SECTION_LABELS, "八段标签")
-    if section_code:
-        add(findings, "error", section_code, section_message)
-    if "整体动画：" in text or "背景音乐：" in text:
-        add(findings, "error", "img_prompt_extra_sections", "slow img prompt 不得包含“整体动画：”或“背景音乐：”段")
-    for term in ("@图2", "@图3", "reference-grid", "参考宫格", "流程", "文件"):
-        if term in text:
-            add(findings, "error", "img_prompt_unsupported_terms", f"slow img prompt 含不可执行词：{term}")
-    errors = sum(1 for f in findings if f["severity"] == "error")
-    return {
-        "path": str(path),
-        "route": "anna",
-        "channel": "auto",
-        "prompt_kind": "slow-img",
-        "bytes": len(text.encode("utf-8")),
-        "errors": errors,
-        "warnings": 0,
-        "infos": 0,
-        "decision": "fail" if errors else "pass",
-        "findings": findings,
-    }
-
-
 def derive_prompt(text, mode):
     if mode == "fast":
         return text.rstrip() + "\n"
-    if mode == "slow-img":
-        return remove_sections(text, {"整体动画", "背景音乐"})
-    if mode == "slow-vid":
-        return remove_role_card_declaration(text).rstrip() + "\n"
     raise ValueError(f"未知派生模式：{mode}")
 
 
 def lint_derived_prompt(text, path, mode):
-    if mode == "slow-img":
-        return lint_img_prompt(text, path)
-    video_mode = "slow" if mode == "slow-vid" else "fast"
-    return lint_text(text, path, video_mode=video_mode)
+    return lint_text(text, path)
 
 
 def derive_main(argv):
     parser = argparse.ArgumentParser(description="从 grid-prompt.txt 机械派生阶段 prompt。")
     parser.add_argument("grid_prompt", help="模块 01 写出的 TEMP/RUN_ID/grid-prompt.txt")
-    parser.add_argument("--mode", choices=["fast", "slow-img", "slow-vid"], required=True)
+    parser.add_argument("--mode", choices=["fast"], required=True)
     parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
     args = parser.parse_args(argv)
 
@@ -373,7 +292,7 @@ def derive_main(argv):
         return 2
 
     source_text = source.read_text(encoding="utf-8", errors="replace")
-    source_lint = lint_text(source_text, source, video_mode="fast")
+    source_lint = lint_text(source_text, source)
     if source_lint["decision"] != "pass":
         print(json.dumps({"decision": "fail", "source_lint": source_lint}, ensure_ascii=False, indent=2))
         return 1
@@ -419,7 +338,7 @@ def write_reports(results, out_dir):
     ]
     for item in results:
         top = "; ".join(f["message"] for f in item["findings"][:4]) or "无"
-        lines.append(f"| {item['decision']} | anna | auto | {item.get('video_mode', 'fast')} | {item['errors']} | {Path(item['path']).name} | {top} |")
+        lines.append(f"| {item['decision']} | anna | auto | fast | {item['errors']} | {Path(item['path']).name} | {top} |")
     report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_json, report_md
 
@@ -429,7 +348,6 @@ def lint_main(argv=None):
     parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
-    parser.add_argument("--video-mode", choices=["fast", "slow"], default="fast")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")
     args = parser.parse_args(argv)
 
@@ -439,7 +357,7 @@ def lint_main(argv=None):
         print(json.dumps({"error": "prompt 文件不存在", "missing": missing}, ensure_ascii=False), file=sys.stderr)
         return 2
 
-    results = [lint_text(file.read_text(encoding="utf-8", errors="replace"), file, args.route, args.channel, args.video_mode) for file in files]
+    results = [lint_text(file.read_text(encoding="utf-8", errors="replace"), file, args.route, args.channel) for file in files]
     out_dir = Path(args.out_dir) if args.out_dir else Path.cwd() / "TEMP/prompt-lint-runs" / datetime.now().strftime("%Y%m%d-%H%M%S")
     report_json, report_md = write_reports(results, out_dir)
     print(json.dumps({
