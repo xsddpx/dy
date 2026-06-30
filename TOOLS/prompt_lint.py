@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint final TNS retry prompts for the anna auto workflow."""
+"""Lint and derive final prompts for the anna auto workflow."""
 
 import argparse
 import json
@@ -130,6 +130,20 @@ ROLE_CARD_DECLARATION_TERMS = [
     "左下大脸和正面脸",
     "侧面、背面和表情小图",
 ]
+ROLE_CARD_DECLARATION_TEXT = (
+    "@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
+    "以 @图1 中左下大脸和正面脸为主要身份依据，侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。"
+)
+IMG_SECTION_LABELS = [
+    "人物",
+    "视频类型",
+    "穿搭",
+    "姿态镜头",
+    "环境",
+    "卖点与锁定",
+    "表情节奏",
+    "其他",
+]
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
 SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
 SECTION_RE_TEMPLATE = r"(^|[。！？!?；;\n])\s*({label})："
@@ -170,32 +184,41 @@ def video_type_finding(text):
     return None, None
 
 
-def section_finding(text):
+def section_spans(text, labels):
     positions = []
     missing = []
-    for label in REQUIRED_SECTION_LABELS:
+    for label in labels:
         match = re.search(SECTION_RE_TEMPLATE.format(label=re.escape(label)), text)
         if match:
             positions.append((label, match.start(2)))
         else:
             missing.append(label)
+    spans = []
+    for index, (label, start) in enumerate(positions):
+        content_start = start + len(label) + 1
+        content_end = positions[index + 1][1] if index + 1 < len(positions) else len(text)
+        spans.append((label, start, content_start, content_end))
+    return positions, missing, spans
+
+
+def section_finding(text, labels=None, section_name="十段标签"):
+    labels = labels or REQUIRED_SECTION_LABELS
+    positions, missing, spans = section_spans(text, labels)
     if missing:
-        return "missing_sections", f"最终 vid prompt 缺少十段标签：{', '.join(missing)}"
+        return "missing_sections", f"最终 prompt 缺少{section_name}：{', '.join(missing)}"
     out_of_order = [
-        REQUIRED_SECTION_LABELS[index]
+        labels[index]
         for index in range(1, len(positions))
         if positions[index][1] < positions[index - 1][1]
     ]
     if out_of_order:
-        return "section_order", f"最终 vid prompt 十段标签顺序错误：{', '.join(out_of_order)}"
+        return "section_order", f"最终 prompt {section_name}顺序错误：{', '.join(out_of_order)}"
     empty = []
-    for index, (label, start) in enumerate(positions):
-        content_start = start + len(label) + 1
-        content_end = positions[index + 1][1] if index + 1 < len(positions) else len(text)
+    for label, _, content_start, content_end in spans:
         if not text[content_start:content_end].strip(" \t\r\n。；;"):
             empty.append(label)
     if empty:
-        return "empty_sections", f"最终 vid prompt 段落为空：{', '.join(empty)}"
+        return "empty_sections", f"最终 prompt 段落为空：{', '.join(empty)}"
     return None, None
 
 
@@ -269,6 +292,116 @@ def lint_text(text, path, route="anna", channel="auto", video_mode="fast"):
     }
 
 
+def remove_sections(text, labels_to_remove):
+    _, missing, spans = section_spans(text, REQUIRED_SECTION_LABELS)
+    if missing:
+        raise ValueError(f"源 prompt 缺少十段标签：{', '.join(missing)}")
+    remove_ranges = [(start, end) for label, start, _, end in spans if label in labels_to_remove]
+    output = text
+    for start, end in sorted(remove_ranges, reverse=True):
+        output = output[:start].rstrip() + "\n" + output[end:].lstrip()
+    return output.strip() + "\n"
+
+
+def remove_role_card_declaration(text):
+    if ROLE_CARD_DECLARATION_TEXT in text:
+        return text.replace(ROLE_CARD_DECLARATION_TEXT, "", 1)
+
+    pattern = re.compile(
+        r"@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
+        r".{0,120}?侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。"
+    )
+    derived, count = pattern.subn("", text, count=1)
+    if count:
+        return derived
+    raise ValueError("源 prompt 的人物段未找到 anna 多视角角色卡声明，无法机械派生 slow 视频 prompt")
+
+
+def lint_img_prompt(text, path):
+    findings = []
+    section_code, section_message = section_finding(text, IMG_SECTION_LABELS, "八段标签")
+    if section_code:
+        add(findings, "error", section_code, section_message)
+    if "整体动画：" in text or "背景音乐：" in text:
+        add(findings, "error", "img_prompt_extra_sections", "slow img prompt 不得包含“整体动画：”或“背景音乐：”段")
+    for term in ("@图2", "@图3", "reference-grid", "参考宫格", "流程", "文件"):
+        if term in text:
+            add(findings, "error", "img_prompt_unsupported_terms", f"slow img prompt 含不可执行词：{term}")
+    errors = sum(1 for f in findings if f["severity"] == "error")
+    return {
+        "path": str(path),
+        "route": "anna",
+        "channel": "auto",
+        "prompt_kind": "slow-img",
+        "bytes": len(text.encode("utf-8")),
+        "errors": errors,
+        "warnings": 0,
+        "infos": 0,
+        "decision": "fail" if errors else "pass",
+        "findings": findings,
+    }
+
+
+def derive_prompt(text, mode):
+    if mode == "fast":
+        return text.rstrip() + "\n"
+    if mode == "slow-img":
+        return remove_sections(text, {"整体动画", "背景音乐"})
+    if mode == "slow-vid":
+        return remove_role_card_declaration(text).rstrip() + "\n"
+    raise ValueError(f"未知派生模式：{mode}")
+
+
+def lint_derived_prompt(text, path, mode):
+    if mode == "slow-img":
+        return lint_img_prompt(text, path)
+    video_mode = "slow" if mode == "slow-vid" else "fast"
+    return lint_text(text, path, video_mode=video_mode)
+
+
+def derive_main(argv):
+    parser = argparse.ArgumentParser(description="从 grid-prompt.txt 机械派生阶段 prompt。")
+    parser.add_argument("grid_prompt", help="模块 01 写出的 TEMP/RUN_ID/grid-prompt.txt")
+    parser.add_argument("--mode", choices=["fast", "slow-img", "slow-vid"], required=True)
+    parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
+    args = parser.parse_args(argv)
+
+    source = Path(args.grid_prompt).expanduser().resolve()
+    out_path = Path(args.out).expanduser().resolve()
+    if not source.exists():
+        print(json.dumps({"error": "grid-prompt 文件不存在", "missing": str(source)}, ensure_ascii=False), file=sys.stderr)
+        return 2
+
+    source_text = source.read_text(encoding="utf-8", errors="replace")
+    source_lint = lint_text(source_text, source, video_mode="fast")
+    if source_lint["decision"] != "pass":
+        print(json.dumps({"decision": "fail", "source_lint": source_lint}, ensure_ascii=False, indent=2))
+        return 1
+
+    try:
+        derived = derive_prompt(source_text, args.mode)
+    except ValueError as exc:
+        print(json.dumps({"decision": "fail", "error": str(exc)}, ensure_ascii=False, indent=2))
+        return 1
+
+    derived_lint = lint_derived_prompt(derived, out_path, args.mode)
+    if derived_lint["decision"] != "pass":
+        print(json.dumps({"decision": "fail", "source_lint": source_lint, "derived_lint": derived_lint}, ensure_ascii=False, indent=2))
+        return 1
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(derived, encoding="utf-8")
+    print(json.dumps({
+        "decision": "pass",
+        "mode": args.mode,
+        "source": str(source),
+        "out": str(out_path),
+        "source_lint": source_lint["decision"],
+        "derived_lint": derived_lint["decision"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def write_reports(results, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     report_json = out_dir / "report.json"
@@ -291,14 +424,14 @@ def write_reports(results, out_dir):
     return report_json, report_md
 
 
-def main():
+def lint_main(argv=None):
     parser = argparse.ArgumentParser(description="检查 dy 项目的最终 prompt 是否满足 TNS 收敛硬门。")
     parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
     parser.add_argument("--video-mode", choices=["fast", "slow"], default="fast")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     files = [Path(p).expanduser().resolve() for p in args.prompts]
     missing = [str(p) for p in files if not p.exists()]
@@ -318,6 +451,13 @@ def main():
         "fail": sum(1 for r in results if r["decision"] == "fail"),
     }, ensure_ascii=False, indent=2))
     return 1 if any(r["decision"] == "fail" for r in results) else 0
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "derive":
+        return derive_main(argv[1:])
+    return lint_main(argv)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,8 @@
 import importlib.util
+import io
+import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 
@@ -21,7 +24,7 @@ GOOD_PROMPT = (
     "表情节奏：开场眼神平静看向镜头，中段眉眼放松，结尾嘴角轻收并短暂停顿。"
     "整体动画：约 5-6 秒，画面人物站在室内镜前自然移动，手部轻整理衣摆后回到腰侧。"
     "背景音乐：轻柔电子节拍，节奏清晰。"
-    "其他：真实皮肤纹理，自然光影，真实面料质感，穿搭轮廓清晰，腰线可见，构图稳定，画面物理真实。"
+    "其他：皮肤真实，不要刻意磨皮美化，写实摄影风格，真实人物质感，自然光影，真实皮肤纹理，细腻毛孔，轻微皮肤瑕疵，真实面部结构，真实眼神反光，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实空气感，真实色彩，不夸张，不塑料感，不磨皮，不网红滤镜，不过度锐化，不AI感，穿搭轮廓清晰，腰线可见，构图稳定，单一连续画面，不生成拼图、分屏、多格、上下或左右双画面、多姿势拼贴，画面物理真实。"
 )
 
 SLOW_PROMPT = GOOD_PROMPT.replace(
@@ -50,6 +53,35 @@ class PromptLintFlowTest(unittest.TestCase):
         result = self.lint(GOOD_PROMPT, video_mode="slow")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "slow_role_card_declaration" for f in result["findings"]), result["findings"])
+
+    def test_derive_fast_copies_grid_prompt(self):
+        self.assertEqual(PROMPT_LINT.derive_prompt(GOOD_PROMPT, "fast"), GOOD_PROMPT + "\n")
+
+    def test_derive_slow_img_removes_animation_and_music(self):
+        derived = PROMPT_LINT.derive_prompt(GOOD_PROMPT, "slow-img")
+        self.assertNotIn("整体动画：", derived)
+        self.assertNotIn("背景音乐：", derived)
+        self.assertIn("人物：", derived)
+        self.assertIn("其他：", derived)
+        result = PROMPT_LINT.lint_derived_prompt(derived, Path("A-01-img-prompt-v1.txt"), "slow-img")
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_derive_slow_vid_removes_role_card_only(self):
+        derived = PROMPT_LINT.derive_prompt(GOOD_PROMPT, "slow-vid")
+        self.assertEqual(derived, SLOW_PROMPT + "\n")
+        result = self.lint(derived, video_mode="slow")
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_derive_main_writes_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "grid-prompt.txt"
+            out = Path(tmp) / "vid-prompt-v1.txt"
+            source.write_text(GOOD_PROMPT, encoding="utf-8")
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = PROMPT_LINT.main(["derive", str(source), "--mode", "slow-vid", "--out", str(out)])
+            self.assertEqual(code, 0, stdout.getvalue())
+            self.assertEqual(out.read_text(encoding="utf-8"), SLOW_PROMPT + "\n")
 
     def test_without_confirmation_image_fails(self):
         result = self.lint("室内镜前自然移动。")
@@ -125,7 +157,7 @@ class PromptLintFlowTest(unittest.TestCase):
         result = self.lint(
             GOOD_PROMPT
             + "背景音乐为轻柔电子节拍。"
-            + "其他：真实皮肤纹理，自然光影，真实面料质感，构图稳定，画面物理真实。"
+            + "其他：皮肤真实，不要刻意磨皮美化，写实摄影风格，真实人物质感，自然光影，真实皮肤纹理，细腻毛孔，轻微皮肤瑕疵，真实面部结构，真实眼神反光，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实空气感，真实色彩，不夸张，不塑料感，不磨皮，不网红滤镜，不过度锐化，不AI感，构图稳定，画面物理真实。"
             + "除背景音乐外，不出现环境声、人声、脚步声、衣料声、镜头声、口播、对白、喘息或音效。"
         )
         self.assertEqual(result["decision"], "pass", result["findings"])
