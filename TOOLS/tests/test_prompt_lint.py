@@ -2,7 +2,7 @@ import importlib.util
 import io
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 
@@ -35,27 +35,23 @@ SLOW_PROMPT = GOOD_PROMPT.replace(
 
 
 class PromptLintFlowTest(unittest.TestCase):
-    def lint(self, text, route="anna", channel="auto", video_mode="fast"):
-        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel, video_mode)
+    def lint(self, text, route="anna"):
+        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route)
 
-    def test_auto_anna_with_ten_section_prompt_passes(self):
-        result = self.lint(GOOD_PROMPT)
+    def test_grid_prompt_with_role_card_declaration_passes(self):
+        result = PROMPT_LINT.lint_grid_prompt(GOOD_PROMPT, Path("grid-prompt.txt"))
         self.assertEqual(result["decision"], "pass", result["findings"])
         self.assertEqual(result["route"], "anna")
-        self.assertEqual(result["channel"], "auto")
-        self.assertEqual(result["video_mode"], "fast")
+        self.assertEqual(result["video_mode"], "slow")
 
     def test_slow_prompt_without_role_card_declaration_passes(self):
-        result = self.lint(SLOW_PROMPT, video_mode="slow")
+        result = self.lint(SLOW_PROMPT)
         self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_slow_prompt_with_role_card_declaration_fails(self):
-        result = self.lint(GOOD_PROMPT, video_mode="slow")
+        result = self.lint(GOOD_PROMPT)
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "slow_role_card_declaration" for f in result["findings"]), result["findings"])
-
-    def test_derive_fast_copies_grid_prompt(self):
-        self.assertEqual(PROMPT_LINT.derive_prompt(GOOD_PROMPT, "fast"), GOOD_PROMPT + "\n")
 
     def test_derive_slow_img_removes_animation_and_music(self):
         derived = PROMPT_LINT.derive_prompt(GOOD_PROMPT, "slow-img")
@@ -69,7 +65,7 @@ class PromptLintFlowTest(unittest.TestCase):
     def test_derive_slow_vid_removes_role_card_only(self):
         derived = PROMPT_LINT.derive_prompt(GOOD_PROMPT, "slow-vid")
         self.assertEqual(derived, SLOW_PROMPT + "\n")
-        result = self.lint(derived, video_mode="slow")
+        result = self.lint(derived)
         self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_derive_main_writes_output(self):
@@ -83,14 +79,35 @@ class PromptLintFlowTest(unittest.TestCase):
             self.assertEqual(code, 0, stdout.getvalue())
             self.assertEqual(out.read_text(encoding="utf-8"), SLOW_PROMPT + "\n")
 
+    def test_removed_derive_mode_is_rejected_without_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "grid-prompt.txt"
+            out = Path(tmp) / "vid-prompt-v1.txt"
+            source.write_text(GOOD_PROMPT, encoding="utf-8")
+            stderr = io.StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                PROMPT_LINT.main(["derive", str(source), "--mode", "fa" + "st", "--out", str(out)])
+            self.assertEqual(raised.exception.code, 2)
+            self.assertFalse(out.exists())
+
+    def test_removed_video_mode_option_is_rejected_without_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "vid-prompt-v1.txt"
+            report_dir = Path(tmp) / "report"
+            source.write_text(SLOW_PROMPT, encoding="utf-8")
+            stderr = io.StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                PROMPT_LINT.main([str(source), "--video-mode", "fa" + "st", "--out-dir", str(report_dir)])
+            self.assertEqual(raised.exception.code, 2)
+            self.assertFalse(report_dir.exists())
+
     def test_without_confirmation_image_fails(self):
         result = self.lint("室内镜前自然移动。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "missing_confirmation_image" for f in result["findings"]), result["findings"])
 
-    def test_non_anna_or_non_auto_fails(self):
+    def test_non_anna_fails(self):
         self.assertEqual(self.lint(GOOD_PROMPT, route="other")["decision"], "fail")
-        self.assertEqual(self.lint(GOOD_PROMPT, channel="other")["decision"], "fail")
 
     def test_unsupported_terms_fail(self):
         result = self.lint(GOOD_PROMPT + " @图2 模型参数。")
@@ -141,7 +158,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue(any(f["code"] == "conditional_or_placeholder_terms" for f in result["findings"]), result["findings"])
 
     def test_camera_mode_conflict_is_left_to_prompt_review(self):
-        result = self.lint(GOOD_PROMPT + "拍摄方式为固定手机机位，带轻微手持感。")
+        result = self.lint(SLOW_PROMPT + "拍摄方式为固定手机机位，带轻微手持感。")
         self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_non_music_sound_terms_fail(self):
@@ -150,12 +167,12 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue(any(f["code"] == "non_music_sound_terms" for f in result["findings"]), result["findings"])
 
     def test_negated_non_music_sound_terms_pass(self):
-        result = self.lint(GOOD_PROMPT + "背景音乐为轻柔电子节拍，除背景音乐外，不出现环境声、人声、脚步声或音效。")
+        result = self.lint(SLOW_PROMPT + "背景音乐为轻柔电子节拍，除背景音乐外，不出现环境声、人声、脚步声或音效。")
         self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_long_negated_non_music_sound_list_pass(self):
         result = self.lint(
-            GOOD_PROMPT
+            SLOW_PROMPT
             + "背景音乐为轻柔电子节拍。"
             + "其他：皮肤真实，不要刻意磨皮美化，写实摄影风格，真实人物质感，自然光影，真实皮肤纹理，细腻毛孔，轻微皮肤瑕疵，真实面部结构，真实眼神反光，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实空气感，真实色彩，不夸张，不塑料感，不磨皮，不网红滤镜，不过度锐化，不AI感，构图稳定，画面物理真实。"
             + "除背景音乐外，不出现环境声、人声、脚步声、衣料声、镜头声、口播、对白、喘息或音效。"

@@ -4,14 +4,13 @@
 
 ## 核心目标
 
-本项目是 `anna auto/fast` 日更发布项目，目标是稳定生成并同步发布单人竖屏短视频到抖音和快手。
+本项目是 anna slow 日更发布项目，目标是通过确认图和视频双确认流程，稳定生成并同步发布单人竖屏短视频到抖音和快手。
 
 
 - 默认路线：`anna` 单人。
-- 默认模式：`auto/fast`，其中 `auto` 就是 `fast`。
-- 显式模式：`slow`，用于 Kie 确认图流程。
+- 唯一模式：`slow`，所有日更入口都进入 Kie 确认图流程。
 - 视频规格：9:16、720p、5-6 秒。
-- 生成工具：Dreamina CLI 负责视频；Kie API 仅在显式 `slow` 模式负责确认图。
+- 生成工具：Kie API 负责确认图，Dreamina CLI 负责视频。
 - 发布渠道：抖音创作者中心和快手创作者中心，两个平台发布前都必须设置 `自主声明/作品声明 -> 内容由AI生成`。
 
 ## 核心卖点与方向
@@ -40,8 +39,7 @@
 
 - 只写可见画面、动作、镜头、场景、穿搭和画面质感。
 - 严禁低俗、裸体、未成年感和不可发布内容。
-- 默认执行 `anna auto/fast` 单图发布链路。
-- 只有用户明确指定 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时，才启用中间生图流程。
+- 默认且仅执行 anna slow 确认图发布链路。
 - 不接入其他生成路线、角色或兜底工具。
 
 ## 固定资产
@@ -56,9 +54,8 @@
 - Chrome 用户数据目录：`/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 接入默认优先使用 Playwright `connect_over_cdp`；AppleScript、系统文件选择器等只作为人工排障或兼容兜底。
 - 模块 00 是环境修复模块，默认跳过；只有遇到 CDP、Playwright、登录态、API key、积分、权限、素材、读写、网络代理等环境问题，或用户明确要求修环境时才执行。
-- `auto/fast` 默认不检查 Kie API key；只有显式 `slow` 进入 Kie 确认图流程，或 Kie 报错需要修复时才检查。
-- auto/fast 视频：`dreamina multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png`，`--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
-- slow 确认图：Kie `gpt-image-2-image-to-image`，PNG 原图下载归档；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1`，每批只生成一个 `*-01` 单张确认图，首批为 `A-01`。用户普通要求换图时在同一 RUN 内递增到下一批，如 `B-01`、`C-01`；只有用户明确要求并发 3 张或一次生成 3 张时，才记录当前槽位 rejected，并在同一 RUN 内并发生成后续三个单槽位批次，如 `F-01`、`G-01`、`H-01`。slow 视频只上传经用户确认的 Kie 原始确认图。
+- Kie 确认图使用 `gpt-image-2-image-to-image`，PNG 原图下载归档；Kie 只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1`，每批只生成一个 `*-01` 单张确认图，首批为 `A-01`。用户普通要求换图时在同一 RUN 内递增到下一批，如 `B-01`、`C-01`；只有用户明确要求并发 3 张或一次生成 3 张时，才记录当前槽位 rejected，并在同一 RUN 内并发生成后续三个单槽位批次，如 `F-01`、`G-01`、`H-01`。
+- Dreamina 视频只上传经用户确认的 Kie 原始确认图，使用 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6`。
 
 ## 目录边界
 
@@ -70,37 +67,27 @@
 - `DOCS/MODULES/MODULE_00_ENV_REPAIR.md`：环境修复与最佳实践沉淀；默认日更跳过，遇到环境问题时才读取。
 - `DOCS/MODULES/MODULE_06_OPERATION_REVIEW.md`：运营复盘唯一流程文档；非默认日更节点。
 
-## 默认 auto/fast 流程
+## 默认 slow 流程
 
 1. 建档：创建 `TEMP/RUN_ID/` 并初始化运行记录；默认不执行模块 00，只有遇到环境问题或用户明确要求修环境时才读取 `MODULE_00_ENV_REPAIR.md`。
 2. 行程窗口：读取当前 active 的 `MATERIAL/anna-weekly-itinerary.json` 并按当天日期匹配行程；资产缺失、无效、当天日期早于 `valid_from` 或已超过 `valid_to` 时，才按今天起连续 7 天重新规划国内真实城市行程，直接保存到 `MATERIAL/` 后继续。
 3. 参考选择：按当天行程大方向选择参考；用户指定参考优先，其次从抖音收藏中找匹配当天日期、季节、城市片区、白天/晚上方向、旅行状态或活动氛围的参考；收藏没有合适主题时，才进入已收藏视频的作者主页，从该 up 主的公开视频中挑选匹配参考作为兜底，不再使用泛抖音热门池。参考地点不必完全等同行程地点，只要能解释为当天行程附近、途中或延展活动；同等可用参考中优先匹配当前阶段性增长方向；进入流程前先检查永久禁用账本。
-4. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；`grid-prompt.txt` 是 fast 的 Dreamina v1 最终 vid prompt，也是 slow prompt 的派生来源，`reference-grid.jpg` 只用于分析与记录，不作为 Kie 或 Dreamina 输入。
-5. 视频提示词：用 `TOOLS/prompt_lint.py derive --mode fast` 从 `grid-prompt.txt` 生成 `vid-prompt-v1.txt` 后提交 Dreamina；prompt 使用 `@图1` 指代 `anna.png`，不得含第二张图片引用、文件名、流程说明、合规说明、平台解释或“吸收/根据某文件”的表达。
-6. 视频生成：只上传 `MATERIAL/fixed-role/anna.png` 作为 `@图1` 后提交 Dreamina 视频。fast 默认不设视频确认节点；生成成功后直接继续，只有用户明确要求视频确认、只生成不发布或发布前确认时才硬停。
-7. 发布：下载正式 MP4 到 `OUTPUT/RUN_ID.mp4`，通过模块 04 同步上传抖音和快手，两个平台都设置 `内容由AI生成` 声明；两个平台都返回 `published` 才判定整体发布成功，不要求发布后核对内容列表。
-8. 记录收尾：成功生成正式视频后记录产物路径和关键执行结果；发布后在运行记录中补充抖音、快手和整体发布状态并刷新记录；不把本次运行状态作为下次默认续跑依据。
-
-## 显式 slow 模式
-
-- `slow` 只有用户明确说 `slow`、`慢速模式`、`Kie 确认图`、`确认图流程` 或 `完整确认图流程` 时才启用。
-- `slow` 在模块 01 后执行模块 02：用 `TOOLS/prompt_lint.py derive --mode slow-img` 从 `grid-prompt.txt` 生成 Kie img prompt；Kie `gpt-image-2-image-to-image` 只上传 `anna.png` 作为 `@图1`，每批固定生成一个 `*-01` 单张确认图。
-- `slow` 必须在每批确认图生成后硬停，展示确认图、输入来源、img prompt、TNS 收敛记录和是否建议使用；等待用户明确确认后，才能记录 `selected_slot`、`selected_confirmation_image` 和选择原因，并进入视频生成。
-- 用户说“换一个”“换一张”或明确拒绝当前确认图时，当前确认图不得进入 Dreamina；默认在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下生成下一批单槽位确认图，例如从 `A-01` 递增到 `B-01`。只有用户明确要求“并发 3 张”“一次生成 3 张”等并发换图时，才记录当前槽位 rejected，并在同一 `RUN_ID`、同一参考和同一 `grid-prompt.txt` 下并发生成后续三个单槽位批次；每个批次仍只有一个 `*-01` 槽位。
-- `slow` 视频生成只上传选中确认图作为 `@图1`；最终 `vid prompt` 用 `TOOLS/prompt_lint.py derive --mode slow-vid` 从 `grid-prompt.txt` 派生。
-- `slow` 视频生成后必须硬停，展示视频、首中尾帧、vid prompt、TNS 记录和是否建议发布；用户明确确认后才能进入模块 04。
-- 不因 `auto/fast` 失败自动切换到 `slow`，也不因 `slow` 失败自动切回 `auto/fast`。
+4. 参考宫格、类型判断、导演结构反推与 grid-prompt 写作：用 `browser_reference_grid.py` 通过 Playwright-CDP 从 CDP Chrome 视频像素抽 6 帧并生成 `reference-grid.jpg`，执行者根据宫格或帧图写入十段式 `grid-prompt.txt`；它是图片和视频阶段 prompt 的唯一派生来源，宫格只用于分析与记录。
+5. 确认图：用 `derive --mode slow-img` 派生 Kie img prompt，只上传 `anna.png` 生成单张确认图。每批生成后硬停；用户拒绝时在同一任务、参考和 grid prompt 下生成下一批，用户确认后记录选中图。
+6. 视频生成：用 `derive --mode slow-vid` 派生 vid prompt，只上传用户确认的 Kie 原始图。下载正式 MP4 到 `OUTPUT/RUN_ID.mp4` 后硬停，展示视频、首中尾帧、prompt、TNS 记录和发布建议。
+7. 发布：只有用户明确确认发布后，才通过模块 04 同步上传抖音和快手；两个平台都设置 `内容由AI生成` 声明，且都返回 `published` 才判定整体成功。
+8. 记录收尾：记录确认图选择、正式视频路径、用户发布确认及双平台结果；不把本次状态作为下次默认续跑依据。
 
 ## 硬阻断
 
 - 参考宫格未通过，不进入提示词或生成。
 - 一周行程资产缺失、无效、当天日期早于 `valid_from` 或已超过 `valid_to` 时，不进入参考选择、提示词、生成或发布；必须先重新生成今天起连续 7 天行程并保存为 active。当天日期仍在当前 active 行程窗口内时，不重新规划。
-- `auto/fast` 缺少 `MATERIAL/fixed-role/anna.png`、`reference-grid-report.json` 通过记录、十段式 `grid-prompt.txt` 时，不进入视频生成。
-- `slow` 没有可用确认图或未记录选中确认图，不进入视频生成。
+- 缺少 `MATERIAL/fixed-role/anna.png`、`reference-grid-report.json` 通过记录或十段式 `grid-prompt.txt` 时，不进入确认图生成。
+- 没有可用确认图或未记录选中确认图，不进入视频生成。
 - 视频生成只允许上传 `@图1` 单图；vid prompt 含第二张图片引用或 Dreamina 命令包含第二个 `--image` 时，不进入提交。
-- 视频或图片生成因 TNS/安全拦截到 `v5` 仍未产出时停止，不发布，不切换 `fast/slow`，并报告 `v1-v5` 失败摘要。
+- 视频或图片生成因 TNS/安全拦截到 `v5` 仍未产出时停止，不发布，并报告 `v1-v5` 失败摘要。
 - TNS 收敛只适用于生成工具明确返回安全拦截且没有产物；网络、登录、积分、参数、上传或超时等失败直接停止报告。
 - CDP、Playwright、登录态、API key、积分、权限、素材、读写或网络代理等环境类失败，不进入生成重试；按模块 00 修复并记录可复用最佳实践。
-- fast 仅在用户明确要求视频确认时等待确认；slow 未获视频发布确认时不得进入模块 04。
+- 未获视频发布确认时不得进入模块 04。
 - 任一平台发布前未完成 `内容由AI生成` 声明，不得点击该平台发布。
 - 单个平台出现登录失效、验证码、账号安全、平台风控、上传失败、发布按钮禁用等阻断时，记录该平台失败并继续尝试另一个平台；两个平台执行完后报告整体状态。
