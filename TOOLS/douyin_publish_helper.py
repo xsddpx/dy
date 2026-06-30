@@ -1045,7 +1045,7 @@ def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 1
 
 
 def normalize_cover_frame(value: str | None) -> str:
-    normalized = (value or "recommended").strip().lower()
+    normalized = (value or "middle").strip().lower()
     aliases = {
         "skip": "none",
         "off": "none",
@@ -1893,8 +1893,6 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
         f"- 标签：{', '.join(report.get('tags') or []) or '无'}",
         f"- 上传：{report.get('steps', {}).get('upload', {}).get('status')}",
         f"- 封面：{report.get('steps', {}).get('cover', {}).get('status')}",
-        f"- AI智能推荐封面：{report.get('steps', {}).get('ai_cover_recommendation', {}).get('status')}",
-        f"- 应用AI智能封面：{report.get('steps', {}).get('ai_cover_apply', {}).get('status')}",
         f"- 文案：{report.get('steps', {}).get('copywriting', {}).get('status')}",
         f"- 位置：{report.get('steps', {}).get('location', {}).get('status')}",
         f"- 自主声明：{report.get('steps', {}).get('declaration', {}).get('status')}",
@@ -2430,8 +2428,6 @@ def build_base_report(args: argparse.Namespace, video: Path, tags: list[str], wa
         "steps": {
             "upload": {"status": "pending"},
             "cover": {"status": "pending"},
-            "ai_cover_recommendation": {"status": "pending"},
-            "ai_cover_apply": {"status": "pending"},
             "copywriting": {"status": "pending"},
             "location": {"status": "pending"},
             "declaration": {"status": "pending", "blocking": False},
@@ -2452,6 +2448,16 @@ def fail(report: dict[str, Any], out_dir: Path, message: str, code: int) -> int:
     return code
 
 
+def should_attempt_location(args: argparse.Namespace) -> bool:
+    return bool(compact_location_query(getattr(args, "location", None))) and not getattr(args, "no_location", False)
+
+
+def location_skip_reason(args: argparse.Namespace) -> str:
+    if getattr(args, "no_location", False):
+        return "命令行指定 --no-location"
+    return "未指定 --location，默认不填写发布地址"
+
+
 def main() -> int:
     global DOM_CDP_URL
     parser = argparse.ArgumentParser(description="自动完成抖音创作者中心发布页的重复操作。")
@@ -2459,8 +2465,8 @@ def main() -> int:
     parser.add_argument("--title", required=True, help="作品标题")
     parser.add_argument("--description", default="", help="作品简介")
     parser.add_argument("--tag", action="append", default=[], help="标签，可重复传入 4-5 个")
-    parser.add_argument("--location", default=None, help="发布位置查询词；不传则按当天行程城市和地点自动推导")
-    parser.add_argument("--no-location", action="store_true", help="跳过发布位置选择")
+    parser.add_argument("--location", default=None, help="发布位置查询词；仅显式传入时才尝试设置位置")
+    parser.add_argument("--no-location", action="store_true", help="跳过发布位置选择；默认不填写发布地址")
     parser.add_argument("--out-dir", default=None, help="报告输出目录，默认 TEMP/publish-runs/YYYYMMDD-HHMMSS")
     parser.add_argument("--upload-url", default=DEFAULT_UPLOAD_URL, help="抖音创作者中心上传页")
     parser.add_argument("--current-tab", action="store_true", help="接管当前已上传完成的发布表单，不重新打开上传页")
@@ -2485,16 +2491,10 @@ def main() -> int:
     parser.add_argument(
         "--cover-frame",
         choices=["recommended", "middle", "ai-recommended", "none"],
-        default="recommended",
-        help="封面帧选择：recommended 选网站推荐帧；middle 选视频中间帧；ai-recommended 走 AI封面 生成；none 跳过",
+        default="middle",
+        help="封面帧选择：默认 middle 选视频中间帧；recommended 选网站推荐帧；ai-recommended 走 AI封面 生成；none 跳过",
     )
     parser.add_argument("--cover-timeout", type=int, default=15, help="封面帧选择尝试秒数；失败不阻断发布")
-    parser.add_argument(
-        "--ai-cover-recommendation-timeout",
-        type=int,
-        default=180,
-        help="等待主发布页右侧 Ai智能推荐封面 生成完成的秒数；0 表示只检查一次",
-    )
     parser.add_argument("--record-jsonl", default=None, help="可选：追加写入 TEMP/RUN_ID/RUN_ID-run-record.jsonl")
     args = parser.parse_args()
 
@@ -2597,11 +2597,13 @@ return {
         return fail(report, out_dir, "等待上传表单超时", 4)
     report["steps"]["upload"]["status"] = "uploaded-or-form-ready"
 
-    # 当前验证重点是主发布页右侧「Ai智能推荐封面」；先禁用进入封面设置器的步骤。
-    report["steps"]["cover"].update({
-        "status": "skipped",
-        "reason": "跳过封面设置器，等待并应用主发布页右侧 Ai智能推荐封面",
-    })
+    try:
+        cover_result = set_cover_frame(args.cover_frame, args.cover_timeout)
+    except Exception as exc:
+        cover_result = {"ok": False, "status": "failed", "mode": args.cover_frame, "reason": str(exc)}
+    report["steps"]["cover"].update(cover_result)
+    if not cover_result.get("ok"):
+        report["warnings"].append(f"封面帧未设置：{cover_result.get('reason') or cover_result.get('status')}")
 
     copywriting = set_text_fields(args.title, args.description)
     tag_result = fill_tags(tags)
@@ -2618,8 +2620,9 @@ return {
         else:
             report["warnings"].append(f"标签填写失败：{tag_result.get('reason')}")
 
-    if args.no_location:
-        report["steps"]["location"].update({"status": "skipped", "reason": "命令行指定 --no-location"})
+    if not should_attempt_location(args):
+        report["steps"]["location"].update({"status": "skipped", "reason": location_skip_reason(args)})
+        report["location"] = {"status": "skipped", "reason": location_skip_reason(args)}
     else:
         location_plan = infer_location_query(root, args.location)
         report["location"] = location_plan
@@ -2644,23 +2647,6 @@ return {
     report["steps"]["declaration"].update(declaration)
     if declaration.get("status") != "set":
         return fail(report, out_dir, "自主声明未成功设置为内容由AI生成，按项目规则阻断发布", 6)
-
-    try:
-        ai_cover = wait_for_ai_cover_recommendation(args.ai_cover_recommendation_timeout)
-    except Exception as exc:
-        ai_cover = {"status": "failed", "reason": str(exc)}
-    report["steps"]["ai_cover_recommendation"].update(ai_cover)
-    if ai_cover.get("status") == "timeout":
-        report["warnings"].append("Ai智能推荐封面等待超时；继续执行后续发布设置")
-    elif ai_cover.get("status") == "failed":
-        report["warnings"].append(f"Ai智能推荐封面检查失败；继续执行后续发布设置：{ai_cover.get('reason')}")
-    elif ai_cover.get("status") in {"ready", "empty", "done"}:
-        ai_cover_apply = apply_ai_cover_recommendation(DOM_CDP_URL, args.cover_timeout)
-        report["steps"]["ai_cover_apply"].update(ai_cover_apply)
-        if not ai_cover_apply.get("ok"):
-            report["warnings"].append(f"Ai智能推荐封面应用失败：{ai_cover_apply.get('reason')}")
-    else:
-        report["steps"]["ai_cover_apply"].update({"status": "skipped", "reason": f"推荐封面状态为 {ai_cover.get('status')}"})
 
     assistant = check_assistant()
     report["steps"]["assistant"].update({"status": "pass" if assistant.get("ok") else "blocked", "result": assistant})

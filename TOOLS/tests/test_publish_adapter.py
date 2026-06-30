@@ -118,6 +118,35 @@ class PublishAdapterTest(unittest.TestCase):
         for command in calls:
             self.assertEqual(command[2:], passthrough)
 
+    def test_both_adapter_defaults_to_no_location(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            calls = []
+
+            def fake_call(command):
+                calls.append(command)
+                platform = Path(command[1]).name.split("_", 1)[0]
+                (out_dir / f"{platform}-publish-report.json").write_text(
+                    '{"decision": "published", "errors": []}',
+                    encoding="utf-8",
+                )
+                return 0
+
+            passthrough = [
+                "demo.mp4",
+                "--title",
+                "窗边随拍",
+                "--out-dir",
+                str(out_dir),
+            ]
+            with mock.patch.object(MODULE.subprocess, "call", side_effect=fake_call):
+                MODULE.main(["both", *passthrough])
+
+        self.assertEqual(len(calls), 2)
+        for command in calls:
+            self.assertIn("--no-location", command)
+            self.assertNotIn("--location", command)
+
     def test_unknown_adapter_has_actionable_error(self):
         with self.assertRaisesRegex(ValueError, "未知发布平台"):
             MODULE.get_adapter("unknown")

@@ -4,6 +4,7 @@ import io
 import os
 import tempfile
 import unittest
+from argparse import Namespace
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -143,12 +144,26 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertEqual(result["source"], "itinerary")
 
     def test_normalize_cover_frame_aliases(self):
-        self.assertEqual(MODULE.normalize_cover_frame(None), "recommended")
+        self.assertEqual(MODULE.normalize_cover_frame(None), "middle")
         self.assertEqual(MODULE.normalize_cover_frame("recommend"), "recommended")
         self.assertEqual(MODULE.normalize_cover_frame("mid"), "middle")
         self.assertEqual(MODULE.normalize_cover_frame("skip"), "none")
         self.assertEqual(MODULE.normalize_cover_frame("ai"), "ai-recommended")
         self.assertEqual(MODULE.normalize_cover_frame("ai_recommended"), "ai-recommended")
+
+    def test_location_defaults_to_skipped_without_explicit_location(self):
+        args = Namespace(location=None, no_location=False)
+        self.assertFalse(MODULE.should_attempt_location(args))
+        self.assertIn("默认不填写发布地址", MODULE.location_skip_reason(args))
+
+    def test_explicit_location_enables_location_attempt(self):
+        args = Namespace(location="上海 武康路", no_location=False)
+        self.assertTrue(MODULE.should_attempt_location(args))
+
+    def test_no_location_overrides_explicit_location(self):
+        args = Namespace(location="上海 武康路", no_location=True)
+        self.assertFalse(MODULE.should_attempt_location(args))
+        self.assertIn("--no-location", MODULE.location_skip_reason(args))
 
     def test_classify_ai_cover_recommendation_snapshot(self):
         self.assertEqual(MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": False}), "absent")
@@ -174,7 +189,9 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("--no-publish", stdout.getvalue())
         self.assertIn("--location", stdout.getvalue())
-        self.assertIn("--ai-cover-recommendation-timeout", stdout.getvalue())
+        self.assertIn("--cover-frame", stdout.getvalue())
+        self.assertIn("默认 middle", stdout.getvalue())
+        self.assertNotIn("--ai-cover-recommendation-timeout", stdout.getvalue())
 
     def test_resolve_cdp_url_prefers_cli_value(self):
         with mock.patch.dict(os.environ, {"DOUYIN_CHROME_CDP_URL": "http://127.0.0.1:9222"}):

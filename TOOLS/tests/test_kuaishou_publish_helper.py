@@ -27,6 +27,10 @@ class KuaishouPublishHelperTest(unittest.TestCase):
         self.assertEqual(caption.count("#旅行"), 1)
         self.assertIn("#穿搭", caption)
 
+    def test_build_caption_keeps_title_on_first_line(self):
+        caption = MODULE.build_caption("窗边随拍", "轻熟针织", ["穿搭"])
+        self.assertEqual(caption.splitlines()[0], "窗边随拍")
+
     def test_ai_declaration_detection(self):
         self.assertTrue(MODULE.ai_declaration_is_set("作品声明 内容由AI生成"))
         self.assertTrue(MODULE.ai_declaration_is_set("作者声明 内容为AI生成"))

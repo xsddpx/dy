@@ -53,6 +53,10 @@ def option_value(args: list[str], option: str) -> str | None:
     return None
 
 
+def option_present(args: list[str], option: str) -> bool:
+    return any(value == option for value in args)
+
+
 def ensure_option(args: list[str], option: str, value: str) -> list[str]:
     if option_value(args, option) is not None:
         return list(args)
@@ -180,6 +184,8 @@ def write_both_report(
 def run_both(passthrough: list[str]) -> int:
     out_dir = Path(option_value(passthrough, "--out-dir") or default_publish_out_dir())
     passthrough = ensure_option(passthrough, "--out-dir", str(out_dir))
+    if option_value(passthrough, "--location") is None and not option_present(passthrough, "--no-location"):
+        passthrough = [*passthrough, "--no-location"]
     record_jsonl = option_value(passthrough, "--record-jsonl")
 
     started_at = datetime.now().isoformat(timespec="seconds")
