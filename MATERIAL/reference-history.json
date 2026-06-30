@@ -304,7 +304,55 @@
       "source": "https://www.douyin.com/video/7647340817040488699",
       "title": "20260629-1025-favorite-764734-mirrorfit",
       "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T10:00:39.993011+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7650087422063705507",
+      "canonical_url": "https://www.douyin.com/video/7650087422063705507",
+      "source": "https://www.douyin.com/video/7650087422063705507",
+      "title": "20260629-1748-favorite-765008-lakewalk",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T10:08:57.194802+00:00",
+      "route": "anna",
+      "status": "blocked_by_user",
+      "video_id": "7650087422063705507",
+      "canonical_url": "https://www.douyin.com/video/7650087422063705507",
+      "source": "https://www.douyin.com/video/7650087422063705507",
+      "title": "20260629-1748-favorite-765008-lakewalk",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T14:08:47.225391+00:00",
+      "route": "anna",
+      "status": "published",
+      "video_id": "7646651102193122234",
+      "canonical_url": "https://www.douyin.com/video/7646651102193122234",
+      "source": "https://www.douyin.com/video/7646651102193122234",
+      "title": "20260629-1809-favorite-764665-headtilt",
+      "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-29T16:43:37.506357+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": "7643027694233850739",
+      "canonical_url": "https://www.douyin.com/video/7643027694233850739",
+      "source": "https://www.douyin.com/video/7643027694233850739"
+    },
+    {
+      "recorded_at": "2026-06-30T04:16:30.640851+00:00",
+      "route": "anna",
+      "status": "published",
+      "video_id": "7643247208468851449",
+      "canonical_url": "https://www.douyin.com/video/7643247208468851449",
+      "source": "https://www.douyin.com/video/7643247208468851449",
+      "title": "20260630-1208-favorite-764324-windowfit",
+      "author": "favorite_collection"
     }
   ],
-  "updated_at": "2026-06-29T02:42:32.771515+00:00"
+  "updated_at": "2026-06-30T04:22:48+00:00"
 }
