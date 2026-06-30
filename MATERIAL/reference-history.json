@@ -352,6 +352,35 @@
       "source": "https://www.douyin.com/video/7643247208468851449",
       "title": "20260630-1208-favorite-764324-windowfit",
       "author": "favorite_collection"
+    },
+    {
+      "recorded_at": "2026-06-26T07:35:15.304173+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": "7642711037176067494",
+      "canonical_url": "https://www.douyin.com/video/7642711037176067494",
+      "source": "https://www.douyin.com/video/7642711037176067494",
+      "title": "20260626-1528-favorite-764271-fast"
+    },
+    {
+      "recorded_at": "2026-06-26T10:35:32.629481+00:00",
+      "route": "anna",
+      "status": "generated_pending_confirm",
+      "video_id": null,
+      "canonical_url": "https://v.douyin.com/a5kI7pSCQ6s",
+      "source": "https://v.douyin.com/a5kI7pSCQ6s/",
+      "title": "明明不是下雨天，却淋湿了双眼～ #泳池穿搭 #泳池纯欲 #泳装搭配指南 #脆脆摇",
+      "author": "不喜欢化妆"
+    },
+    {
+      "recorded_at": "2026-06-26T10:40:18.607962+00:00",
+      "route": "anna",
+      "status": "used",
+      "video_id": null,
+      "canonical_url": "https://v.douyin.com/a5kI7pSCQ6s",
+      "source": "https://v.douyin.com/a5kI7pSCQ6s/",
+      "title": "明明不是下雨天，却淋湿了双眼～ #泳池穿搭 #泳池纯欲 #泳装搭配指南 #脆脆摇",
+      "author": "不喜欢化妆"
     }
   ],
   "updated_at": "2026-06-30T04:22:48+00:00"
