@@ -26,13 +26,14 @@
 
 img prompt 的内容规范只看模块 01，不在本模块维护单独模板。
 
-- 本模块只执行阶段裁剪：从 `TEMP/RUN_ID/grid-prompt.txt` 删除完整的 `整体动画：` 段和完整的 `背景音乐：` 段，得到当前槽位的 `TEMP/RUN_ID/SLOT-img-prompt-v1.txt`，例如 `A-01-img-prompt-v1.txt` 或 `B-01-img-prompt-v1.txt`。
-- 除删除上述两段外，其余段落不得在模块 02 临时重组、补写或改写。
+- 本模块只执行机械派生：用 `TOOLS/prompt_lint.py derive --mode slow-img` 得到当前槽位的 `TEMP/RUN_ID/SLOT-img-prompt-v1.txt`，例如 `A-01-img-prompt-v1.txt` 或 `B-01-img-prompt-v1.txt`。
+- 不得在模块 02 临时重组、补写或改写派生结果。
 - 派生结果必须仍是 Kie 可直接执行的静态画面描述；如果删除后出现断裂、矛盾、动态动作过强、第二张图片引用或内部说明，必须回到模块 01 重写 `grid-prompt.txt` 后重新派生。
 
 ## 命令
 
 ```bash
+python3 TOOLS/prompt_lint.py derive TEMP/RUN_ID/grid-prompt.txt --mode slow-img --out TEMP/RUN_ID/SLOT-img-prompt-v1.txt
 python3 TOOLS/kie_confirmation_image.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch BATCH --slot SLOT --topic TOPIC --prompt-path TEMP/RUN_ID/SLOT-img-prompt-v1.txt --out-dir TEMP/RUN_ID/confirm-BATCH-HHMMSS
 python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --batch BATCH --topic TOPIC --out-dir TEMP/RUN_ID/confirm-BATCH-HHMMSS --entry @TEMP/RUN_ID/confirm-BATCH-HHMMSS/SLOT-entry.json
 ```
@@ -51,7 +52,7 @@ python3 TOOLS/confirmation_manifest.py --run-id RUN_ID --stamp YYYYMMDD-HHMM --b
 ## 确认图硬停
 
 - 当前槽位生成后必须向用户展示确认图、输入来源、img prompt、TNS 收敛记录和是否建议使用。
-- 输入来源必须说明 Kie 视觉输入只有 `MATERIAL/fixed-role/anna.png`，模块 01 的宫格或帧图仅作为人工视觉分析来源，最终 img prompt 由 `grid-prompt.txt` 删除动画和音乐两段得到。
+- 输入来源必须说明 Kie 视觉输入只有 `MATERIAL/fixed-role/anna.png`，模块 01 的宫格或帧图仅作为人工视觉分析来源，最终 img prompt 由 `prompt_lint.py derive --mode slow-img` 得到。
 - 建议使用不等于用户确认；未获用户明确确认前，不得写入最终选图记录，不得进入 Dreamina 视频生成。
 - 用户确认使用后，记录 `selected_slot`、`selected_confirmation_image`、选择原因和确认时间。
 - 用户拒绝当前槽位，或说“换一个”“换一张”时，记录当前槽位为 rejected，并生成下一批单槽位确认图；只有用户明确要求并发换图时，才一次并发生成后续三个单槽位批次。换图不改变参考、不改变 `grid-prompt.txt`、不进入 Dreamina。只有用户明确说停止时，才停止当前 slow 流程。

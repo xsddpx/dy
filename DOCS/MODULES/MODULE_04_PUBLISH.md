@@ -5,14 +5,14 @@
 - 将 `OUTPUT/RUN_ID.mp4` 同步上传到抖音和快手。
 - 两个平台都设置 `自主声明/作品声明 -> 内容由AI生成`。
 - 填写标题、简介和标签。
-- 抖音按当天行程大方向尽量添加发布位置；快手不设置发布地址。
+- 默认不填写发布地址；抖音和快手都跳过地址设置。
 - 点击两个平台发布按钮并记录抖音、快手和整体结果。
 
 ## 前置条件
 
 - 已完成模块 03，正式成片已保存为 `OUTPUT/RUN_ID.mp4`。
 - 已满足模块 03 的确认规则：fast 默认可直接发布；fast 显式确认任务或 slow 已取得用户发布确认。
-- 已完成模块 00 发布预检，固定执行账户 `xsddpx` 的 CDP Chrome、抖音创作者中心登录态和快手创作者中心登录态可用。
+- 默认不执行模块 00；发布 helper 会在动作现场检查 CDP/Playwright、页面接管和平台登录态，遇到环境类失败时再进入模块 00 修复。
 - 本模块只发布本次 `RUN_ID` 的正式成片，不因 `TEMP/` 或 `OUTPUT/` 中存在旧文件而发布旧任务。
 
 ## 执行入口
@@ -35,7 +35,7 @@ sudo -H -u xsddpx python3 TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
   --tag "标签2" \
   --tag "标签3" \
   --tag "标签4" \
-  --location "上海 武康路与安福路街区" \
+  --no-location \
   --cdp-url http://127.0.0.1:9222 \
   --out-dir TEMP/RUN_ID/logs/publish \
   --record-jsonl TEMP/RUN_ID/RUN_ID-run-record.jsonl
@@ -43,11 +43,12 @@ sudo -H -u xsddpx python3 TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
 
 要求：
 
-- `--title` 必填；标签使用 tag 池随机抽取 4 个。
-- 默认自动读取 `MATERIAL/anna-weekly-itinerary.json` 的当天 `city` 和 `location`，作为抖音位置查询词；如果本次内容大方向更具体，可显式传入 `--location "城市 大概地点"` 覆盖。
-- 抖音 helper 可拆分复合位置词重试；只选择同时匹配具体地点和城市上下文的 POI，避免误选同名外地位置。
-- 抖音位置只需按当天行程大方向选择差不多匹配的 POI；页面未显示位置控件、搜索无结果或控件被平台动态替换时，记录 warning 后继续，不作为发布硬阻断。
+- `--title` 必填且不能为空；标题应来自本次画面、场景或穿搭品类，避免只写“今日穿搭”“随拍”等泛化标题。
+- 标签使用 tag 池随机抽取 4 个。
+- 默认不填写发布地址；`TOOLS/publish_adapter.py both` 会在未显式传入 `--location` 时补 `--no-location`。
+- 抖音 helper 只在显式传入 `--location "城市 大概地点"` 且未传 `--no-location` 时尝试设置位置；位置失败仍只记录 warning，不作为发布硬阻断。
 - 快手 helper 为兼容双平台入口会接受 `--location` / `--no-location` / `--location-timeout`，但固定跳过地址设置，不产生位置 warning。
+- 抖音 helper 默认使用视频中间帧作为封面，不等待或应用主发布页右侧 `AI智能推荐封面`。
 - 抖音 helper 默认使用 `--upload-mode cdp`，不主动改用 `auto`、`dialog` 或 `--current-tab`。
 - 快手 helper 必须使用常规视频上传入口；如果页面进入 `VR360°全景视频上传模式`，立即阻断，不得发布。
 - 快手必须等视频上传/转码完成后再点击发布；页面仍显示 `上传中`、`预览转码中` 或 `转码过程也可以发布` 时不得发布。
