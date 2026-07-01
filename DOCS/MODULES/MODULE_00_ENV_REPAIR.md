@@ -90,3 +90,10 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 - 只记录可复用经验，不写本次无关流水账。
 - 不写入 API key、cookie、密码、验证码或账号敏感信息。
 - 一次修复只追加一条最小记录；相同根因复发时更新判断规则即可。
+
+### 2026-07-01 抖音上传页 CDP 导航超时
+- 症状：`douyin_publish_helper.py` 预检通过，但打开 `https://creator.douyin.com/creator-micro/content/upload` 时 `Page.goto` 在 20 秒 `domcontentloaded` 等待内超时；快手可正常发布。
+- 根因：抖音创作者中心上传页偶发加载慢，默认 `--cdp-timeout 20` 不足以完成首轮 Playwright-CDP 导航和文件输入接管。
+- 修复动作：只重试抖音单平台，保留原视频、标题、标签和 `--no-location`，将 `--cdp-timeout` 放宽到 `60`。
+- 验证：同一条 `RUN_ID` 用抖音单平台重试完成上传、中间帧封面、`内容由AI生成` 自主声明和发布，报告返回 `published`。
+- 下次判断：若 CDP/登录态预检均通过且失败点只是上传页 `Page.goto` 超时，优先单平台重试并加 `--cdp-timeout 60`，不要重复发布已成功的平台。
