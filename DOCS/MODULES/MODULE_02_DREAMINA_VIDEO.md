@@ -37,8 +37,8 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 
 ## 视频后的确认规则
 
-- `auto/fast` 默认不设视频确认节点：MP4 通过可解码、竖屏和时长校验后直接进入模块 03。
-- 用户明确要求视频确认、只生成不发布或发布前确认时，fast 在本模块硬停，展示视频、首中尾帧、vid prompt、TNS 记录和是否建议发布；未获确认不得进入模块 03。
+- `auto/fast` 默认设视频确认节点：MP4 通过可解码、竖屏和时长校验并保存到 `OUTPUT/RUN_ID.mp4` 后，必须在本模块硬停。
+- 硬停时展示正式视频、首中尾帧、vid prompt、TNS 记录和是否建议发布；未获用户明确发布确认不得进入模块 03。
 
 ## 重试
 
@@ -56,4 +56,4 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 - Dreamina 只收到固定角色图 `MATERIAL/fixed-role/anna.png`；vid prompt 由 `prompt_lint.py derive --mode fast` 生成并通过校验。
 - vid prompt 不含第二张图片引用或参考图视觉输入语义。
 - 下载到的 MP4 可解码、竖屏、约 5-6 秒，并整理为 `OUTPUT/RUN_ID.mp4`。
-- fast 默认可直接进入模块 03；显式确认任务取得用户发布确认后才可进入模块 03。
+- fast 默认必须取得用户发布确认后才可进入模块 03。

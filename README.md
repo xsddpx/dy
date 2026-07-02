@@ -1,6 +1,6 @@
 # dy
 
-`/Users/Shared/codex/dy` 是 `anna auto/fast` 双平台日更项目，默认执行单图视频生成并同步发布到抖音和快手。
+`/Users/Shared/codex/dy` 是 `anna auto/fast` 双平台日更项目，默认执行单图视频生成，视频确认后同步发布到抖音和快手。
 
 ## 固定流程
 
@@ -10,9 +10,9 @@
 4. 检查永久禁用账本；未命中后通过 Playwright-CDP 从 CDP Chrome 抽帧生成参考宫格，再根据宫格写十段式 `grid-prompt.txt`。
 5. 用 `prompt_lint.py derive --mode fast` 从 `grid-prompt.txt` 派生视频 prompt。
 6. Dreamina `multimodal2video` 只上传 `MATERIAL/fixed-role/anna.png` 生成 5-6 秒竖屏视频。
-7. 下载并质检 MP4。
-8. 同步上传抖音和快手，两个平台都设置 `内容由AI生成` 声明并发布。
-9. 记录产物、抖音/快手发布状态和双平台整体状态。
+7. 下载并质检 MP4，展示视频和关键质检信息等待发布确认。
+8. 收到发布授权后，同步上传抖音和快手，两个平台都设置 `内容由AI生成` 声明并发布。
+9. 记录产物、视频确认状态、抖音/快手发布状态和双平台整体状态。
 
 ## 边界
 
