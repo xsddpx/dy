@@ -97,3 +97,10 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 - 修复动作：只重试抖音单平台，保留原视频、标题、标签和 `--no-location`，将 `--cdp-timeout` 放宽到 `60`。
 - 验证：同一条 `RUN_ID` 用抖音单平台重试完成上传、中间帧封面、`内容由AI生成` 自主声明和发布，报告返回 `published`。
 - 下次判断：若 CDP/登录态预检均通过且失败点只是上传页 `Page.goto` 超时，优先单平台重试并加 `--cdp-timeout 60`，不要重复发布已成功的平台。
+
+### 2026-07-04 Dreamina 单图相对路径上传失败
+- 症状：`dreamina multimodal2video --image MATERIAL/fixed-role/anna.png ...` 返回 `upload phase, no file upload`，未进入生成阶段，不是 TNS。
+- 根因：Dreamina CLI 本次对相对路径图片上传没有实际提交文件。
+- 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，将 `--image` 改为 `/Users/Shared/codex/dy/MATERIAL/fixed-role/anna.png` 绝对路径后重提。
+- 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 720x1280、约 5 秒 MP4。
+- 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先用固定素材绝对路径重试；不要改 prompt、不要进入 TNS 收敛。
