@@ -76,6 +76,16 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "unsafe_body_terms" for f in result["findings"]), result["findings"])
 
+    def test_missing_chest_safe_expression_fails(self):
+        result = self.lint(GOOD_PROMPT.replace("饱满的立体廓形", "立体剪裁层次"))
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(any(f["code"] == "missing_chest_safe_expression" for f in result["findings"]), result["findings"])
+
+    def test_missing_hip_safe_expression_fails(self):
+        result = self.lint(GOOD_PROMPT.replace("腰胯比例明显", "比例线条清楚"))
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(any(f["code"] == "missing_hip_safe_expression" for f in result["findings"]), result["findings"])
+
     def test_missing_required_section_fails(self):
         result = self.lint(GOOD_PROMPT.replace("表情节奏：开场眼神平静看向镜头，中段眉眼放松，结尾嘴角轻收并短暂停顿。", ""))
         self.assertEqual(result["decision"], "fail")

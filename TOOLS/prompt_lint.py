@@ -48,6 +48,20 @@ REQUIRED_SECTION_LABELS = [
     "其他",
 ]
 
+CHEST_SAFE_EXPRESSIONS = [
+    "饱满的立体廓形",
+    "高感知度的面料张力",
+    "上身丰盈的沙漏型线条",
+    "领口与上身轮廓清晰",
+]
+
+HIP_SAFE_EXPRESSIONS = [
+    "腰胯比例明显",
+    "臀胯轮廓自然凸显",
+    "高腰线与下装包裹出稳定曲线",
+    "古典雕塑般的 S 形动态",
+]
+
 REFERENCE_TYPES = [
     "舞蹈律动",
     "健身运动",
@@ -203,6 +217,16 @@ def section_finding(text, labels=None, section_name="十段标签"):
     return None, None
 
 
+def section_content(text, label):
+    _, missing, spans = section_spans(text, REQUIRED_SECTION_LABELS)
+    if label in missing:
+        return None
+    for section_label, _, content_start, content_end in spans:
+        if section_label == label:
+            return text[content_start:content_end]
+    return None
+
+
 def image_one_clothing_conflict(text):
     compact = re.sub(r"\s+", "", text)
     patterns = [
@@ -244,6 +268,12 @@ def lint_text(text, path, route="anna", channel="auto"):
     clothing_conflicts = image_one_clothing_conflict(text)
     if clothing_conflicts:
         add(findings, "error", "image_one_clothing_anchor", "@图1 只能作为身份、五官、发型、脸型和稳定身材比例依据，auto/fast 不得把 @图1 穿搭作为依据")
+    sellpoint_text = section_content(text, "卖点与锁定")
+    if sellpoint_text is not None:
+        if not any(term in sellpoint_text for term in CHEST_SAFE_EXPRESSIONS):
+            add(findings, "error", "missing_chest_safe_expression", "卖点与锁定段必须至少包含一条胸部体量安全表达")
+        if not any(term in sellpoint_text for term in HIP_SAFE_EXPRESSIONS):
+            add(findings, "error", "missing_hip_safe_expression", "卖点与锁定段必须至少包含一条臀胯比例安全表达")
     forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:
         add(findings, "error", "unsafe_body_terms", f"prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
