@@ -22,7 +22,7 @@ python3 TOOLS/prompt_lint.py derive TEMP/RUN_ID/grid-prompt.txt --mode fast --ou
 dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" --model_version seedance2.0_vip --ratio 9:16 --video_resolution 720p --duration 5
 ```
 
-`--duration` 可按本次画面节奏使用 `5` 或 `6`。
+`--duration` 可按本次画面节奏使用 `5`、`6` 或 `7`。
 
 ## auto/fast 默认模式
 
@@ -37,9 +37,18 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 
 ## 视频后的发布路由
 
-- 默认自主分支不设发布前确认节点：MP4 通过可解码、竖屏和时长校验并保存到 `OUTPUT/RUN_ID.mp4` 后，记录基础质检信息并直接进入模块 03。
+- 默认自主分支不设发布前确认节点：MP4 通过可解码、竖屏和时长校验，且三张代理图人工视觉质检通过并保存到 `OUTPUT/RUN_ID.mp4` 后，记录质检信息并直接进入模块 03。
 - 用户明确要求“发布前确认”“只生成不发布”“本次不用发布”等暂停发布时，必须在本模块硬停。
 - 硬停时展示正式视频、首中尾帧、vid prompt、TNS 记录和是否建议发布；收到用户明确发布授权后进入模块 03。
+
+## 三张代理图人工质检
+
+- 每个正式 MP4 发布前必须抽取三张小代理图：首段、中段、尾段，建议取约 `0.5s`、视频中点和结尾前约 `0.5s`。
+- 代理图只用于 Codex 视觉检查，单张必须小于 `100KB`，不得把原始大图内联进记录；正式产物、发布和归档仍使用原始 MP4。
+- 执行者必须亲自逐张打开代理图做视觉质检，不得只依赖 `ffprobe`、脚本返回值或平台预览文案。
+- 三张代理图必须检查：画面内只出现 Anna 一位主体；没有角落头像贴片、画中画、小照片卡片、参考图边框、额外人脸、分屏、多格、黑屏、冻结帧、明显畸形、主体严重跑偏或穿搭结构明显错误。
+- 任何一张代理图出现上述问题，本次视频质检失败，不得发布；必须记录失败帧路径、问题描述和下一步处理。
+- 三张代理图全部通过时，运行记录必须写明三张代理图路径和人工视觉质检结论。
 
 ## 重试
 
@@ -56,5 +65,6 @@ dreamina multimodal2video --image MATERIAL/fixed-role/anna.png --prompt "$(cat T
 
 - Dreamina 只收到固定角色图 `MATERIAL/fixed-role/anna.png`；vid prompt 由 `prompt_lint.py derive --mode fast` 生成并通过校验。
 - vid prompt 只含 `@图1` 的单图指代语义。
-- 下载到的 MP4 可解码、竖屏、约 5-6 秒，并整理为 `OUTPUT/RUN_ID.mp4`。
+- 下载到的 MP4 可解码、竖屏、约 5-7 秒，并整理为 `OUTPUT/RUN_ID.mp4`。
+- 三张代理图已由执行者亲自逐张打开检查，且没有角落头像贴片、画中画、小照片卡片、参考图边框、额外人脸、分屏、多格、黑屏、冻结帧、明显畸形、主体严重跑偏或穿搭结构明显错误。
 - 默认自主分支可直接进入模块 03；用户要求确认/不发布时，必须取得用户发布授权后才可进入模块 03。
