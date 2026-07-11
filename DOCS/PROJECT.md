@@ -31,7 +31,7 @@
 
 ## 本地环境
 
-- 固定执行账户为 `xsddpx`；CDP Chrome 由 `TOOLS/open_cdp_chrome.sh` 启动，默认地址为 `http://127.0.0.1:9222`，用户目录为 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
+- 本机只使用当前 macOS 账户 `xsddpx` 执行和维护本项目，不再进行跨账户配置同步；CDP Chrome 由 `TOOLS/open_cdp_chrome.sh` 启动，默认地址为 `http://127.0.0.1:9222`，用户目录为 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
 - CDP 默认使用 Playwright `connect_over_cdp`；AppleScript 和系统文件选择器仅作兼容兜底。
 - Dreamina 固定只上传 `MATERIAL/fixed-role/anna.png`，参数为 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6|7`。
 

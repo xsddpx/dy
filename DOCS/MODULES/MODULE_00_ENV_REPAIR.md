@@ -100,7 +100,7 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ### 2026-07-04 Dreamina 单图相对路径上传失败
 - 症状：`dreamina multimodal2video --image MATERIAL/fixed-role/anna.png ...` 返回 `upload phase, no file upload`，未进入生成阶段，不是 TNS。
 - 根因：Dreamina CLI 本次对相对路径图片上传没有实际提交文件。
-- 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，将 `--image` 改为 `/Users/Shared/codex/dy/MATERIAL/fixed-role/anna.png` 绝对路径后重提。
+- 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，将 `--image` 改为 `/Users/xsddpx/Codex/dy/MATERIAL/fixed-role/anna.png` 绝对路径后重提。
 - 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 720x1280、约 5 秒 MP4。
 - 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先用固定素材绝对路径重试；不要改 prompt、不要进入 TNS 收敛。
 

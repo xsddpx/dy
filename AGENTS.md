@@ -4,18 +4,18 @@
 
 - 默认读取本文件和 `DOCS/PROJECT.md`。
 - 按 `DOCS/PROJECT.md` 的流程路由读取 `DOCS/MODULES/` 对应模块。
-- 读取 `/Users/Shared/codex/Obsidian Vault/Askill/🎭AGENT须知.md`。
+- 读取 `/Users/xsddpx/.codex/AGENTS.md`。
 
 ## 固定边界
 
-- 本项目路径固定为 `/Users/Shared/codex/dy`。
+- 本项目路径固定为 `/Users/xsddpx/Codex/dy`。
 - 只按 `DOCS/PROJECT.md` 和对应模块执行当前项目流程。
 
 ## 文档边界
 
 - `DOCS/PROJECT.md` 保存核心事实、流程路由和全局硬阻断。
 - 具体执行细节只看 `DOCS/PROJECT.md` 路由到的对应模块。
-- 选题、穿搭、prompt、镜头、动作、生成、质检、发布和记录等执行细则写入对应模块；跨模块生效的核心结论、流程路由和全局硬阻断写入 `DOCS/PROJECT.md`；`/Users/Shared/codex/skills/dy/SKILL.md` 只保留调用语义和文档路由。
+- 选题、穿搭、prompt、镜头、动作、生成、质检、发布和记录等执行细则写入对应模块；跨模块生效的核心结论、流程路由和全局硬阻断写入 `DOCS/PROJECT.md`；`/Users/xsddpx/.codex/skills/dy/SKILL.md` 只保留调用语义和文档路由。
 - 项目文档、prompt 规则和示例优先使用正向描述，直接写清期望呈现的画面、动作和结果，尽量去掉“不要”“不得”“禁止”等负向表达及负向词堆叠；安全、发布、输入合同和全局硬阻断等必须明确排除的边界可保留必要的负向描述。
 - 修改核心事实、核心卖点或提示词规则前必须先说明拟修改内容和原因；用户明确要求修改时，本次授权仅限其明确范围。
 

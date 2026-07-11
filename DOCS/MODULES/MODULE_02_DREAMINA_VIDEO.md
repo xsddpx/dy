@@ -12,7 +12,7 @@
 
 ```bash
 dreamina multimodal2video \
-  --image /Users/Shared/codex/dy/MATERIAL/fixed-role/anna.png \
+  --image /Users/xsddpx/Codex/dy/MATERIAL/fixed-role/anna.png \
   --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" \
   --model_version seedance2.0_vip \
   --ratio 9:16 \
