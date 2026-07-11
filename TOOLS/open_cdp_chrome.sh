@@ -2,18 +2,18 @@
 set -euo pipefail
 
 PORT="9222"
-REFRESH_FROM_PROFILE1=0
+REFRESH_FROM_BROWSER=0
 for arg in "$@"; do
   case "${arg}" in
-    --refresh-from-profile1|--refresh-profile1)
-      REFRESH_FROM_PROFILE1=1
+    --refresh-from-browser|--refresh-profile)
+      REFRESH_FROM_BROWSER=1
       ;;
     <->)
       PORT="${arg}"
       ;;
     *)
       echo "未知参数：${arg}" >&2
-      echo "用法：TOOLS/open_cdp_chrome.sh [端口] [--refresh-from-profile1]" >&2
+      echo "用法：TOOLS/open_cdp_chrome.sh [端口] [--refresh-from-browser]" >&2
       exit 64
       ;;
   esac
@@ -21,11 +21,44 @@ done
 CDP_HOST="127.0.0.1"
 CDP_URL="http://${CDP_HOST}:${PORT}"
 TARGET_USER_DATA="${HOME}/Library/Application Support/Google/Chrome-Codex-CDP"
-PROFILE_DIRECTORY="Profile 1"
 SOURCE_USER_DATA="${HOME}/Library/Application Support/Google/Chrome"
+PROFILE_DIRECTORY="${CHROME_PROFILE_DIRECTORY:-}"
+if [[ -z "${PROFILE_DIRECTORY}" ]]; then
+  PROFILE_DIRECTORY="$(python3 - "${SOURCE_USER_DATA}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+state_path = root / "Local State"
+candidates = []
+try:
+    profile = json.loads(state_path.read_text(encoding="utf-8")).get("profile", {})
+    if profile.get("last_used"):
+        candidates.append(profile["last_used"])
+    candidates.extend(reversed(profile.get("last_active_profiles") or []))
+except (OSError, ValueError, TypeError):
+    pass
+candidates.append("Default")
+seen = set()
+for name in candidates:
+    if name in seen:
+        continue
+    seen.add(name)
+    if name and (root / name / "Preferences").is_file():
+        print(name)
+        break
+PY
+)"
+fi
+if [[ -z "${PROFILE_DIRECTORY}" ]]; then
+  echo "普通 Chrome 中没有可用 Profile，请先完成 Chrome 初始化和登录。" >&2
+  exit 3
+fi
 SOURCE_PROFILE="${SOURCE_USER_DATA}/${PROFILE_DIRECTORY}"
 CHROME_APP="/Applications/Google Chrome.app"
 CURRENT_USER="$(id -un)"
+REOPEN_SOURCE_CHROME=0
 
 chrome_main_processes() {
   local processes
@@ -52,7 +85,7 @@ target_profile_listener_matches() {
   printf '%s\n' "${listener_pids}" | grep -qx "${lock_pid}"
 }
 
-wrong_processes() {
+source_chrome_processes() {
   chrome_main_processes | grep -v -- "--user-data-dir=${TARGET_USER_DATA}" || true
 }
 
@@ -77,7 +110,7 @@ copy_profile_from_source() {
   local reason backup_dir
   if [[ ! -f "${SOURCE_PROFILE}/Preferences" ]]; then
     echo "找不到源 Chrome ${PROFILE_DIRECTORY}：${SOURCE_PROFILE}" >&2
-    echo "请先在普通 Chrome 中创建并登录 ${PROFILE_DIRECTORY}，再运行本脚本。" >&2
+    echo "请先在普通 Chrome 中完成初始化和登录，再运行本脚本。" >&2
     exit 3
   fi
 
@@ -161,23 +194,24 @@ force_close_target_chrome() {
   fi
 }
 
-force_close_wrong_chrome() {
+force_close_source_chrome() {
   local lines
-  lines="$(wrong_processes)"
+  lines="$(source_chrome_processes)"
   if [[ -z "${lines}" ]]; then
     return
   fi
 
-  echo "检测到当前账户 Chrome 未使用本地 CDP 用户目录，正在关闭后重启："
+  REOPEN_SOURCE_CHROME=1
+  echo "为同步 Chrome Profile，正在临时关闭普通 Chrome："
   printf '%s\n' "${lines}" | sed 's/^/  /'
   printf '%s\n' "${lines}" | awk '{print $1}' | while read -r pid; do
     [[ -n "${pid}" ]] && kill "${pid}" >/dev/null 2>&1 || true
   done
   sleep 3
 
-  lines="$(wrong_processes)"
+  lines="$(source_chrome_processes)"
   if [[ -n "${lines}" ]]; then
-    echo "仍有当前账户 Chrome 未退出，执行强制 kill -9："
+    echo "普通 Chrome 仍未退出，执行强制 kill -9："
     printf '%s\n' "${lines}" | sed 's/^/  /'
     printf '%s\n' "${lines}" | awk '{print $1}' | while read -r pid; do
       [[ -n "${pid}" ]] && kill -9 "${pid}" >/dev/null 2>&1 || true
@@ -186,33 +220,40 @@ force_close_wrong_chrome() {
   fi
 }
 
-if [[ "${REFRESH_FROM_PROFILE1}" == "1" ]]; then
+reopen_source_chrome_if_needed() {
+  if [[ "${REOPEN_SOURCE_CHROME}" != "1" ]]; then
+    return
+  fi
+  if [[ -d "${CHROME_APP}" ]]; then
+    open -gna "${CHROME_APP}" --args --profile-directory="${PROFILE_DIRECTORY}" --new-window about:blank
+  else
+    open -gna "Google Chrome" --args --profile-directory="${PROFILE_DIRECTORY}" --new-window about:blank
+  fi
+}
+
+if [[ "${REFRESH_FROM_BROWSER}" == "1" ]]; then
   force_close_target_chrome
-  if [[ -n "$(chrome_main_processes)" ]]; then
-    force_close_wrong_chrome
+  if [[ -n "$(source_chrome_processes)" ]]; then
+    force_close_source_chrome
   fi
   copy_profile_from_source "refresh"
 fi
 
 if cdp_is_available; then
   if [[ -n "$(target_processes)" ]] || target_profile_listener_matches; then
-    force_close_wrong_chrome
     ensure_page_target
     activate_chrome
     echo "本地 CDP Chrome 已可用：${CDP_URL}"
     echo "用户目录：${TARGET_USER_DATA}"
     exit 0
   fi
-  echo "${CDP_URL} 已可访问，但当前账户 Chrome 未匹配本地 CDP 进程。"
-  force_close_wrong_chrome
-  if cdp_is_available; then
-    echo "端口 ${PORT} 仍被其他进程占用，无法启动本地 CDP Chrome。" >&2
-    exit 2
-  fi
+  echo "${CDP_URL} 已可访问，但 Chrome 进程未匹配 CDP 数据目录。"
+  echo "端口 ${PORT} 已被其他进程占用，无法启动本地 CDP Chrome。" >&2
+  exit 2
 fi
 
-if [[ -n "$(chrome_main_processes)" ]]; then
-  force_close_wrong_chrome
+if [[ ! -f "${TARGET_USER_DATA}/${PROFILE_DIRECTORY}/Preferences" && -n "$(source_chrome_processes)" ]]; then
+  force_close_source_chrome
 fi
 
 init_profile_if_needed
@@ -237,6 +278,7 @@ fi
 
 wait_for_cdp
 ensure_page_target
+reopen_source_chrome_if_needed
 activate_chrome
 
 echo "已启动本地 CDP Chrome：${CDP_URL}"

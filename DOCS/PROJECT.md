@@ -29,15 +29,23 @@
 - Anna 衣柜：`MATERIAL/anna-wardrobe.md`。默认按当天日期优先选择对应编号；与卖点或动画模板不适配时可改选，并记录原因。
 - `TEMP/` 保存可清理的过程文件，不作为下次默认续跑状态；`OUTPUT/RUN_ID.mp4` 保存正式成片；`DOCS/`、`TOOLS/`、`MATERIAL/` 分别保存规则、自动化脚本和固定资产。
 
+## 运行建档
+
+- 每次执行先在项目根目录创建唯一 `RUN_ID`，默认格式为 `YYYYMMDD-HHMMSS`；同一秒内并发启动时追加简短来源或序号后缀。
+- 创建 `TEMP/RUN_ID/logs/` 和 `OUTPUT/`，并向 `TEMP/RUN_ID/RUN_ID-run-record.jsonl` 写入 `run/started` 首条事件；触发来源、scheduled run 或 thread 标识可用时一并写入事件数据。
+- 后续所有 prompt、下载、代理图、发布报告和运行记录都使用本次 `RUN_ID`，不从旧目录推断本次状态。
+
 ## 本地环境
 
-- 本机只使用当前 macOS 账户 `xsddpx` 执行和维护本项目，不再进行跨账户配置同步；CDP Chrome 由 `TOOLS/open_cdp_chrome.sh` 启动，默认地址为 `http://127.0.0.1:9222`，用户目录为 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
+- 所有项目命令先切换到当前 Git 仓库根目录；需要绝对路径时从 `git rev-parse --show-toplevel` 解析，不写死 macOS 用户名。
+- CDP Chrome 由 `TOOLS/open_cdp_chrome.sh` 启动，默认地址为 `http://127.0.0.1:9222`；脚本从普通 Chrome 当前使用的 Profile 初始化独立 CDP 数据目录，普通 Chrome 可与 CDP Chrome 并存。
 - CDP 默认使用 Playwright `connect_over_cdp`；AppleScript 和系统文件选择器仅作兼容兜底。
+- Python 依赖使用项目根目录 `.venv/`；媒体检查依赖 `ffmpeg` 与 `ffprobe`。
 - Dreamina 固定只上传 `MATERIAL/fixed-role/anna.png`，参数为 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6|7`。
 
 ## 发布数量与重复阻断
 
-- 项目不设自然日、轮次或条数上限；06:00、18:00、手动 `/dy`、补跑和新 `RUN_ID` 均独立执行。
+- 项目不设自然日、轮次或条数上限；06:00、18:00、手动 `/xdy`、补跑和新 `RUN_ID` 均独立执行。
 - 仅当 scheduled run/thread、`RUN_ID`、成片和平台均相同，且该平台已返回 `published` 时，才跳过重复点击；其他平台、新主题、新成片和补跑继续执行。
 
 ## 全局硬阻断

@@ -36,9 +36,8 @@
 
 ### CDP Chrome 与 Playwright
 
-- 固定执行账户为 macOS 用户 `xsddpx`。
 - 固定 CDP 地址为 `http://127.0.0.1:9222`。
-- 固定用户目录为 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP`。
+- 启动脚本从普通 Chrome 当前使用的 Profile 初始化独立 CDP 数据目录；普通 Chrome 与 CDP Chrome 可并存，需要重新同步登录态时使用 `--refresh-from-browser`。
 - 需要启动或刷新 CDP Chrome 时使用：
 
 ```bash
@@ -48,7 +47,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 - 需要单独诊断 Playwright 和 CDP 可用性时使用：
 
 ```bash
-python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
+.venv/bin/python TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ```
 
 - 发布、抽帧 helper 内部仍会在动作现场检查 CDP/Playwright；这些检查失败时，按本模块修复。
@@ -69,7 +68,8 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ### 文件与依赖
 
 - `MATERIAL/fixed-role/anna.png` 缺失、`TEMP/` 或 `OUTPUT/` 不可读写属于环境问题。
-- Python/Playwright 依赖异常时，优先使用当前项目已验证的解释器和依赖路径，不随意升级全局环境。
+- Python/Playwright 依赖异常或项目刚从其他电脑迁移时，运行 `zsh TOOLS/setup_env.sh --recreate`；脚本先把原 `.venv/` 备份到 `TEMP/env-backups/`，再重建项目环境。
+- `ffmpeg` 与 `ffprobe` 由 `static-ffmpeg` 提供，并链接到用户级命令目录；重建 `.venv/` 后同步刷新链接并复测媒体工具。
 
 ## 环境修复最佳实践记录
 
@@ -100,16 +100,16 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 ### 2026-07-04 Dreamina 单图相对路径上传失败
 - 症状：`dreamina multimodal2video --image MATERIAL/fixed-role/anna.png ...` 返回 `upload phase, no file upload`，未进入生成阶段，不是 TNS。
 - 根因：Dreamina CLI 本次对相对路径图片上传没有实际提交文件。
-- 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，将 `--image` 改为 `/Users/xsddpx/Codex/dy/MATERIAL/fixed-role/anna.png` 绝对路径后重提。
+- 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，从 Git 根目录解析 `MATERIAL/fixed-role/anna.png` 的绝对路径后重提。
 - 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 720x1280、约 5 秒 MP4。
 - 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先用固定素材绝对路径重试；不要改 prompt、不要进入 TNS 收敛。
 
 ### 2026-07-09 发布前 CDP 端口未启动且存在普通 Chrome
-- 症状：`publish_adapter.py both` 在抖音和快手预检阶段均失败，`127.0.0.1:9222` connection refused，进程检查发现只有普通 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，没有固定用户目录的 CDP Chrome。
-- 根因：当前账户只开了普通 Chrome，未使用 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP` 和 `--remote-debugging-port=9222`。
-- 修复动作：运行 `zsh TOOLS/open_cdp_chrome.sh 9222`，脚本关闭错误目录普通 Chrome 并启动固定 CDP Chrome。
-- 验证：`python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 返回 `ok: true`，进程命令含固定用户目录和 `--remote-debugging-port=9222`。
-- 下次判断：若发布预检显示 `connection refused` 且 wrong Chrome 只有普通进程，直接运行固定 CDP 启动脚本，再用 preflight 复测后重试发布。
+- 症状：`publish_adapter.py both` 在抖音和快手预检阶段均失败，`127.0.0.1:9222` connection refused，进程检查发现只有普通 Chrome，没有带 `--remote-debugging-port=9222` 的 CDP Chrome。
+- 根因：普通 Chrome 已启动，但项目 CDP Chrome 尚未启动。
+- 修复动作：运行 `zsh TOOLS/open_cdp_chrome.sh 9222` 启动独立 CDP Chrome。
+- 验证：`.venv/bin/python TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 返回 `ok: true`，进程命令含 CDP 数据目录和 `--remote-debugging-port=9222`。
+- 下次判断：若发布预检显示 `connection refused` 且只有普通 Chrome，直接运行 CDP 启动脚本，再用 preflight 复测后重试发布。
 
 ### 2026-07-10 Dreamina 成功任务下载副本被截断
 - 适用边界：本条仅用于文件大小、哈希、播放或解码出现异常迹象的下载排障；默认视频质检按模块 02 使用 `ffprobe` 核对基础规格。
@@ -118,3 +118,24 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 - 修复动作：保留同一 `submit_id`，刷新一次查询结果获得当前临时媒体地址，只向全新目标文件发起一次可重试下载，并等待实际下载进程退出；下载期间不再向同一目标重复调用 `query_result`。
 - 验证：目标文件大小停止增长后，先用 `ffmpeg -xerror -v error -i INPUT -f null -` 做全文件严格解码，再核对 `ffprobe` 的分辨率、方向和时长；全部通过后才复制到 `OUTPUT/`。
 - 下次判断：Dreamina 返回成功但 MP4 哈希或大小不稳定时，按下载传输异常处理，先复用原任务完整取回并严格解码；不得把可读头信息等同于完整成片，也不得因此重提生成。
+
+### 2026-07-12 迁移后 Python 与媒体依赖缺失
+- 症状：系统 Python 缺少 OpenCV、NumPy、Playwright 和 pytest，`ffmpeg`、`ffprobe` 不在 `PATH`，迁移来的 `TEMP/.venv-publish` 含断裂解释器链接。
+- 根因：虚拟环境和本机命令不能跨电脑直接迁移，仓库此前没有统一的本地环境重建入口。
+- 修复动作：新增并运行 `zsh TOOLS/setup_env.sh --recreate`，将原 `.venv/` 备份到 `TEMP/env-backups/` 后重建，通过 `static-ffmpeg` 安装媒体命令并链接到 `~/.local/bin`。
+- 验证：OpenCV、NumPy、Playwright、pytest 可导入，`ffmpeg` 与 `ffprobe` 可执行，项目全量测试通过。
+- 下次判断：迁移或 `.venv/` 失效时直接运行 `zsh TOOLS/setup_env.sh --recreate`；普通依赖补装才使用不带参数的 `zsh TOOLS/setup_env.sh`。
+
+### 2026-07-12 CDP 启动脚本残留旧设备 Profile 名称
+- 症状：启动脚本写死读取旧设备的 Profile 名称，与本机普通 Chrome 当前 Profile 不一致，导致 9222 无法启动。
+- 根因：脚本把源 Profile 名称当作跨设备固定值。
+- 修复动作：启动脚本改为读取普通 Chrome `Local State` 中当前使用的 Profile，缺省使用 `Default`；刷新参数统一为 `--refresh-from-browser`。
+- 验证：脚本从 `Default` 初始化 CDP 数据目录，9222 可访问，Playwright 与进程目录预检均通过。
+- 下次判断：源 Profile 变化时由脚本自动识别；需要覆盖时使用 `CHROME_PROFILE_DIRECTORY` 环境变量，不在脚本中写死设备历史名称。
+
+### 2026-07-12 普通 Chrome 与 CDP Chrome 互斥
+- 症状：CDP 启动脚本会关闭普通 Chrome，导致 ChatGPT Chrome 插件控制通道消失；重新打开普通 Chrome 后，旧预检又将其视为错误进程。
+- 根因：旧环境把所有非 CDP Chrome 进程都当作阻断项，与单账户下插件和发布自动化并行使用的需求冲突。
+- 修复动作：启动脚本保留普通 Chrome；只有首次初始化或刷新 Profile 时临时关闭并在复制后恢复。预检只要求唯一匹配的 CDP 进程，把普通 Chrome 记录为辅助进程。
+- 验证：普通 Chrome 的插件通道与 9222 CDP 同时可用，CDP 进程目录和 Playwright 预检通过。
+- 下次判断：普通 Chrome 存在不再构成发布阻断；只有 CDP 目标进程缺失、重复或端口被其他进程占用时进入修复。

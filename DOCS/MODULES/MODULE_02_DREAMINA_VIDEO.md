@@ -11,8 +11,11 @@
 - 图片使用绝对路径提交；`--duration` 按画面节奏选择 `5`、`6` 或 `7`。
 
 ```bash
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
 dreamina multimodal2video \
-  --image /Users/xsddpx/Codex/dy/MATERIAL/fixed-role/anna.png \
+  --image "$ROOT_DIR/MATERIAL/fixed-role/anna.png" \
   --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" \
   --model_version seedance2.0_vip \
   --ratio 9:16 \

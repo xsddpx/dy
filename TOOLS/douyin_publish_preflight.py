@@ -131,9 +131,9 @@ def check_chrome_processes(cdp_url: str, expected_user_data_dir: Path) -> dict[s
             "ok": fallback["ok"],
             "expected_user_data_dir": str(expected_user_data_dir),
             "target_count": 0,
-            "wrong_count": 0,
+            "auxiliary_count": 0,
             "target": [],
-            "wrong": [],
+            "auxiliary": [],
             "fallback": fallback,
             "warning": "当前环境不允许读取 Chrome 进程列表，已改用 Profile 锁 PID 与 CDP 监听 PID 核对。"
             if fallback["ok"]
@@ -143,7 +143,7 @@ def check_chrome_processes(cdp_url: str, expected_user_data_dir: Path) -> dict[s
             else "当前环境不允许读取 Chrome 进程列表，且 Profile 锁 PID 与 CDP 监听 PID 不匹配。",
             "fix": None
             if fallback["ok"]
-            else "请运行 TOOLS/open_cdp_chrome.sh 9222 启动当前账户本地 CDP Chrome。",
+            else "请运行 TOOLS/open_cdp_chrome.sh 9222 启动 CDP Chrome。",
         }
     target = [
         item
@@ -151,16 +151,16 @@ def check_chrome_processes(cdp_url: str, expected_user_data_dir: Path) -> dict[s
         if command_has_user_data(item["command"], expected_user_data_dir)
         and command_has_cdp_port(item["command"], cdp_url)
     ]
-    wrong = [item for item in processes if item not in target]
-    ok = len(target) == 1 and not wrong
+    auxiliary = [item for item in processes if item not in target]
+    ok = len(target) == 1
     return {
         "ok": ok,
         "expected_user_data_dir": str(expected_user_data_dir),
         "target_count": len(target),
-        "wrong_count": len(wrong),
+        "auxiliary_count": len(auxiliary),
         "target": target,
-        "wrong": wrong,
-        "fix": "请运行 TOOLS/open_cdp_chrome.sh；入口会用当前账户本地非共享 CDP 用户目录启动 Chrome"
+        "auxiliary": auxiliary,
+        "fix": "请运行 TOOLS/open_cdp_chrome.sh 启动 CDP Chrome"
         if not ok
         else None,
     }
@@ -209,7 +209,7 @@ def main() -> int:
     parser.add_argument(
         "--user-data-dir",
         default=str(DEFAULT_USER_DATA_DIR),
-        help=f"当前账户本地 CDP Chrome 用户目录，默认 {DEFAULT_USER_DATA_DIR}",
+        help=f"CDP Chrome 用户目录，默认 {DEFAULT_USER_DATA_DIR}",
     )
     parser.add_argument("--timeout", type=int, default=3, help="CDP HTTP 检查超时秒数")
     args = parser.parse_args()

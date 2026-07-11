@@ -16,7 +16,7 @@
 ```bash
 python3 TOOLS/publish_tag_pool.py --count 4 --shell-args
 
-sudo -H -u xsddpx python3 TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
+.venv/bin/python TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
   --title "作品标题" \
   --description "与本次成片一致的作品简介" \
   --tag "标签1" \
