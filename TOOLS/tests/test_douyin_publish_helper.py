@@ -5,7 +5,6 @@ import os
 import tempfile
 import unittest
 from argparse import Namespace
-from datetime import date
 from pathlib import Path
 from unittest import mock
 
@@ -112,36 +111,17 @@ class DouyinPublishHelperTest(unittest.TestCase):
 
     def test_infer_location_query_prefers_cli_value(self):
         with tempfile.TemporaryDirectory() as tmp:
-            result = MODULE.infer_location_query(Path(tmp), "上海 外滩")
+            result = MODULE.infer_location_query("上海 外滩")
         self.assertTrue(result["ok"])
         self.assertEqual(result["query"], "上海 外滩")
         self.assertEqual(result["source"], "cli")
 
-    def test_infer_location_query_reads_today_itinerary(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            path = root / "MATERIAL"
-            path.mkdir()
-            (path / "anna-weekly-itinerary.json").write_text(
-                """
-{
-  "status": "active",
-  "days": [
-    {
-      "date": "2026-06-27",
-      "city": "上海",
-      "location": "武康路与安福路街区",
-      "activity": "咖啡街拍"
-    }
-  ]
-}
-""".strip(),
-                encoding="utf-8",
-            )
-            result = MODULE.infer_location_query(root, today=date(2026, 6, 27))
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["query"], "上海 武康路与安福路街区")
-        self.assertEqual(result["source"], "itinerary")
+    def test_infer_location_query_requires_cli_value(self):
+        result = MODULE.infer_location_query()
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["query"], "")
+        self.assertEqual(result["source"], "cli")
+        self.assertIn("--location", result["reason"])
 
     def test_normalize_cover_frame_aliases(self):
         self.assertEqual(MODULE.normalize_cover_frame(None), "middle")

@@ -1,36 +1,24 @@
 # 模块 03：双平台发布
 
-## 职责
+## 职责与前置条件
 
-- 将 `OUTPUT/RUN_ID.mp4` 同步上传到抖音和快手。
-- 两个平台都设置 `自主声明/作品声明 -> 内容由AI生成`。
-- 填写标题、简介和标签。
-- 默认不填写发布地址；抖音和快手都跳过地址设置。
-- 点击两个平台发布按钮并记录抖音、快手和整体结果。
+将本次 `OUTPUT/RUN_ID.mp4` 同步发布到抖音和快手，设置 `内容由AI生成`，填写文案与标签，并记录单平台和整体结果。
 
-## 前置条件
-
-- 已完成模块 02，正式成片已保存为 `OUTPUT/RUN_ID.mp4`。
-- 已满足模块 02 的发布路由：默认自主分支已通过基础质检；用户要求确认/不发布时，已取得用户明确发布授权。
-- 默认不执行模块 00；发布 helper 会在动作现场检查 CDP/Playwright、页面接管和平台登录态，遇到环境类失败时再进入模块 00 修复。
-- 本模块只发布本次 `RUN_ID` 的正式成片，不因 `TEMP/` 或 `OUTPUT/` 中存在旧文件而发布旧任务。
+- 模块 02 已通过：正式 MP4 可解码，两项内容硬门通过；用户要求确认或暂停时已取得明确发布授权。
+- 只处理本次 `RUN_ID`，不因 `TEMP/` 或 `OUTPUT/` 中存在旧文件而选用旧成片。
+- 默认跳过模块 00；helper 在动作现场检查 CDP、Playwright、页面和登录态，出现环境问题时再进入模块 00。
+- 不设置按日期、轮次或条数的发布上限。仅当 scheduled run/thread、`RUN_ID`、成片路径和平台均相同，且该平台已返回 `published` 时，才跳过再次点击该平台发布按钮。
 
 ## 执行入口
 
-模块 03 默认使用 `TOOLS/publish_adapter.py both` 依次编排抖音和快手发布。固定顺序为先抖音、后快手；抖音失败也必须继续尝试快手。
-
-发布标签从 `MATERIAL/publish-tag-pool.json` 随机抽取，不写 `AI生成`、`AIGC` 或 `内容由AI生成`：
+`TOOLS/publish_adapter.py both` 固定先抖音、后快手；抖音失败也继续尝试快手。标签先从 `MATERIAL/publish-tag-pool.json` 生成候选，再选择与人物、场景、动作和穿搭一致的四个。
 
 ```bash
 python3 TOOLS/publish_tag_pool.py --count 4 --shell-args
-```
 
-跨账户执行时必须使用固定账户环境：
-
-```bash
 sudo -H -u xsddpx python3 TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
   --title "作品标题" \
-  --description "作品简介，可包含话题标签" \
+  --description "与本次成片一致的作品简介" \
   --tag "标签1" \
   --tag "标签2" \
   --tag "标签3" \
@@ -41,22 +29,17 @@ sudo -H -u xsddpx python3 TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
   --record-jsonl TEMP/RUN_ID/RUN_ID-run-record.jsonl
 ```
 
-要求：
+## 发布要求
 
-- `--title` 必填且不能为空；标题应来自本次画面、场景或穿搭品类，避免只写“今日穿搭”“随拍”等泛化标题。
-- 标签使用 tag 池随机抽取 4 个。
-- 默认不填写发布地址；`TOOLS/publish_adapter.py both` 会在未显式传入 `--location` 时补 `--no-location`。
-- 抖音 helper 只在显式传入 `--location "城市 大概地点"` 且未传 `--no-location` 时尝试设置位置；位置失败仍只记录 warning，不作为发布硬阻断。
-- 快手 helper 为兼容双平台入口会接受 `--location` / `--no-location` / `--location-timeout`，但固定跳过地址设置，不产生位置 warning。
-- 抖音 helper 默认使用视频中间帧作为封面，不等待或应用主发布页右侧 `AI智能推荐封面`。
-- 抖音 helper 默认使用 `--upload-mode cdp`，不主动改用 `auto`、`dialog` 或 `--current-tab`。
-- 快手 helper 必须使用常规视频上传入口；如果页面进入 `VR360°全景视频上传模式`，立即阻断，不得发布。
-- 快手必须等视频上传/转码完成后再点击发布；页面仍显示 `上传中`、`预览转码中` 或 `转码过程也可以发布` 时不得发布。
-- 报告固定写入 `TEMP/RUN_ID/logs/publish/douyin-publish-report.json`、`kuaishou-publish-report.json` 和 `publish-both-report.json`，并生成对应 `.md`。
+- 标题必须来自本次画面、场景或穿搭品类；简介使用正常文案，话题统一通过 `--tag` 传入。
+- 默认不填写发布地址。抖音仅在显式传入 `--location` 且未传 `--no-location` 时尝试位置，失败只记 warning；快手兼容位置参数但固定跳过地址设置。
+- 抖音默认使用视频中间帧封面和 `--upload-mode cdp`，不等待 AI 智能推荐封面，也不主动切换 `auto`、`dialog` 或 `--current-tab`。
+- 快手必须使用常规视频入口；进入 VR360° 模式时阻断。上传或转码尚未完成时等待，不提前点击发布。
+- 两个平台都必须完成 `内容由AI生成` 声明后才能点击发布。
+- 报告写入 `TEMP/RUN_ID/logs/publish/` 下的 `douyin-publish-report`、`kuaishou-publish-report` 和 `publish-both-report`，同时生成 JSON 与 Markdown。
 
 ## 成功判定
 
-- 抖音和快手都返回 `published`，且聚合报告结论为 `published`，才判定本模块整体发布成功。
-- 任一平台失败不回滚另一个平台已发布结果；必须在两个平台都尝试后报告整体状态。
-- 发布后无需核对创作者中心内容列表。
-- 任一平台 `内容由AI生成` 声明失败、上传未完成、发布按钮无法点击或 helper 无法完成点击时，记录该平台失败；另一个平台仍继续尝试。
+- 两个平台均返回 `published` 且聚合报告为 `published`，整体才算成功；发布后无需核对创作者中心内容列表。
+- 任一平台失败不回滚另一平台，也不阻断另一平台尝试。单个平台已经成功时，后续只重试未成功平台。
+- AI 声明、上传完成状态、发布按钮或 helper 执行任一项失败时，记录该平台失败及原因。

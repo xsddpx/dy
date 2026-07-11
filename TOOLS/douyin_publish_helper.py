@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,6 @@ from run_record import append_artifact, append_event, refresh_markdown
 
 
 DEFAULT_UPLOAD_URL = "https://creator.douyin.com/creator-micro/content/upload"
-DEFAULT_ITINERARY_PATH = Path("MATERIAL/anna-weekly-itinerary.json")
 HARD_ASSISTANT_WORDS = ("违规", "禁止发布", "无法发布", "发布失败", "审核不通过", "请修改后发布")
 SOFT_ASSISTANT_WORDS = ("建议", "可优化", "推荐", "提示", "风险提醒")
 AI_DECLARATION_WORDS = ("内容由AI生成", "AI生成", "人工智能生成", "AIGC")
@@ -2087,38 +2086,11 @@ def location_candidate_is_plausible(text: str, query: str, attempt: str) -> bool
     return True
 
 
-def infer_location_query(root: Path, explicit: str | None = None, today: date | None = None) -> dict[str, Any]:
+def infer_location_query(explicit: str | None = None) -> dict[str, Any]:
     explicit_value = compact_location_query(explicit)
     if explicit_value:
         return {"ok": True, "query": explicit_value, "source": "cli"}
-
-    itinerary_path = root / DEFAULT_ITINERARY_PATH
-    if not itinerary_path.exists():
-        return {"ok": False, "query": "", "source": "itinerary", "reason": f"行程文件不存在：{itinerary_path}"}
-
-    try:
-        data = json.loads(itinerary_path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        return {"ok": False, "query": "", "source": "itinerary", "reason": f"行程文件读取失败：{exc}"}
-
-    target_date = (today or date.today()).isoformat()
-    day = next((item for item in data.get("days", []) if item.get("date") == target_date), None)
-    if not isinstance(day, dict):
-        return {"ok": False, "query": "", "source": "itinerary", "reason": f"行程中没有当天日期：{target_date}"}
-
-    query = compact_location_query(day.get("city"), day.get("location"))
-    if not query:
-        query = compact_location_query(day.get("city"), day.get("activity"), day.get("shoot_scene"))
-    return {
-        "ok": bool(query),
-        "query": query,
-        "source": "itinerary",
-        "date": target_date,
-        "city": day.get("city"),
-        "location": day.get("location"),
-        "activity": day.get("activity"),
-        "reason": "" if query else "当天行程缺少可用城市或地点",
-    }
+    return {"ok": False, "query": "", "source": "cli", "reason": "未显式传入 --location"}
 
 
 def set_location_via_playwright(cdp_url: str | None, query: str, timeout_sec: int = 15) -> dict[str, Any]:
@@ -2624,7 +2596,7 @@ return {
         report["steps"]["location"].update({"status": "skipped", "reason": location_skip_reason(args)})
         report["location"] = {"status": "skipped", "reason": location_skip_reason(args)}
     else:
-        location_plan = infer_location_query(root, args.location)
+        location_plan = infer_location_query(args.location)
         report["location"] = location_plan
         if not location_plan.get("ok"):
             report["steps"]["location"].update({"status": "skipped", **location_plan})

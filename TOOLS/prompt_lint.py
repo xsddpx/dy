@@ -41,32 +41,59 @@ REQUIRED_SECTION_LABELS = [
     "穿搭",
     "姿态镜头",
     "环境",
-    "卖点与锁定",
-    "表情节奏",
     "整体动画",
     "背景音乐",
     "其他",
 ]
 
-CHEST_SAFE_EXPRESSIONS = [
-    "饱满的立体廓形",
-    "高感知度的面料张力",
-    "上身丰盈的沙漏型线条",
-    "领口与上身轮廓清晰",
+PERSON_REQUIRED_TERMS = [
+    "同一位成年女性",
+    "多视角",
+    "多表情",
+    "左下大脸",
+    "正面脸",
+    "五官比例",
+    "脸型",
+    "眼神",
+    "鼻唇结构",
+    "发型分线",
+    "自然神态",
+    "正面、侧面和背面全身图",
+    "上身体量",
+    "胸部体量比例",
+    "纤细腰线",
+    "腰胯比例",
+    "整体 S 型曲线",
+    "画面中只出现这一位成年女性",
 ]
 
-HIP_SAFE_EXPRESSIONS = [
-    "腰胯比例明显",
-    "臀胯轮廓自然凸显",
-    "高腰线与下装包裹出稳定曲线",
-    "古典雕塑般的 S 形动态",
+STANDALONE_SELLPOINT_LABELS = [
+    "卖点与建议",
+    "卖点与锁定",
+]
+
+ANIMATION_ADAPTED_PRESENTATION_TERMS = [
+    "脸部",
+    "表情",
+    "视线",
+    "肩颈",
+    "领口",
+    "上身轮廓",
+    "面料张力",
+    "穿搭轮廓",
+    "腰线",
+    "腰胯",
+    "手部",
+    "步态",
+    "腿部",
+    "裙摆",
+    "发丝",
 ]
 
 REFERENCE_TYPES = [
     "舞蹈律动",
     "健身运动",
     "穿搭展示",
-    "镜前自拍",
     "走路回头",
     "坐姿互动",
     "双人互动",
@@ -97,6 +124,14 @@ INTERNAL_SOURCE_TERMS = [
     "身材表达使用艺术化穿搭语言",
     "艺术化穿搭语言：",
     "视频类型为",
+    "视频生成 AI",
+    "视频生成AI",
+    "生成 AI 自由发挥",
+    "生成AI自由发挥",
+    "由 AI 自主完成",
+    "由AI自主完成",
+    "由视频生成 AI",
+    "由视频生成AI",
 ]
 
 COMPLIANCE_OR_EXPLANATION_TERMS = [
@@ -142,7 +177,183 @@ NON_MUSIC_SOUND_TERMS = [
 SOUND_NEGATION_TERMS = ["不出现", "不要", "不含", "杜绝", "禁止", "没有"]
 SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
 SECTION_RE_TEMPLATE = r"(^|[。！？!?；;\n])\s*({label})："
+SECTION_LABEL_SCAN_RE = re.compile(r"(^|[。！？!?；;\n])\s*([\u4e00-\u9fffA-Za-z0-9_/-]{1,16})：")
+ALLOWED_INLINE_LABELS = {"次类型"}
 VIDEO_TYPE_RE = re.compile(r"视频类型：\s*(?P<main>[^，,。；;\s]+)\s*[；;]\s*次类型：\s*(?P<sub>[^，,。；;\s]+)")
+EXPLICIT_PROMPT_DURATION_RE = re.compile(
+    r"(约\s*)?([0-9一二三四五六七八九十]+)\s*([-~到至]\s*[0-9一二三四五六七八九十]+)?\s*秒"
+)
+
+NEGATIVE_STYLE_TERMS = [
+    "不要",
+    "不生成",
+    "不出现",
+    "不含",
+    "不夸张",
+    "不塑料感",
+    "不磨皮",
+    "不网红滤镜",
+    "不过度锐化",
+    "不AI感",
+    "禁止",
+    "杜绝",
+]
+
+TEMPLATE_ACTION_TERMS = [
+    "腰线停顿",
+    "原地转身",
+    "挑眉",
+    "抿唇",
+    "玻璃连廊",
+    "轻舞律动",
+]
+
+ACTION_OVERLOAD_TERMS = [
+    "整理",
+    "扶",
+    "转身",
+    "轻舞",
+    "摆胯",
+    "低头",
+    "抬眼",
+    "回看",
+]
+
+ACTION_SEQUENCE_TERMS = [
+    "先",
+    "随后",
+    "然后",
+    "接着",
+    "再",
+    "最后",
+]
+
+BODY_PATH_TERMS = [
+    "左手",
+    "右手",
+    "双手",
+    "左脚",
+    "右脚",
+    "脚尖",
+    "肩部",
+    "肩胯",
+    "髋部",
+    "头部",
+    "视线",
+]
+
+TIMELINE_MARKERS = [
+    "第 1",
+    "第 2",
+    "第 3",
+    "第 4",
+    "第 5",
+    "第 6",
+    "第1",
+    "第2",
+    "第3",
+    "第4",
+    "第5",
+    "第6",
+    "前 1 秒",
+    "最后 1 秒",
+]
+
+ENDING_CLICHE_TERMS = [
+    "稳定收束",
+    "自然收束",
+    "稳定构图自然收束",
+    "保持稳定构图",
+    "最清楚的一刻",
+    "卡在",
+]
+
+SELF_HELD_CAMERA_TERMS = [
+    "自拍",
+    "自己持机",
+    "人物持机",
+    "手机前置",
+    "胸口持机",
+    "脸侧持机",
+    "腰侧持机",
+    "腰侧斜向",
+    "短自拍杆",
+    "手臂伸出",
+    "伸出持机",
+    "手机放低",
+    "取回手机",
+]
+
+FIXED_CAMERA_TERMS = [
+    "固定机位",
+    "固定拍摄",
+    "固定镜头",
+    "固定竖屏",
+]
+
+OTHER_HANDHELD_CAMERA_TERMS = [
+    "他人手持",
+    "朋友手持",
+    "摄影者手持",
+]
+
+OUT_OF_FRAME_ACTION_TERMS = [
+    "走出画面",
+    "走出镜头",
+    "走出取景范围",
+    "离开画面",
+    "离开镜头",
+    "走到画外",
+    "消失在画面",
+    "消失在镜头",
+    "出框",
+    "出画",
+]
+
+RUNWAY_ROAMING_ACTION_TERMS = [
+    "T 台走秀",
+    "T台走秀",
+    "模特走秀",
+    "走秀步态",
+    "猫步",
+    "巡场",
+    "沿场景行走",
+    "边走边拍",
+    "走近走远",
+    "沿通道慢走",
+    "沿通道行走",
+    "沿连廊行走",
+    "沿走廊行走",
+    "沿步道行走",
+    "走近镜头",
+    "走向镜头",
+    "连续走",
+    "走两步",
+    "走三步",
+    "继续向前走",
+    "继续前行",
+    "全身跟拍",
+    "行走跟拍",
+    "沿场景跟拍",
+    "后退跟拍",
+]
+
+VISIBLE_RECORDING_DEVICE_TERMS = [
+    "架手机",
+    "手机被",
+    "手机架在",
+    "手机被架",
+    "被架在",
+    "取回手机",
+    "拿起手机结束",
+    "手伸向手机",
+    "靠近手机镜头",
+    "前景手机",
+    "底部手机",
+    "手机前景",
+    "支架",
+    "三脚架",
+]
 
 
 def positive_sound_hits(text):
@@ -183,24 +394,44 @@ def section_spans(text, labels):
     positions = []
     missing = []
     for label in labels:
-        match = re.search(SECTION_RE_TEMPLATE.format(label=re.escape(label)), text)
-        if match:
-            positions.append((label, match.start(2)))
+        matches = []
+        for actual_label in [label]:
+            match = re.search(SECTION_RE_TEMPLATE.format(label=re.escape(actual_label)), text)
+            if match:
+                matches.append((match.start(2), actual_label))
+        if matches:
+            start, actual_label = min(matches, key=lambda item: item[0])
+            positions.append((label, start, actual_label))
         else:
             missing.append(label)
     spans = []
-    for index, (label, start) in enumerate(positions):
-        content_start = start + len(label) + 1
+    for index, (label, start, actual_label) in enumerate(positions):
+        content_start = start + len(actual_label) + 1
         content_end = positions[index + 1][1] if index + 1 < len(positions) else len(text)
         spans.append((label, start, content_start, content_end))
     return positions, missing, spans
 
 
-def section_finding(text, labels=None, section_name="十段标签"):
+def section_finding(text, labels=None, section_name="八段标签"):
     labels = labels or REQUIRED_SECTION_LABELS
     positions, missing, spans = section_spans(text, labels)
     if missing:
         return "missing_sections", f"最终 prompt 缺少{section_name}：{', '.join(missing)}"
+    duplicates = [
+        label
+        for label in labels
+        if len(list(re.finditer(SECTION_RE_TEMPLATE.format(label=re.escape(label)), text))) > 1
+    ]
+    if duplicates:
+        return "duplicate_sections", f"最终 prompt 的八段标签各保留一次：{', '.join(duplicates)}"
+    detected_labels = [match.group(2) for match in SECTION_LABEL_SCAN_RE.finditer(text)]
+    unexpected = [
+        label
+        for label in detected_labels
+        if label not in labels and label not in ALLOWED_INLINE_LABELS
+    ]
+    if unexpected:
+        return "unexpected_sections", f"最终 prompt 只使用固定八段标签：{', '.join(dict.fromkeys(unexpected))}"
     out_of_order = [
         labels[index]
         for index in range(1, len(positions))
@@ -239,6 +470,96 @@ def image_one_clothing_conflict(text):
     return [pattern for pattern in patterns if pattern in compact]
 
 
+def section_text_or_empty(text, label):
+    content = section_content(text, label)
+    return content or ""
+
+
+def count_term_hits(text, terms):
+    return [(term, text.count(term)) for term in terms if text.count(term)]
+
+
+def add_prompt_style_findings(findings, text):
+    other_text = section_text_or_empty(text, "其他")
+    negative_hits = count_term_hits(other_text, NEGATIVE_STYLE_TERMS)
+    negative_count = sum(count for _, count in negative_hits)
+    if negative_count >= 6:
+        add(
+            findings,
+            "warn",
+            "long_negative_style_list",
+            "其他段反向审美约束过长，优先改成短正向摄影约束",
+        )
+
+    template_hits = count_term_hits(text, TEMPLATE_ACTION_TERMS)
+    if len(template_hits) >= 4:
+        add(
+            findings,
+            "warn",
+            "template_action_stack",
+            "prompt 堆叠了多组近期常见模板动作，建议换成一个更明确的短视频主动作链",
+        )
+
+    animation_text = section_text_or_empty(text, "整体动画")
+    timeline_hits = count_term_hits(animation_text, TIMELINE_MARKERS)
+    if len(timeline_hits) >= 4:
+        add(
+            findings,
+            "warn",
+            "overdirected_timeline",
+            "整体动画逐秒编排过细，建议保留一个连续主动作链",
+        )
+
+    if EXPLICIT_PROMPT_DURATION_RE.search(text):
+        add(
+            findings,
+            "error",
+            "prompt_explicit_duration",
+            "prompt 正文聚焦可见画面，视频长度统一由 Dreamina --duration 参数控制",
+        )
+
+    action_text = section_text_or_empty(text, "姿态镜头") + section_text_or_empty(text, "整体动画")
+    action_hits = count_term_hits(action_text, ACTION_OVERLOAD_TERMS)
+    if len(action_hits) >= 6:
+        add(
+            findings,
+            "warn",
+            "action_overload",
+            "姿态镜头和整体动画包含过多动作方向，建议压到一个主动作链和一个节奏点",
+        )
+
+    sequence_count = sum(count for _, count in count_term_hits(action_text, ACTION_SEQUENCE_TERMS))
+    body_path_hits = count_term_hits(action_text, BODY_PATH_TERMS)
+    if sequence_count >= 4 or len(body_path_hits) >= 5:
+        add(
+            findings,
+            "warn",
+            "overchoreographed_action",
+            "动作编排细节过多，建议删除分解动作，只保留主要动作目标、人物状态和画面结果",
+        )
+
+    ending_hits = count_term_hits(animation_text, ENDING_CLICHE_TERMS)
+    if ending_hits:
+        add(
+            findings,
+            "warn",
+            "cliche_stable_ending",
+            "整体动画结尾不要固定写稳定收束、自然收束或卡在最清楚的一刻，优先停在原地舞蹈节奏点、完成原地转身、保持肩胯余韵或以手部造型结束",
+        )
+
+    compact = re.sub(r"\s+", "", text)
+    has_fixed = any(term in compact for term in FIXED_CAMERA_TERMS)
+    has_other_handheld = any(term in compact for term in OTHER_HANDHELD_CAMERA_TERMS)
+    has_active_camera = any(term in compact for term in ("跟拍", "后退", "推近"))
+    if has_fixed and (has_other_handheld or has_active_camera or "手持感" in compact):
+        add(
+            findings,
+            "error",
+            "mixed_camera_relation",
+            "镜头关系保持单一：固定拍摄维持镜头位置不变，移动跟随由他人手持拍摄承担",
+        )
+
+
 def lint_text(text, path, route="anna", channel="auto"):
     findings = []
     if route != "anna":
@@ -259,27 +580,98 @@ def lint_text(text, path, route="anna", channel="auto"):
     conditional_hits = [term for term in CONDITIONAL_OR_PLACEHOLDER_TERMS if term in text]
     if conditional_hits:
         add(findings, "error", "conditional_or_placeholder_terms", f"prompt 含条件分支或占位符：{', '.join(conditional_hits)}")
+    visible_device_hits = [term for term in VISIBLE_RECORDING_DEVICE_TERMS if term in text]
+    if visible_device_hits:
+        add(findings, "error", "visible_recording_device_terms", f"prompt 可能导致拍摄设备入镜：{', '.join(visible_device_hits)}")
+    self_held_hits = [term for term in SELF_HELD_CAMERA_TERMS if term in text]
+    if self_held_hits:
+        add(
+            findings,
+            "error",
+            "self_held_camera_terms",
+            f"prompt 禁止人物自己持机，只允许固定拍摄或他人手持拍摄：{', '.join(self_held_hits)}",
+        )
+    out_of_frame_hits = [term for term in OUT_OF_FRAME_ACTION_TERMS if term in text]
+    if out_of_frame_hits:
+        add(
+            findings,
+            "error",
+            "out_of_frame_action_terms",
+            f"人物必须从开场到结尾始终留在画面内：{', '.join(out_of_frame_hits)}",
+        )
+    action_text = section_text_or_empty(text, "姿态镜头") + section_text_or_empty(text, "整体动画")
+    runway_roaming_hits = [term for term in RUNWAY_ROAMING_ACTION_TERMS if term in action_text]
+    if runway_roaming_hits:
+        add(
+            findings,
+            "error",
+            "runway_roaming_action_terms",
+            f"人物动作以原地展示、生活化互动和半步内调整为主，删除持续巡场式行走：{', '.join(runway_roaming_hits)}",
+        )
+    standalone_sellpoint_hits = [
+        label
+        for label in STANDALONE_SELLPOINT_LABELS
+        if re.search(SECTION_RE_TEMPLATE.format(label=re.escape(label)), text)
+    ]
+    if standalone_sellpoint_hits:
+        add(
+            findings,
+            "error",
+            "standalone_sellpoint_section",
+            f"prompt 不再使用独立卖点段，请把内容按动画形式并入姿态镜头：{', '.join(standalone_sellpoint_hits)}",
+        )
     section_code, section_message = section_finding(text)
     if section_code:
         add(findings, "error", section_code, section_message)
+    person_text = section_content(text, "人物")
+    if person_text is not None:
+        missing_person_terms = [term for term in PERSON_REQUIRED_TERMS if term not in person_text]
+        if missing_person_terms:
+            add(
+                findings,
+                "error",
+                "missing_person_anchors",
+                f"人物段需完整保留固定身份和身材锚点：{', '.join(missing_person_terms)}",
+            )
     type_code, type_message = video_type_finding(text)
     if type_code:
         add(findings, "error", type_code, type_message)
     clothing_conflicts = image_one_clothing_conflict(text)
     if clothing_conflicts:
-        add(findings, "error", "image_one_clothing_anchor", "@图1 只能作为身份、五官、发型、脸型和稳定身材比例依据，auto/fast 不得把 @图1 穿搭作为依据")
-    sellpoint_text = section_content(text, "卖点与锁定")
-    if sellpoint_text is not None:
-        if not any(term in sellpoint_text for term in CHEST_SAFE_EXPRESSIONS):
-            add(findings, "error", "missing_chest_safe_expression", "卖点与锁定段必须至少包含一条胸部体量安全表达")
-        if not any(term in sellpoint_text for term in HIP_SAFE_EXPRESSIONS):
-            add(findings, "error", "missing_hip_safe_expression", "卖点与锁定段必须至少包含一条臀胯比例安全表达")
+        add(findings, "error", "image_one_clothing_anchor", "@图1 只能作为身份、五官、发型、脸型、稳定身材比例、上身体量和胸部体量比例依据，auto/fast 不得把 @图1 穿搭作为依据")
+    pose_text = section_content(text, "姿态镜头")
+    if pose_text is not None:
+        compact_pose = re.sub(r"\s+", "", pose_text)
+        has_fixed = any(term in compact_pose for term in FIXED_CAMERA_TERMS)
+        has_other_handheld = any(term in compact_pose for term in OTHER_HANDHELD_CAMERA_TERMS)
+        if not has_fixed and not has_other_handheld:
+            add(
+                findings,
+                "error",
+                "missing_allowed_camera_relation",
+                "姿态镜头必须明确选择固定拍摄或他人手持拍摄",
+            )
+        elif has_fixed and has_other_handheld:
+            add(
+                findings,
+                "error",
+                "multiple_camera_relations",
+                "姿态镜头只能选择一种镜头关系，不能同时写固定拍摄和他人手持拍摄",
+            )
+    if pose_text is not None and not any(term in pose_text for term in ANIMATION_ADAPTED_PRESENTATION_TERMS):
+        add(
+            findings,
+            "warn",
+            "missing_animation_adapted_presentation",
+            "姿态镜头段建议按整体动画和实际景别写出至少一项可见表现；近景、中近景或全身均可，不要求固定全身",
+        )
     forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:
         add(findings, "error", "unsafe_body_terms", f"prompt 含直白身材或低俗词：{', '.join(forbidden_hits)}")
     non_music_sound_hits = positive_sound_hits(text)
     if non_music_sound_hits:
         add(findings, "error", "non_music_sound_terms", f"prompt 含音乐以外的声音：{', '.join(non_music_sound_hits)}")
+    add_prompt_style_findings(findings, text)
 
     errors = sum(1 for f in findings if f["severity"] == "error")
     warnings = sum(1 for f in findings if f["severity"] == "warn")
@@ -308,11 +700,19 @@ def lint_derived_prompt(text, path, mode):
     return lint_text(text, path)
 
 
-def derive_main(argv):
-    parser = argparse.ArgumentParser(description="从 grid-prompt.txt 机械派生阶段 prompt。")
+def build_derive_parser():
+    parser = argparse.ArgumentParser(
+        prog="prompt_lint.py derive",
+        description="从 grid-prompt.txt 机械派生阶段 prompt。",
+    )
     parser.add_argument("grid_prompt", help="模块 01 写出的 TEMP/RUN_ID/grid-prompt.txt")
     parser.add_argument("--mode", choices=["fast"], required=True)
     parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
+    return parser
+
+
+def derive_main(argv):
+    parser = build_derive_parser()
     args = parser.parse_args(argv)
 
     source = Path(args.grid_prompt).expanduser().resolve()
@@ -373,12 +773,20 @@ def write_reports(results, out_dir):
     return report_json, report_md
 
 
-def lint_main(argv=None):
-    parser = argparse.ArgumentParser(description="检查 dy 项目的最终 prompt 是否满足 TNS 收敛硬门。")
+def build_lint_parser(prog="prompt_lint.py"):
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="检查 dy 项目的最终 prompt 是否满足 TNS 收敛硬门。",
+    )
     parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")
+    return parser
+
+
+def lint_main(argv=None, prog="prompt_lint.py"):
+    parser = build_lint_parser(prog)
     args = parser.parse_args(argv)
 
     files = [Path(p).expanduser().resolve() for p in args.prompts]
@@ -401,10 +809,39 @@ def lint_main(argv=None):
     return 1 if any(r["decision"] == "fail" for r in results) else 0
 
 
+def top_level_help():
+    parser = argparse.ArgumentParser(
+        prog="prompt_lint.py",
+        description="检查和派生 dy 项目的最终 prompt。",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog=(
+            "子命令:\n"
+            "  lint    检查最终 prompt；兼容旧式写法，省略 lint 也会进入 lint\n"
+            "  derive  从 grid-prompt.txt 机械派生阶段 prompt\n"
+            "\n"
+            "常用:\n"
+            "  python3 TOOLS/prompt_lint.py derive TEMP/RUN_ID/grid-prompt.txt --mode fast --out TEMP/RUN_ID/vid-prompt-v1.txt\n"
+            "  python3 TOOLS/prompt_lint.py lint TEMP/RUN_ID/vid-prompt-v1.txt\n"
+            "  python3 TOOLS/prompt_lint.py TEMP/RUN_ID/vid-prompt-v1.txt\n"
+            "\n"
+            "查看子命令参数:\n"
+            "  python3 TOOLS/prompt_lint.py derive --help\n"
+            "  python3 TOOLS/prompt_lint.py lint --help"
+        ),
+    )
+    parser.add_argument("command", nargs="?", help="子命令：lint 或 derive；省略时按旧式 lint 处理")
+    parser.print_help()
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in {"-h", "--help"}:
+        return top_level_help()
     if argv and argv[0] == "derive":
         return derive_main(argv[1:])
+    if argv and argv[0] == "lint":
+        return lint_main(argv[1:], prog="prompt_lint.py lint")
     return lint_main(argv)
 
 

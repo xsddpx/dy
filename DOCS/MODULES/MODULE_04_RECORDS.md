@@ -2,10 +2,9 @@
 
 ## 职责
 
-- 刷新 `RUN_ID-run-record.jsonl` 和 `RUN_ID-run-record.md`。
-- 成功生成正式视频后记录产物和关键执行结果。
-- 发布后补充运行记录中的抖音、快手和整体发布状态。
-- 不把本次任务状态作为下次默认续跑依据。
+- 刷新 `RUN_ID-run-record.jsonl` 和 `RUN_ID-run-record.md`，不把本次状态作为下次默认续跑依据。
+- 记录正式视频路径、固定角色代理图、首中尾视频代理图，以及人脸身份和身材比例两项人工质检结论；其他画面差异按需记 warning。
+- 发布后补充抖音、快手和双平台整体结论及报告路径。
 
 ## 命令
 
@@ -13,8 +12,4 @@
 python3 TOOLS/run_record.py summary TEMP/RUN_ID/RUN_ID-run-record.jsonl --md TEMP/RUN_ID/RUN_ID-run-record.md
 ```
 
-发布收尾摘要必须包含：
-
-- 抖音发布结论和报告路径。
-- 快手发布结论和报告路径。
-- 双平台整体结论和 `publish-both-report.json` 路径。
+收尾摘要必须包含抖音、快手和整体发布结论，以及对应平台报告和 `publish-both-report.json` 路径。

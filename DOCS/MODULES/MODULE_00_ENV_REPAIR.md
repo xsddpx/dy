@@ -95,7 +95,7 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 - 根因：抖音创作者中心上传页偶发加载慢，默认 `--cdp-timeout 20` 不足以完成首轮 Playwright-CDP 导航和文件输入接管。
 - 修复动作：只重试抖音单平台，保留原视频、标题、标签和 `--no-location`，将 `--cdp-timeout` 放宽到 `60`。
 - 验证：同一条 `RUN_ID` 用抖音单平台重试完成上传、中间帧封面、`内容由AI生成` 自主声明和发布，报告返回 `published`。
-- 下次判断：若 CDP/登录态预检均通过且失败点只是上传页 `Page.goto` 超时，优先单平台重试并加 `--cdp-timeout 60`，不要重复发布已成功的平台。
+- 下次判断：若 CDP/登录态预检均通过且失败点只是上传页 `Page.goto` 超时，优先单平台重试并加 `--cdp-timeout 60`；只跳过同一 `RUN_ID`、同一成片、同一平台已 `published` 的完全相同发布动作，不按日期或条数限制后续发布。
 
 ### 2026-07-04 Dreamina 单图相对路径上传失败
 - 症状：`dreamina multimodal2video --image MATERIAL/fixed-role/anna.png ...` 返回 `upload phase, no file upload`，未进入生成阶段，不是 TNS。
@@ -103,3 +103,18 @@ python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222
 - 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，将 `--image` 改为 `/Users/Shared/codex/dy/MATERIAL/fixed-role/anna.png` 绝对路径后重提。
 - 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 720x1280、约 5 秒 MP4。
 - 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先用固定素材绝对路径重试；不要改 prompt、不要进入 TNS 收敛。
+
+### 2026-07-09 发布前 CDP 端口未启动且存在普通 Chrome
+- 症状：`publish_adapter.py both` 在抖音和快手预检阶段均失败，`127.0.0.1:9222` connection refused，进程检查发现只有普通 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，没有固定用户目录的 CDP Chrome。
+- 根因：当前账户只开了普通 Chrome，未使用 `/Users/xsddpx/Library/Application Support/Google/Chrome-Codex-CDP` 和 `--remote-debugging-port=9222`。
+- 修复动作：运行 `zsh TOOLS/open_cdp_chrome.sh 9222`，脚本关闭错误目录普通 Chrome 并启动固定 CDP Chrome。
+- 验证：`python3 TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 返回 `ok: true`，进程命令含固定用户目录和 `--remote-debugging-port=9222`。
+- 下次判断：若发布预检显示 `connection refused` 且 wrong Chrome 只有普通进程，直接运行固定 CDP 启动脚本，再用 preflight 复测后重试发布。
+
+### 2026-07-10 Dreamina 成功任务下载副本被截断
+- 适用边界：本条仅用于文件大小、哈希、播放或解码出现异常迹象的下载排障；默认视频质检按模块 02 使用 `ffprobe` 核对基础规格。
+- 症状：`query_result` 已返回 `success`，但同一 `submit_id` 下载出的 MP4 大小和哈希不一致，`ffprobe` 可读到头信息，`ffmpeg -xerror` 全文件解码时报 `partial file` 或 `Invalid NAL unit size`。
+- 根因：慢速媒体传输尚未真正结束时又向同一路径发起查询或整理文件，下载副本被截断或覆盖；生成任务本身已经成功，不需要重新提交。
+- 修复动作：保留同一 `submit_id`，刷新一次查询结果获得当前临时媒体地址，只向全新目标文件发起一次可重试下载，并等待实际下载进程退出；下载期间不再向同一目标重复调用 `query_result`。
+- 验证：目标文件大小停止增长后，先用 `ffmpeg -xerror -v error -i INPUT -f null -` 做全文件严格解码，再核对 `ffprobe` 的分辨率、方向和时长；全部通过后才复制到 `OUTPUT/`。
+- 下次判断：Dreamina 返回成功但 MP4 哈希或大小不稳定时，按下载传输异常处理，先复用原任务完整取回并严格解码；不得把可读头信息等同于完整成片，也不得因此重提生成。
