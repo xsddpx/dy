@@ -160,13 +160,10 @@ class PromptLintFlowTest(unittest.TestCase):
     def test_closeup_presentation_without_full_body_passes(self):
         text = GOOD_PROMPT.replace(
             POSE_PROMPT,
-            "姿态镜头：他人手持拍摄，竖屏脸侧近景，镜头从脸部裁到胸口上方；她随轻缓动画侧过脸再看向镜头，肩颈、领口、表情和手部整理发丝的动作清楚可见。",
-        ).replace(
-            "固定拍摄一条出门穿搭短视频",
-            "他人手持拍摄一条出门穿搭短视频",
+            "姿态镜头：固定拍摄，竖屏脸侧近景，镜头从脸部裁到胸口上方并保持不变；她随轻缓动画侧过脸再看向镜头，肩颈、领口、表情和手部整理发丝的动作清楚可见。",
         ).replace(
             ANIMATION_PROMPT,
-            "整体动画：单一连续他人手持镜头，她轻轻侧过脸再看向镜头，手部整理一次发丝，摄影者保持稳定近景构图。",
+            "整体动画：单一连续固定镜头，她轻轻侧过脸再看向镜头，手部整理一次发丝，镜头保持稳定近景构图。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
@@ -181,7 +178,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "pass", result["findings"])
         self.assertTrue(any(f["code"] == "missing_animation_adapted_presentation" for f in result["findings"]), result["findings"])
 
-    def test_other_person_handheld_camera_passes(self):
+    def test_other_person_handheld_camera_fails(self):
         text = GOOD_PROMPT.replace(
             POSE_PROMPT,
             "姿态镜头：他人手持拍摄，竖屏中近景，镜头略高于腰部；她从侧身转向镜头后停住半拍，上身轮廓和腰线清楚可见。",
@@ -193,7 +190,17 @@ class PromptLintFlowTest(unittest.TestCase):
             "整体动画：单一连续他人手持镜头，她从侧身转向镜头后完成一次轻微重心切换，摄影者保持稳定中近景构图。",
         )
         result = self.lint(text)
-        self.assertEqual(result["decision"], "pass", result["findings"])
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "other_handheld_camera_terms" for f in result["findings"]), result["findings"])
+
+    def test_generic_handheld_camera_fails(self):
+        text = GOOD_PROMPT.replace(
+            POSE_PROMPT,
+            "姿态镜头：手持镜头，竖屏中近景，人物自然转身展示穿搭。",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "other_handheld_camera_terms" for f in result["findings"]), result["findings"])
 
     def test_missing_allowed_camera_relation_fails(self):
         text = GOOD_PROMPT.replace(
@@ -224,7 +231,7 @@ class PromptLintFlowTest(unittest.TestCase):
             "",
         ).replace(
             POSE_PROMPT,
-            "姿态镜头：他人手持拍摄，竖屏中近景，镜头略高于胸口并轻微向下；动作承接整体动画：转向镜头后停住半拍。",
+            "姿态镜头：固定拍摄，竖屏中近景，镜头略高于胸口并保持角度不变；动作承接整体动画：转向镜头后停住半拍。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail")

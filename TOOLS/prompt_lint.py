@@ -295,6 +295,9 @@ OTHER_HANDHELD_CAMERA_TERMS = [
     "他人手持",
     "朋友手持",
     "摄影者手持",
+    "手持拍摄",
+    "手持镜头",
+    "手持感",
 ]
 
 OUT_OF_FRAME_ACTION_TERMS = [
@@ -556,7 +559,7 @@ def add_prompt_style_findings(findings, text):
             findings,
             "error",
             "mixed_camera_relation",
-            "镜头关系保持单一：固定拍摄维持镜头位置不变，移动跟随由他人手持拍摄承担",
+            "固定拍摄需在整段视频中保持机位、视角和构图关系不变",
         )
 
 
@@ -589,7 +592,15 @@ def lint_text(text, path, route="anna", channel="auto"):
             findings,
             "error",
             "self_held_camera_terms",
-            f"prompt 禁止人物自己持机，只允许固定拍摄或他人手持拍摄：{', '.join(self_held_hits)}",
+            f"prompt 只允许固定拍摄，人物不持机：{', '.join(self_held_hits)}",
+        )
+    other_handheld_hits = [term for term in OTHER_HANDHELD_CAMERA_TERMS if term in text]
+    if other_handheld_hits:
+        add(
+            findings,
+            "error",
+            "other_handheld_camera_terms",
+            f"prompt 只允许固定拍摄，不使用他人手持拍摄：{', '.join(other_handheld_hits)}",
         )
     out_of_frame_hits = [term for term in OUT_OF_FRAME_ACTION_TERMS if term in text]
     if out_of_frame_hits:
@@ -644,12 +655,12 @@ def lint_text(text, path, route="anna", channel="auto"):
         compact_pose = re.sub(r"\s+", "", pose_text)
         has_fixed = any(term in compact_pose for term in FIXED_CAMERA_TERMS)
         has_other_handheld = any(term in compact_pose for term in OTHER_HANDHELD_CAMERA_TERMS)
-        if not has_fixed and not has_other_handheld:
+        if not has_fixed:
             add(
                 findings,
                 "error",
                 "missing_allowed_camera_relation",
-                "姿态镜头必须明确选择固定拍摄或他人手持拍摄",
+                "姿态镜头必须明确使用固定拍摄",
             )
         elif has_fixed and has_other_handheld:
             add(
