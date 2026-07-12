@@ -1,29 +1,27 @@
-# dy auto 项目启动协议
+# Repository Guidelines
 
-## 启动读取
+## 项目结构
 
-- 默认读取本文件和 `DOCS/PROJECT.md`。
-- 按 `DOCS/PROJECT.md` 的流程路由读取 `DOCS/MODULES/` 对应模块。
-- 读取 `~/.codex/AGENTS.md`。
+`DOCS/PROJECT.md` 是跨模块项目合同，`DOCS/MODULES/` 保存各阶段执行细则。Python 与 Shell 自动化位于 `TOOLS/`，测试位于 `TOOLS/tests/`，稳定素材和数据账本位于 `MATERIAL/`。运行目录、成片命名及流程硬阻断统一查阅 `DOCS/PROJECT.md`，不要在本文件重复维护。
 
-## 项目边界
+## 开发与测试命令
 
-- 以当前 Git 仓库根目录作为项目根目录。
-- 执行项目命令前先切换到该根目录；文档中的相对路径和 `$PWD` 均以该目录为基准。
-- 只按 `DOCS/PROJECT.md` 和对应模块执行当前项目流程。
+- `zsh TOOLS/setup_env.sh`：创建或修复项目 `.venv` 并安装依赖。
+- `.venv/bin/python -m pytest TOOLS/tests -q`：运行完整测试套件。
+- `.venv/bin/python -m pytest TOOLS/tests/test_run_workspace.py -q`：运行单个测试模块。
 
-## 文档边界
+所有命令从 Git 仓库根目录执行，使用 `.venv/bin/python`，不要写死 macOS 用户名或调用系统 Python。
 
-- `DOCS/PROJECT.md` 保存核心事实、流程路由和全局硬阻断。
-- 具体执行细节只看 `DOCS/PROJECT.md` 路由到的对应模块。
-- 选题、穿搭、prompt、镜头、动作、生成、质检、发布和记录等执行细则写入对应模块；跨模块生效的核心结论、流程路由和全局硬阻断写入 `DOCS/PROJECT.md`；`~/.codex/skills/xdy/SKILL.md` 只保留调用语义和文档路由。
-- 项目文档、prompt 规则和示例优先使用正向描述，直接写清期望呈现的画面、动作和结果，尽量去掉“不要”“不得”“禁止”等负向表达及负向词堆叠；安全、发布、输入合同和全局硬阻断等必须明确排除的边界可保留必要的负向描述。
-- 修改核心事实、核心卖点或提示词规则前必须先说明拟修改内容和原因；用户明确要求修改时，本次授权仅限其明确范围。
+## 编码风格与测试规范
 
-## 本地提示
+Python 使用四空格缩进；函数和文件采用 `snake_case`，测试类采用 `PascalCase`，常量采用 `UPPER_SNAKE_CASE`。CLI 使用 `argparse`，公开辅助函数在有助于理解时添加类型标注。Shell 脚本沿用所在文件既有的 zsh 或 POSIX 风格。项目未配置统一格式化工具，应保持相邻代码风格并控制改动范围。
 
-- 默认使用中文，实事求是，不虚构未验证结果。
+测试使用 `unittest` 的断言和 mock，由 pytest 收集。测试文件命名为 `test_<模块>.py`，方法命名为 `test_<行为>`。CLI 校验、文件系统状态和发布适配器修改应补充离线回归测试。项目未设置覆盖率阈值，但评审前必须保证全量测试通过。
 
-## 结果汇报
+## 提交与拉取请求
 
-- 生成结果默认按“成片信息、Google Drive 链接、最终 prompt、生成与 TNS 状态”汇报，正文不内嵌视频或图片预览；仅在用户明确要求查看时内嵌。
+提交标题应简短、使用祈使语气，可采用 `feat:`、`fix:`、`docs:` 或 `refine:` 前缀。每个提交只处理一个明确主题。拉取请求需说明流程影响、列出已运行测试并关联相关 issue；仅在界面或生成资产变化时附截图。不得提交 `.env`、浏览器配置、凭据、`TEMP/` 或 `OUTPUT/` 媒体文件。
+
+## Agent 启动与汇报
+
+启动时依次读取本文件、`DOCS/PROJECT.md`、`~/.codex/AGENTS.md`，再按项目路由读取当前模块。默认使用中文，只汇报已验证结果。生成任务按“成片信息、Google Drive 链接、最终 prompt、生成与 TNS 状态”汇报；仅在用户明确要求时内嵌媒体。

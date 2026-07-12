@@ -38,6 +38,7 @@
 
 - 固定 CDP 地址为 `http://127.0.0.1:9222`。
 - 启动脚本从普通 Chrome 当前使用的 Profile 初始化独立 CDP 数据目录；普通 Chrome 与 CDP Chrome 可并存，需要重新同步登录态时使用 `--refresh-from-browser`。
+- 自动化默认使用 Playwright `connect_over_cdp` 接管该浏览器；AppleScript 和系统文件选择器仅作为兼容兜底。静态端口预检不能替代真实 CDP 接管验证。
 - 需要启动或刷新 CDP Chrome 时使用：
 
 ```bash
@@ -68,6 +69,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 ### 文件与依赖
 
 - `MATERIAL/fixed-role/anna.png` 缺失、找不到任何 `MATERIAL/fixed-environment/anna-room-NN.png` 正式环境图、本次 `environment-path.txt` 指向无效文件，或 `TEMP/`、`OUTPUT/` 不可读写，均属于环境问题。
+- Python 依赖统一安装在仓库根目录 `.venv/`；项目命令使用 `.venv/bin/python`。
 - Python/Playwright 依赖异常或项目刚从其他电脑迁移时，运行 `zsh TOOLS/setup_env.sh --recreate`；脚本先把原 `.venv/` 备份到 `TEMP/env-backups/`，再重建项目环境。
 
 ## 环境修复最佳实践记录
