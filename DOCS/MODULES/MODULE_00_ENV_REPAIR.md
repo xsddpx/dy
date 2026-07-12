@@ -130,3 +130,10 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 - 修复动作：启动脚本保留普通 Chrome；只有首次初始化或刷新 Profile 时临时关闭并在复制后恢复。预检只要求唯一匹配的 CDP 进程，把普通 Chrome 记录为辅助进程。
 - 验证：普通 Chrome 的插件通道与 9222 CDP 同时可用，CDP 进程目录和 Playwright 预检通过。
 - 下次判断：普通 Chrome 存在不再构成发布阻断；只有 CDP 目标进程缺失、重复或端口被其他进程占用时进入修复。
+
+### 2026-07-12 CDP 静态预检通过但实际接管报协议错误
+- 症状：端口、进程目录和静态预检均正常，但发布 helper 的 `connect_over_cdp` 返回 `Browser.setDownloadBehavior: Browser context management is not supported`。
+- 根因：独立 CDP Chrome 旧进程的浏览器协议状态异常，静态端口检查无法覆盖真实 Playwright 接管。
+- 修复动作：只结束独立 CDP Chrome 目标进程，再用 `TOOLS/open_cdp_chrome.sh 9222` 重启，保留普通 Chrome。
+- 验证：先运行最小 `playwright.chromium.connect_over_cdp` 得到一个浏览器上下文，再重试原发布命令，抖音与快手均返回 `published`。
+- 下次判断：遇到相同协议错误时不要只重复静态 preflight；重启独立 CDP 进程并以真实 `connect_over_cdp` 作为恢复判定。
