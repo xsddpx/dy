@@ -36,13 +36,14 @@
 - 固定角色图：`MATERIAL/fixed-role/anna.png`，用于锚定同一位成年女性的脸部身份、上身体量、胸部体量比例、纤细腰线、腰胯比例和整体 S 型曲线。
 - 固定环境图集合：正式环境图统一存放在 `MATERIAL/fixed-environment/`，文件名使用 `anna-room-NN.png`；每次运行从全部正式编号图中随机选择一张，并将绝对路径锁定到 `TEMP/RUN_ID/environment-path.txt`。环境图 01 为 `anna-room-01.png`：适配膝盖以上中景的 9:16 纯墙面纵图，墙面为干净白墙，左上方固定一幅木色窄框米色抽象画，中央约 60% 作为干净的贴墙动作与投影区。替换前版本、历史版本和 `candidates/` 均不进入随机池。
 - Anna 衣柜：`MATERIAL/anna-wardrobe.md`。默认按当天日期优先选择对应编号；当天对应编号不存在时，从现有衣柜条目中随机选择；与卖点或动作模板不适配时可改选，并记录原因。
-- `TEMP/` 保存可清理的过程文件，不作为下次默认续跑状态；`OUTPUT/RUN_ID.mp4` 保存正式成片；`DOCS/`、`TOOLS/`、`MATERIAL/` 分别保存规则、自动化脚本和固定资产。
+- `TEMP/` 保存可清理的过程文件，不作为下次默认续跑状态；正式运行目录固定为 `TEMP/RUN_ID/`，正式成片固定为 `OUTPUT/RUN_ID.mp4`，两者使用完全相同的 `RUN_ID`；`DOCS/`、`TOOLS/`、`MATERIAL/` 分别保存规则、自动化脚本和固定资产。
 
 ## 运行建档
 
-- 每次执行先在项目根目录创建唯一 `RUN_ID`，默认格式为 `YYYYMMDD-HHMMSS`；同一秒内并发启动时追加简短来源或序号后缀。
-- 创建 `TEMP/RUN_ID/logs/` 和 `OUTPUT/`，并向 `TEMP/RUN_ID/RUN_ID-run-record.jsonl` 写入 `run/started` 首条事件；触发来源、scheduled run 或 thread 标识可用时一并写入事件数据。
+- 每次执行通过 `TOOLS/run_workspace.py init` 创建唯一 `RUN_ID`。唯一合法格式为 `YYYYMMDD-HHMMSS`；同一秒内首个运行使用纯时间，后续依次使用两位数字后缀 `-01` 至 `-99`，不在 RUN_ID 中加入主题、模式、来源或模板等语义后缀。
+- `init` 按 `Asia/Shanghai` 时间原子创建 `TEMP/RUN_ID/logs/` 和 `OUTPUT/`，并向 `TEMP/RUN_ID/RUN_ID-run-record.jsonl` 写入 `run/started` 首条事件；触发来源、scheduled run 或 thread 标识通过事件数据记录。
 - 后续所有 prompt、下载、代理图、发布报告和运行记录都使用本次 `RUN_ID`，不从旧目录推断本次状态。
+- `TOOLS/run_workspace.py audit` 用于检查正式运行目录、运行记录和 `OUTPUT/*.mp4` 的命名与对应关系；候选、调试、缓存和 `TEMP/del/` 等辅助目录不作为正式 RUN_ID。
 
 ## 本地环境
 

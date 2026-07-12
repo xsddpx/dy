@@ -11,16 +11,11 @@
 ## 启动建档
 
 ```bash
-RUN_ID="$(date +%Y%m%d-%H%M%S)"
-mkdir -p "TEMP/$RUN_ID/logs" OUTPUT
-.venv/bin/python TOOLS/run_record.py append "TEMP/$RUN_ID/$RUN_ID-run-record.jsonl" \
-  --stage run \
-  --event started \
-  --status in_progress \
-  --summary "本次运行已建档"
+RUN_SOURCE="${RUN_SOURCE:-manual}"
+RUN_ID="$(.venv/bin/python TOOLS/run_workspace.py init --source "$RUN_SOURCE" --format id)"
 ```
 
-同一秒内存在并发任务时，为后启动任务的 `RUN_ID` 追加来源或序号后缀。定时任务、补跑或 Codex thread 标识可用时，通过 `--data` 写入首条事件。
+`init` 固定按上海时间创建纯时间 RUN_ID；同一秒内并发任务自动追加 `-01`、`-02`。定时任务、补跑或 Codex thread 标识可用时，通过 `--source` 和 `--data` 写入首条事件，不写入 RUN_ID。
 
 ## 命令
 
@@ -29,3 +24,9 @@ python3 TOOLS/run_record.py summary "TEMP/$RUN_ID/$RUN_ID-run-record.jsonl" --md
 ```
 
 收尾摘要必须包含 Google Drive 上传状态和发布状态；已尝试发布时再写入平台报告和 `publish-both-report.json` 路径。
+
+收尾后执行命名审计：
+
+```bash
+.venv/bin/python TOOLS/run_workspace.py audit
+```
