@@ -67,7 +67,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 
 ### 文件与依赖
 
-- `MATERIAL/fixed-role/anna.png` 缺失、`TEMP/` 或 `OUTPUT/` 不可读写属于环境问题。
+- `MATERIAL/fixed-role/anna.png`、`MATERIAL/fixed-environment/anna-room.png` 任一缺失，或 `TEMP/`、`OUTPUT/` 不可读写，均属于环境问题。
 - Python/Playwright 依赖异常或项目刚从其他电脑迁移时，运行 `zsh TOOLS/setup_env.sh --recreate`；脚本先把原 `.venv/` 备份到 `TEMP/env-backups/`，再重建项目环境。
 
 ## 环境修复最佳实践记录
@@ -99,9 +99,9 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 ### 2026-07-04 Dreamina 单图相对路径上传失败
 - 症状：`dreamina multimodal2video --image MATERIAL/fixed-role/anna.png ...` 返回 `upload phase, no file upload`，未进入生成阶段，不是 TNS。
 - 根因：Dreamina CLI 本次对相对路径图片上传没有实际提交文件。
-- 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，从 Git 根目录解析 `MATERIAL/fixed-role/anna.png` 的绝对路径后重提。
+- 修复动作：当时保持同一个 `vid-prompt-v1.txt` 和单图输入不变，从 Git 根目录解析 `MATERIAL/fixed-role/anna.png` 的绝对路径后重提。
 - 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 MP4。
-- 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先用固定素材绝对路径重试；不要改 prompt、不要进入 TNS 收敛。
+- 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先把当前流程的全部固定输入图解析为绝对路径，保持双图组合、顺序和 prompt 不变后重试；不要进入 TNS 收敛。
 
 ### 2026-07-09 发布前 CDP 端口未启动且存在普通 Chrome
 - 症状：`publish_adapter.py both` 在抖音和快手预检阶段均失败，`127.0.0.1:9222` connection refused，进程检查发现只有普通 Chrome，没有带 `--remote-debugging-port=9222` 的 CDP Chrome。

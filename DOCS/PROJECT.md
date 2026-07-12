@@ -14,6 +14,7 @@
 ## 流程路由
 
 - 默认日更：`DOCS/MODULES/MODULE_01_REFERENCE.md` 自主选题、衣柜匹配与七段式 prompt -> `DOCS/MODULES/MODULE_02_DREAMINA_VIDEO.md` 生成、质检与 Google Drive 上传 -> `DOCS/MODULES/MODULE_03_PUBLISH.md` 双平台发布 -> `DOCS/MODULES/MODULE_04_RECORDS.md` 记录收尾。
+- 只生成视频：`DOCS/MODULES/MODULE_01_REFERENCE.md` 自主选题、衣柜匹配与七段式 prompt -> `DOCS/MODULES/MODULE_02_DREAMINA_VIDEO.md` 按 `xdysp` 分支生成、不质检并上传 Google Drive -> `DOCS/MODULES/MODULE_04_RECORDS.md` 记录收尾；不进入模块 03。
 - 环境修复：`DOCS/MODULES/MODULE_00_ENV_REPAIR.md`；默认跳过，仅在出现环境问题或用户明确要求时执行。
 - 评论任务：`DOCS/MODULES/MODULE_06_COMMENT_REPLY.md`；仅在用户明确要求查看或回复评论时执行。
 
@@ -62,4 +63,4 @@
 - Dreamina 明确返回 TNS/安全拦截时最多收敛到 `v5`；仍无产物则停止。网络、登录、积分、参数、上传、下载或超时等环境问题转模块 00 修复并复测。
 - 发布前必须人工对照固定角色代理图与首中尾三帧。仅胸部体量明显偏小时阻断，其余全部通过。
 - 任一平台发布前必须设置 `内容由AI生成`。单个平台受登录、验证、风控、上传或按钮状态阻断时记录失败，并继续尝试另一个平台。
-- 正式视频整理完成后必须尝试上传到 Google Drive 的 My Drive 根目录；上传失败时记录失败原因并继续双平台发布，不把云端归档失败作为平台发布阻断项。
+- `xdy` 或 `xdysp` 只要成功整理出 `OUTPUT/RUN_ID.mp4`，都必须尝试上传到 Google Drive 的 My Drive 根目录；上传失败时记录失败原因和补传状态。`xdy` 继续双平台发布，`xdysp` 继续记录收尾，不把云端归档失败作为后续流程阻断项。
