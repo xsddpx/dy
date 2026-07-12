@@ -416,7 +416,7 @@ def capture_video_frames_cdp(url, out_dir, args, report):
         try:
             browser = p.chromium.connect_over_cdp(DEFAULT_CDP_URL)
             if not browser.contexts:
-                raise RuntimeError("当前账户本地 CDP Chrome 没有可用浏览器上下文")
+                raise RuntimeError("CDP Chrome 没有可用浏览器上下文")
             context = browser.contexts[0]
             if open_error:
                 page = context.pages[0] if context.pages else context.new_page()
@@ -489,7 +489,7 @@ def capture_video_frames_cdp(url, out_dir, args, report):
                 "capture_mode": "video-canvas-frame-cdp-playwright",
                 "capture_rect": {
                     "source": "video-canvas-frame-cdp-playwright",
-                    "note": "从当前账户本地 CDP Chrome video 元素直接抽取 9:16 当前帧像素，未下载原视频",
+                    "note": "从 CDP Chrome video 元素直接抽取 9:16 当前帧像素，未下载原视频",
                 },
             })
             if not state.get("ok"):
@@ -1030,7 +1030,7 @@ def target_times(duration, count):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="通过当前账户本地 CDP Chrome 播放截图生成参考视频宫格图，不默认下载原视频。")
+    parser = argparse.ArgumentParser(description="通过 CDP Chrome 播放截图生成参考视频宫格图，不默认下载原视频。")
     parser.add_argument("url", help="抖音视频详情页 URL")
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/reference-grids/YYYYMMDD-HHMMSS")
     parser.add_argument("--frames", type=int, default=6, help="截图数量，默认 6")
@@ -1076,7 +1076,7 @@ def main():
         cdp_preflight = check_cdp(DEFAULT_CDP_URL, timeout=3, expected_user_data_dir=DEFAULT_USER_DATA_DIR)
         report["cdp_preflight"] = cdp_preflight
         if not cdp_preflight.get("ok"):
-            report["errors"].append("当前账户本地 CDP Chrome 预检失败；请运行 TOOLS/open_cdp_chrome.sh 启动")
+            report["errors"].append("CDP Chrome 预检失败；请运行 TOOLS/open_cdp_chrome.sh 启动")
             write_report(out_dir, report)
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return 3
@@ -1214,7 +1214,7 @@ def main():
                 report["capture_mode"] = "video-canvas-frame"
                 report["capture_rect"] = {
                     "source": "video-canvas-frame",
-                    "note": "从当前账户本地 CDP Chrome video 元素直接抽取当前帧像素，未下载原视频",
+                    "note": "从 CDP Chrome video 元素直接抽取当前帧像素，未下载原视频",
                 }
         else:
             if duration <= 0:

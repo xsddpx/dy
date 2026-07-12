@@ -23,13 +23,13 @@ class KuaishouPublishHelperTest(unittest.TestCase):
         self.assertIn("tabType=1", MODULE.DEFAULT_UPLOAD_URL)
 
     def test_build_caption_dedupes_existing_tags(self):
-        caption = MODULE.build_caption("窗边随拍", "轻熟针织 #旅行", ["旅行", "#穿搭"])
-        self.assertEqual(caption.count("#旅行"), 1)
+        caption = MODULE.build_caption("轻熟针织穿搭", "今天心情很轻松 #好心情", ["好心情", "#穿搭"])
+        self.assertEqual(caption.count("#好心情"), 1)
         self.assertIn("#穿搭", caption)
 
     def test_build_caption_keeps_title_on_first_line(self):
-        caption = MODULE.build_caption("窗边随拍", "轻熟针织", ["穿搭"])
-        self.assertEqual(caption.splitlines()[0], "窗边随拍")
+        caption = MODULE.build_caption("轻熟针织穿搭", "今天心情很轻松", ["穿搭"])
+        self.assertEqual(caption.splitlines()[0], "轻熟针织穿搭")
 
     def test_ai_declaration_detection(self):
         self.assertTrue(MODULE.ai_declaration_is_set("作品声明 内容由AI生成"))

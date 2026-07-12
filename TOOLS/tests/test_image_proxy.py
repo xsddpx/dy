@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -32,7 +33,7 @@ class ImageProxyTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def run_proxy(self, images, *extra_args):
-        args = ["python3", str(SCRIPT), "--out-dir", str(self.out_dir), *extra_args]
+        args = [sys.executable, str(SCRIPT), "--out-dir", str(self.out_dir), *extra_args]
         args.extend(str(image) for image in images)
         return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

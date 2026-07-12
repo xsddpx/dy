@@ -2448,7 +2448,7 @@ def main() -> int:
         "--upload-mode",
         choices=["auto", "cdp", "dialog"],
         default="cdp",
-        help="上传方式：默认 cdp，使用当前账户本地 CDP Chrome；auto/dialog 仅保留人工排障兼容",
+        help="上传方式：默认 cdp，使用项目 CDP Chrome；auto/dialog 仅保留人工排障兼容",
     )
     parser.add_argument(
         "--cdp-url",
@@ -2496,7 +2496,7 @@ def main() -> int:
         preflight = run_cdp_preflight(cdp_url)
         report["steps"]["upload"]["cdp_preflight"] = preflight
         if not preflight.get("ok"):
-            return fail(report, out_dir, "当前账户本地 CDP Chrome 预检失败；请运行 TOOLS/open_cdp_chrome.sh 启动", 3)
+            return fail(report, out_dir, "CDP Chrome 预检失败；请运行 TOOLS/open_cdp_chrome.sh 启动", 3)
 
     cdp_first_upload = (not args.current_tab) and args.upload_mode == "cdp"
 

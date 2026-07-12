@@ -74,6 +74,31 @@ class DouyinPublishPreflightTest(unittest.TestCase):
             )
         self.assertFalse(result["ok"])
 
+    def test_local_cdp_and_regular_chrome_can_coexist(self):
+        with mock.patch.object(
+            MODULE,
+            "chrome_main_processes",
+            return_value=[
+                {
+                    "pid": 123,
+                    "command": (
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome "
+                        f"--user-data-dir={MODULE.DEFAULT_USER_DATA_DIR} --remote-debugging-port=9222"
+                    ),
+                },
+                {
+                    "pid": 456,
+                    "command": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                },
+            ],
+        ):
+            result = MODULE.check_chrome_processes(
+                "http://127.0.0.1:9222", MODULE.DEFAULT_USER_DATA_DIR
+            )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["target_count"], 1)
+        self.assertEqual(result["auxiliary_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

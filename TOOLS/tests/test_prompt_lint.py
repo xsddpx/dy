@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -7,6 +8,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "prompt_lint.py"
+PROJECT_ROOT = SCRIPT.parents[1]
 SPEC = importlib.util.spec_from_file_location("prompt_lint", SCRIPT)
 PROMPT_LINT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PROMPT_LINT)
@@ -14,42 +16,127 @@ SPEC.loader.exec_module(PROMPT_LINT)
 
 PERSON_PROMPT = (
     "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
-    "以 @图1 中左下大脸和正面脸为主要身份依据，特别保持五官比例、脸型、眼神、鼻唇结构、发型分线和自然神态；"
-    "以 @图1 中正面、侧面和背面全身图为稳定身材依据，特别保持上身体量、胸部体量比例、纤细腰线、腰胯比例和整体 S 型曲线。"
-    "侧面、背面和表情小图只用于辅助保持发型、脸型、身材比例和整体气质。画面中只出现这一位成年女性。"
+    "脸部严格参考左下角大脸，身材严格参考正面、侧面和背面全身图，保持同一人物的脸部身份与身材一致。"
+    "画面中只出现这一位成年女性。"
 )
 
-POSE_PROMPT = (
-    "姿态镜头：固定拍摄，竖屏中近景，镜头略高于腰部并保持位置不变，裁切从头顶到大腿上段；"
-    "她以松弛妩媚的状态完成自然转身展示，修身剪裁和高腰半裙让上身轮廓、清晰腰线与腰胯比例在连续动作中自然可读。"
-)
+PERSON_ACTION_PROMPT = "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["01"]
 
-ANIMATION_PROMPT = (
-    "整体动画：保持单一连续固定镜头，以自然转身展示为主要动作目标，人物松弛妩媚且身体保持流动感，"
-    "穿搭轮廓和腰线在动作中持续可读，发丝和裙摆随身体运动自然摆动，人物始终留在画面内。"
-)
+VIDEO_CONSTRAINT_PROMPT = "视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"]
+
+ENVIRONMENT_PROMPT = "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"]
+
+OTHER_PROMPT = "其他：写实摄影风格，真实人物质感，均匀柔和的真实室内光影，真实皮肤纹理，真实面部结构，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实色彩。穿搭轮廓清晰，腰线可见，构图稳定，单一连续完整竖屏画面，人物和环境保持同一时空与稳定透视。"
 
 GOOD_PROMPT = (
     PERSON_PROMPT
-    + "视频类型：穿搭展示；次类型：生活场景剧情；固定拍摄一条出门穿搭短视频。"
+    + VIDEO_CONSTRAINT_PROMPT
     + "穿搭：黑色修身上衣搭配高腰半裙，上衣贴合上身并露出清晰腰线，半裙包覆腰胯并停在膝上。"
-    + POSE_PROMPT
-    + "环境：现代酒店窗边，柔和窗光、浅色墙面和干净木地板，背景有衣架与小桌，空间透视清楚。"
-    + ANIMATION_PROMPT
-    + "背景音乐：轻柔电子节拍，节奏清晰。"
-    + "其他：写实摄影风格，真实人物质感，自然光影，真实皮肤纹理，真实面部结构，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实色彩。穿搭轮廓清晰，腰线可见，构图稳定，单一连续完整竖屏画面，人物和环境保持同一时空与稳定透视。"
+    + ENVIRONMENT_PROMPT
+    + PERSON_ACTION_PROMPT
+    + "背景音乐：轻快电子律动纯音乐，稳定四拍节奏，氛围俏皮自信。"
+    + OTHER_PROMPT
 )
 
 class PromptLintFlowTest(unittest.TestCase):
     def lint(self, text, route="anna", channel="auto"):
         return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel)
 
-    def test_auto_anna_with_eight_section_prompt_passes(self):
+    def test_auto_anna_with_seven_section_prompt_passes(self):
         result = self.lint(GOOD_PROMPT)
         self.assertEqual(result["decision"], "pass", result["findings"])
         self.assertEqual(result["route"], "anna")
         self.assertEqual(result["channel"], "auto")
         self.assertEqual(result["mode"], "fast")
+
+    def test_documented_fixed_templates_match_linter_contract(self):
+        doc = (PROJECT_ROOT / "DOCS/MODULES/MODULE_01_REFERENCE.md").read_text(encoding="utf-8")
+        self.assertTrue((PROJECT_ROOT / "MATERIAL/fixed-environment/anna-room-01.png").exists())
+        self.assertIn("未指定时，在动作模板 01、02 中随机选择一个", doc)
+        environment = re.search(r"### 固定环境引用\n\n```text\n(.*?)\n```", doc, re.S).group(1)
+        self.assertEqual(environment, "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"])
+        self.assertIn("@图2 是本次随机选中的固定墙面环境", environment)
+        self.assertIn("人物贴墙站立", environment)
+        self.assertIn("墙上呈现轻微自然投影", environment)
+        for template_id, name in (("01", "靠墙完整侧身转回"),):
+            action = re.search(rf"### 动作模板 {template_id}：{name}\n\n```text\n(.*?)\n```", doc, re.S).group(1)
+            self.assertEqual(action, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES[template_id])
+            self.assertIn("视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES[template_id], doc)
+            self.assertIn("全身沿墙面原地同步向左转至清晰的侧身姿态", action)
+            self.assertIn("侧身短暂停留", action)
+            self.assertIn("再沿墙面转回正面", action)
+            self.assertIn("撩头发、整理衣服、看向镜头、表情变化、叉腰、手放胸前", action)
+            self.assertIn("动作舒展流畅、衔接自然", action)
+            self.assertIn("甜美亲切、自然有韵律", action)
+            self.assertIn("肩背自然靠墙", action)
+            self.assertIn("动作范围集中在墙面前方半步内", action)
+            self.assertIn("墙上轻微投影随动作同步变化", action)
+            self.assertNotIn("轻微重心", action)
+            self.assertNotIn("机械僵硬", action)
+            self.assertNotIn("人物神态轻松自信", action)
+            self.assertNotIn("服装轮廓、上身比例、清晰腰线和整体身形在动作过程中持续可读", action)
+            for micro_direction in ("一只手", "另一只手", "耳侧", "自然回落", "视线在镜头附近"):
+                self.assertNotIn(micro_direction, action)
+            self.assertNotIn("镜子", action)
+            for high_risk_term in ("舞蹈", "跳舞", "肩胯", "妩媚", "S 型曲线", "面料张力"):
+                self.assertNotIn(high_risk_term, action)
+        action_02 = re.search(r"### 动作模板 02：靠墙自然摆姿回正\n\n```text\n(.*?)\n```", doc, re.S).group(1)
+        self.assertEqual(action_02, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["02"])
+        self.assertIn("从正面自然站姿开始", action_02)
+        self.assertIn("一个常见的女性拍照姿态", action_02)
+        self.assertIn("恢复正面自然站姿", action_02)
+        self.assertIn("面向镜头比心或比出 V 手势", action_02)
+        self.assertIn("撩头发、视线移动和表情变化", action_02)
+        self.assertIn("人物位置保持稳定", action_02)
+        self.assertIn("墙上轻微投影随动作同步变化", action_02)
+        self.assertIn("整体动作清晰流畅、衔接自然", action_02)
+        self.assertIn("单一连续膝盖以上中景", VIDEO_CONSTRAINT_PROMPT)
+        self.assertIn("机位高度大致与人物胸部齐平", VIDEO_CONSTRAINT_PROMPT)
+        self.assertIn("人物位于画面中央并贴近墙面", VIDEO_CONSTRAINT_PROMPT)
+        self.assertIn("动作范围保持在墙前半步内", VIDEO_CONSTRAINT_PROMPT)
+        self.assertIn("脚部始终位于画外", VIDEO_CONSTRAINT_PROMPT)
+        self.assertNotIn("人物展示；", VIDEO_CONSTRAINT_PROMPT)
+        self.assertNotIn("舞蹈律动", VIDEO_CONSTRAINT_PROMPT)
+
+    def test_non_template_environment_fails(self):
+        text = GOOD_PROMPT.replace(ENVIRONMENT_PROMPT, "环境：现代酒店窗边，柔和窗光和木地板。")
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "invalid_environment_template" for f in result["findings"]), result["findings"])
+
+    def test_person_action_text_is_not_exactly_validated(self):
+        text = GOOD_PROMPT.replace(
+            PERSON_ACTION_PROMPT,
+            "人物动作：人物在原地完成一圈转身展示。",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "pass", result["findings"])
+        self.assertFalse(any(f["code"] == "invalid_action_template" for f in result["findings"]), result["findings"])
+
+    def test_action_template_01_with_its_video_constraint_passes(self):
+        text = GOOD_PROMPT.replace(
+            VIDEO_CONSTRAINT_PROMPT,
+            "视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"],
+        ).replace(
+            PERSON_ACTION_PROMPT,
+            "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["01"],
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_action_template_02_with_fixed_video_constraint_passes(self):
+        text = GOOD_PROMPT.replace(
+            PERSON_ACTION_PROMPT,
+            "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["02"],
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_legacy_overall_animation_section_fails(self):
+        text = GOOD_PROMPT.replace(PERSON_ACTION_PROMPT, "整体动画：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["01"])
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "missing_sections" for f in result["findings"]), result["findings"])
 
     def test_person_section_missing_fixed_anchors_fails(self):
         text = GOOD_PROMPT.replace(PERSON_PROMPT, "人物：@图1 是同一位成年女性。")
@@ -58,7 +145,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue(any(f["code"] == "missing_person_anchors" for f in result["findings"]), result["findings"])
 
     def test_extra_expression_section_fails(self):
-        text = GOOD_PROMPT.replace("整体动画：", "表情节奏：自然微笑。整体动画：")
+        text = GOOD_PROMPT.replace("人物动作：", "表情节奏：自然微笑。人物动作：")
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
         self.assertTrue(any(f["code"] == "unexpected_sections" for f in result["findings"]), result["findings"])
@@ -70,8 +157,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_standalone_sellpoint_section_fails(self):
         text = GOOD_PROMPT.replace(
-            "整体动画：",
-            "卖点与建议：上身轮廓和腰线清楚。整体动画：",
+            "人物动作：",
+            "卖点与建议：上身轮廓和腰线清楚。人物动作：",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail")
@@ -79,8 +166,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_legacy_standalone_sellpoint_lock_section_fails(self):
         text = GOOD_PROMPT.replace(
-            "整体动画：",
-            "卖点与锁定：上身轮廓和腰线清楚。整体动画：",
+            "人物动作：",
+            "卖点与锁定：上身轮廓和腰线清楚。人物动作：",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail")
@@ -143,92 +230,106 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(self.lint(GOOD_PROMPT, channel="other")["decision"], "fail")
 
     def test_unsupported_terms_fail(self):
-        result = self.lint(GOOD_PROMPT + " @图2 模型参数。")
+        result = self.lint(GOOD_PROMPT + " @图3 模型参数。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "unsupported_terms" for f in result["findings"]), result["findings"])
 
-    def test_at_image_two_fails_for_video_prompt(self):
-        result = self.lint(GOOD_PROMPT + " 参考宫格图不能写成 @图2。")
+    def test_without_environment_image_fails(self):
+        result = self.lint(GOOD_PROMPT.replace(ENVIRONMENT_PROMPT, "环境：固定室内环境。"))
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "unsupported_terms" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "missing_environment_image" for f in result["findings"]), result["findings"])
 
     def test_unsafe_body_terms_fail(self):
         result = self.lint(GOOD_PROMPT + " 大胸、屁股大。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "unsafe_body_terms" for f in result["findings"]), result["findings"])
 
-    def test_closeup_presentation_without_full_body_passes(self):
+    def test_non_template_action_with_visible_presentation_passes(self):
         text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：他人手持拍摄，竖屏脸侧近景，镜头从脸部裁到胸口上方；她随轻缓动画侧过脸再看向镜头，肩颈、领口、表情和手部整理发丝的动作清楚可见。",
-        ).replace(
-            "固定拍摄一条出门穿搭短视频",
-            "他人手持拍摄一条出门穿搭短视频",
-        ).replace(
-            ANIMATION_PROMPT,
-            "整体动画：单一连续他人手持镜头，她轻轻侧过脸再看向镜头，手部整理一次发丝，摄影者保持稳定近景构图。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：她轻轻侧过脸再看向镜头，肩颈、领口、表情和手部整理发丝的动作清楚可见。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
-        self.assertFalse(any(f["code"] == "missing_animation_adapted_presentation" for f in result["findings"]), result["findings"])
+        self.assertFalse(any(f["code"] == "invalid_action_template" for f in result["findings"]), result["findings"])
+        self.assertFalse(any(f["code"] == "missing_action_adapted_presentation" for f in result["findings"]), result["findings"])
 
-    def test_missing_animation_adapted_presentation_warns(self):
+    def test_missing_action_adapted_presentation_warns(self):
         text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：固定拍摄，竖屏近景，镜头保持稳定，她随动画自然移动。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：她自然移动。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
-        self.assertTrue(any(f["code"] == "missing_animation_adapted_presentation" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "missing_action_adapted_presentation" for f in result["findings"]), result["findings"])
 
-    def test_other_person_handheld_camera_passes(self):
+    def test_other_person_handheld_camera_fails(self):
         text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：他人手持拍摄，竖屏中近景，镜头略高于腰部；她从侧身转向镜头后停住半拍，上身轮廓和腰线清楚可见。",
-        ).replace(
-            "固定拍摄一条出门穿搭短视频",
-            "他人手持拍摄一条出门穿搭短视频",
-        ).replace(
-            ANIMATION_PROMPT,
-            "整体动画：单一连续他人手持镜头，她从侧身转向镜头后完成一次轻微重心切换，摄影者保持稳定中近景构图。",
-        )
-        result = self.lint(text)
-        self.assertEqual(result["decision"], "pass", result["findings"])
-
-    def test_missing_allowed_camera_relation_fails(self):
-        text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：竖屏中近景，镜头略高于腰部；她从侧身转向镜头后停住半拍，上身轮廓和腰线清楚可见。",
+            VIDEO_CONSTRAINT_PROMPT,
+            "视频约束：他人手持拍摄，单一连续膝盖以上中景，呈现穿搭。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
-        self.assertTrue(any(f["code"] == "missing_allowed_camera_relation" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "other_handheld_camera_terms" for f in result["findings"]), result["findings"])
+
+    def test_generic_handheld_camera_fails(self):
+        text = GOOD_PROMPT.replace(
+            VIDEO_CONSTRAINT_PROMPT,
+            "视频约束：手持镜头，单一连续膝盖以上中景，呈现穿搭。",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "other_handheld_camera_terms" for f in result["findings"]), result["findings"])
+
+    def test_missing_fixed_camera_relation_fails(self):
+        text = GOOD_PROMPT.replace(
+            VIDEO_CONSTRAINT_PROMPT,
+            "视频约束：单一连续膝盖以上中景，人物居中，脚部位于画外。",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "missing_fixed_camera_relation" for f in result["findings"]), result["findings"])
 
     def test_multiple_camera_relations_fail(self):
         text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：固定拍摄和他人手持拍摄同时使用，竖屏中近景；她从侧身转向镜头后停住半拍，上身轮廓和腰线清楚可见。",
+            VIDEO_CONSTRAINT_PROMPT,
+            "视频约束：固定拍摄和他人手持拍摄同时使用，单一连续膝盖以上中景，呈现穿搭。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
         self.assertTrue(any(f["code"] == "multiple_camera_relations" for f in result["findings"]), result["findings"])
 
+    def test_missing_fixed_shooting_format_fails(self):
+        text = GOOD_PROMPT.replace(
+            VIDEO_CONSTRAINT_PROMPT,
+            "视频约束：固定拍摄，膝盖以上中景，人物居中，脚部位于画外。",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "missing_fixed_shooting_format" for f in result["findings"]), result["findings"])
+
+    def test_camera_relation_in_person_action_fails(self):
+        text = GOOD_PROMPT.replace(
+            PERSON_ACTION_PROMPT,
+            "人物动作：固定拍摄，人物自然转身展示穿搭，腰线清楚。",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "camera_relation_in_person_action" for f in result["findings"]), result["findings"])
+
     def test_missing_required_section_fails(self):
-        result = self.lint(GOOD_PROMPT.replace(ANIMATION_PROMPT, ""))
+        result = self.lint(GOOD_PROMPT.replace(PERSON_ACTION_PROMPT, ""))
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "missing_sections" for f in result["findings"]), result["findings"])
 
-    def test_inline_label_mention_does_not_count_as_section(self):
+    def test_removed_pose_camera_section_fails(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "",
-        ).replace(
-            POSE_PROMPT,
-            "姿态镜头：他人手持拍摄，竖屏中近景，镜头略高于胸口并轻微向下；动作承接整体动画：转向镜头后停住半拍。",
+            PERSON_ACTION_PROMPT,
+            "姿态镜头：固定拍摄，竖屏中近景。人物动作：固定拍摄，人物自然转身展示穿搭。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "missing_sections" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "unexpected_sections" for f in result["findings"]), result["findings"])
 
     def test_conditional_person_template_fails(self):
         text = GOOD_PROMPT.replace(
@@ -251,8 +352,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_prompt_explicit_duration_fails(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：约 6 秒单一连续固定镜头，她原地从侧身转向镜头，完成一次轻微重心切换后停在舞蹈节奏点。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：约 6 秒内她原地从侧身转向镜头，完成一次轻微重心切换后停在舞蹈节奏点。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
@@ -294,21 +395,21 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "internal_source_terms" for f in result["findings"]), result["findings"])
 
-    def test_missing_video_type_fails(self):
-        text = GOOD_PROMPT.replace("视频类型：穿搭展示；次类型：生活场景剧情；固定拍摄一条出门穿搭短视频。", "")
+    def test_missing_video_constraint_fails(self):
+        text = GOOD_PROMPT.replace(VIDEO_CONSTRAINT_PROMPT, "")
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "missing_video_type" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "missing_video_constraint" for f in result["findings"]), result["findings"])
 
-    def test_invalid_video_type_fails(self):
-        result = self.lint(GOOD_PROMPT.replace("视频类型：穿搭展示", "视频类型：随便展示"))
+    def test_invalid_video_constraint_fails(self):
+        result = self.lint(GOOD_PROMPT.replace(VIDEO_CONSTRAINT_PROMPT, "视频约束：随意拍摄和自由构图。"))
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "invalid_video_type" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "invalid_video_constraint" for f in result["findings"]), result["findings"])
 
-    def test_invalid_sub_video_type_fails(self):
-        result = self.lint(GOOD_PROMPT.replace("次类型：生活场景剧情", "次类型：随便运动"))
+    def test_legacy_video_type_section_fails(self):
+        result = self.lint(GOOD_PROMPT.replace(VIDEO_CONSTRAINT_PROMPT, "视频类型：人物展示；固定拍摄，单一连续中全景。"))
         self.assertEqual(result["decision"], "fail")
-        self.assertTrue(any(f["code"] == "invalid_video_type" for f in result["findings"]), result["findings"])
+        self.assertTrue(any(f["code"] == "missing_video_constraint" for f in result["findings"]), result["findings"])
 
     def test_runway_roaming_action_terms_fail(self):
         for action in (
@@ -321,25 +422,27 @@ class PromptLintFlowTest(unittest.TestCase):
             "沿场景跟拍",
         ):
             with self.subTest(action=action):
-                result = self.lint(GOOD_PROMPT.replace(ANIMATION_PROMPT, f"整体动画：{action}，保持单一连续画面。"))
+                result = self.lint(GOOD_PROMPT.replace(PERSON_ACTION_PROMPT, f"人物动作：{action}，保持单一连续画面。"))
                 self.assertEqual(result["decision"], "fail", result["findings"])
                 self.assertTrue(
                     any(f["code"] == "runway_roaming_action_terms" for f in result["findings"]),
                     result["findings"],
                 )
 
-    def test_half_step_action_terms_pass(self):
-        result = self.lint(GOOD_PROMPT.replace(ANIMATION_PROMPT, "整体动画：原地转向镜头并向侧前方调整半步，保持单一连续画面。"))
+    def test_non_template_half_step_action_passes(self):
+        result = self.lint(GOOD_PROMPT.replace(PERSON_ACTION_PROMPT, "人物动作：原地转向镜头并向侧前方调整半步，腰线清楚，保持单一连续画面。"))
         self.assertEqual(result["decision"], "pass", result["findings"])
+        self.assertFalse(any(f["code"] == "invalid_action_template" for f in result["findings"]), result["findings"])
 
     def test_out_of_frame_action_terms_fail(self):
-        result = self.lint(GOOD_PROMPT.replace(ANIMATION_PROMPT, "整体动画：自然展示穿搭，最后走出画面。"))
+        result = self.lint(GOOD_PROMPT.replace(PERSON_ACTION_PROMPT, "人物动作：自然展示穿搭，最后走出画面。"))
         self.assertEqual(result["decision"], "fail", result["findings"])
         self.assertTrue(any(f["code"] == "out_of_frame_action_terms" for f in result["findings"]), result["findings"])
 
-    def test_walk_back_video_type_with_stationary_action_passes(self):
-        result = self.lint(GOOD_PROMPT.replace("视频类型：穿搭展示", "视频类型：走路回头"))
-        self.assertEqual(result["decision"], "pass", result["findings"])
+    def test_unmapped_video_constraint_fails(self):
+        result = self.lint(GOOD_PROMPT.replace(VIDEO_CONSTRAINT_PROMPT, "视频约束：走路回头，自由跟拍。"))
+        self.assertEqual(result["decision"], "fail", result["findings"])
+        self.assertTrue(any(f["code"] == "invalid_video_constraint" for f in result["findings"]), result["findings"])
 
     def test_image_one_clothing_anchor_fails(self):
         result = self.lint(GOOD_PROMPT + "人物：以 @图1 中的人物和穿搭作为身份、五官、发型、姿态、穿搭和稳定身材比例依据。")
@@ -348,7 +451,7 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_long_negative_style_list_warns(self):
         text = GOOD_PROMPT.replace(
-            "其他：写实摄影风格，真实人物质感，自然光影，真实皮肤纹理，真实面部结构，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实色彩。穿搭轮廓清晰，腰线可见，构图稳定，单一连续完整竖屏画面，人物和环境保持同一时空与稳定透视。",
+            OTHER_PROMPT,
             "其他：皮肤真实，不要刻意磨皮美化，写实摄影风格，真实人物质感，自然光影，不夸张，不塑料感，不磨皮，不网红滤镜，不过度锐化，不AI感，不生成拼图、分屏、多格或多姿势拼贴。",
         )
         result = self.lint(text)
@@ -362,8 +465,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_overdirected_timeline_warns(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：第 1 个动作侧身站定，第 2 个动作原地转身，第 3 个动作整理衣摆，第 4 个动作肩胯律动，第 5 个动作抬眼，第 6 个动作停住。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：第 1 个动作侧身站定，第 2 个动作原地转身，第 3 个动作整理衣摆，第 4 个动作肩胯律动，第 5 个动作抬眼，第 6 个动作停住。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
@@ -371,8 +474,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_overchoreographed_sequence_warns(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：她先侧身站定，随后抬起右手，然后左脚向前，再转动肩部，最后移动视线看向镜头。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：她先侧身站定，随后抬起右手，然后左脚向前，再转动肩部，最后移动视线看向镜头。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
@@ -380,8 +483,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_body_part_path_stack_warns(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：左手整理衣摆，右手扶腰，左脚承重，右脚轻点，肩部转动，视线移向镜头。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：左手整理衣摆，右手扶腰，左脚承重，右脚轻点，肩部转动，视线移向镜头。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
@@ -393,8 +496,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_generation_ai_meta_instruction_fails(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：人物自然展示穿搭，具体动作衔接、视线、表情与结尾由视频生成 AI 根据音乐与场景自然发挥。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：人物自然展示穿搭，具体动作衔接、视线、表情与结尾由视频生成 AI 根据音乐与场景自然发挥。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
@@ -402,8 +505,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_cliche_stable_ending_warns(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：单一连续画面，她从侧身转向镜头，完成一次轻微重心切换后停住，最后保持稳定构图自然收束。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：她从侧身转向镜头，完成一次轻微重心切换后停住，最后保持稳定构图自然收束。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
@@ -411,8 +514,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_cliche_clearest_moment_ending_warns(self):
         text = GOOD_PROMPT.replace(
-            ANIMATION_PROMPT,
-            "整体动画：单一连续画面，她从侧身转向镜头，最后卡在腰线最清楚的一刻。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：她从侧身转向镜头，最后卡在腰线最清楚的一刻。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])
@@ -420,8 +523,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_mixed_camera_relation_fails(self):
         text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：固定机位竖屏中近景，镜头略低于胸口，带轻微手持感，人物原地转身时镜头后退并推近保持构图。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：固定机位竖屏中近景，镜头略低于胸口，带轻微手持感，人物原地转身时镜头后退并推近保持构图。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
@@ -439,8 +542,8 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_visible_recording_device_terms_fail(self):
         text = GOOD_PROMPT.replace(
-            POSE_PROMPT,
-            "姿态镜头：手机被架在长椅上，固定竖屏中景，她走近后伸手取回手机。",
+            PERSON_ACTION_PROMPT,
+            "人物动作：手机被架在长椅上，固定竖屏中景，她走近后伸手取回手机。",
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail")

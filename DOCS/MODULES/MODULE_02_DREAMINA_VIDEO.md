@@ -2,18 +2,24 @@
 
 ## 职责
 
-使用模块 01 派生的 vid prompt 和固定角色图提交 Dreamina，下载并检查正式 MP4，完成人脸与身材质检，再按用户要求进入发布或暂停。
+使用模块 01 派生的 vid prompt、固定角色图和固定环境图提交 Dreamina 并下载 MP4。`xdy` 完成胸部体量质检后整理正式成片，`xdysp` 跳过内容质检直接整理正式成片；两条路线只要生成正式成片都上传 Google Drive，再分别进入发布或记录收尾。
 
 ## 输入合同与命令
 
-- `MATERIAL/fixed-role/anna.png` 是唯一图片输入，prompt 统一以 `@图1` 指代；不得增加第二张图或切换其他路线。
+- 固定使用两张图片输入：`MATERIAL/fixed-role/anna.png` 是第一张图，prompt 以 `@图1` 指代；`TEMP/RUN_ID/environment-path.txt` 中锁定的环境图是第二张图，prompt 以 `@图2` 指代。同一次运行的图片路径和顺序固定。
 - `TEMP/RUN_ID/vid-prompt-v1.txt` 必须由模块 01 的 `derive --mode fast` 生成并通过校验；内容不合格时回模块 01 重写 `grid-prompt.txt`。
 - 图片使用绝对路径提交；`--duration` 按画面节奏选择 `5`、`6` 或 `7`。
 
 ```bash
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+ENV_IMAGE="$(cat "TEMP/$RUN_ID/environment-path.txt")"
+test -f "$ENV_IMAGE"
+
 dreamina multimodal2video \
-  --image /Users/Shared/codex/dy/MATERIAL/fixed-role/anna.png \
-  --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" \
+  --image "$ROOT_DIR/MATERIAL/fixed-role/anna.png" \
+  --image "$ENV_IMAGE" \
+  --prompt "$(cat "TEMP/$RUN_ID/vid-prompt-v1.txt")" \
   --model_version seedance2.0_vip \
   --ratio 9:16 \
   --video_resolution 720p \
@@ -22,39 +28,25 @@ dreamina multimodal2video \
 
 默认跳过模块 00。网络、登录、积分、参数、上传、下载或超时等环境问题转模块 00 做最小修复并复测原失败点。
 
-## 媒体可用性检查
+## 成片整理与胸部体量质检
 
-Dreamina 返回成功后将媒体下载到临时路径并等待下载进程退出，再执行：
+- `xdy`：从临时 MP4 抽取首段、中段、尾段三张代理图，建议约为 `0.5s`、视频中点和结尾前 `0.5s`；另从固定角色图制作一张代理图。每张均小于 `100KB`，仅用于 Codex 视觉检查。
+- `xdy`：执行者亲自逐张打开三帧并与固定角色代理图对照，不能只依赖脚本或平台预览；仅胸部体量明显偏小时阻断，其余全部通过。硬门通过后，将临时 MP4 整理为 `OUTPUT/RUN_ID.mp4`，并记录代理图和人工结论。
+- `xdysp`：Dreamina 成功返回并下载原始 MP4 后，直接整理为 `OUTPUT/RUN_ID.mp4`；不抽取代理帧，不执行内容审查或视频质检，运行记录将质检状态写为 `not_performed`，成片由用户本人检查。
+- 两条路线的发布、归档和交付始终使用 `OUTPUT/RUN_ID.mp4` 对应的原始 MP4。
 
-```bash
-ffprobe -v error -show_entries stream=width,height -show_entries format=duration -of json TEMP/RUN_ID/downloaded.mp4
-```
+## Google Drive 上传与发布路由
 
-- 记录方向、分辨率和时长；9:16、720p、约 5–7 秒是目标规格，偏差记为 warning。
-- 确认文件可完整解码后整理为 `OUTPUT/RUN_ID.mp4`。大小、哈希、播放或解码异常时，按模块 00 的下载传输路径复用原 `submit_id` 取回，不改变任务和 prompt。
-
-## 人脸与身材质检
-
-- 从正式 MP4 抽取首段、中段、尾段三张代理图，建议约为 `0.5s`、视频中点和结尾前 `0.5s`；另从固定角色图制作一张代理图。每张均小于 `100KB`，仅用于 Codex 视觉检查。
-- 执行者亲自逐张打开三帧并与固定角色代理图对照，不能只依赖脚本、`ffprobe` 或平台预览。
-- 内容发布仅保留两项硬门：人脸身份一致；胸部大小、上身体量、纤细腰线、腰胯比例、臀胯轮廓和整体 S 型身材一致且动作过程中无明显漂移。
-- 任一帧未通过硬门时阻断发布，并记录失败帧、问题和下一步。穿搭结构、颜色、动作、场景、构图、贴片、分屏、局部畸形及其他观感差异只记 warning。
-- 运行记录写入固定角色代理图、三张视频代理图及两项人工对照结论；正式产物、发布和归档始终使用原始 MP4。
-
-## 发布路由
-
-- MP4 可解码且两项内容硬门通过后，保存到 `OUTPUT/RUN_ID.mp4` 并默认进入模块 03。
-- 用户明确要求“发布前确认”“只生成不发布”或“本次不用发布”时在此硬停，展示正式视频、首中尾帧、vid prompt、TNS 记录和发布建议；取得明确授权后再进入模块 03。
+- `xdy` 或 `xdysp` 只要整理出 `OUTPUT/RUN_ID.mp4`，就使用已连接的 Google Drive 应用将本次正式原始 MP4 上传到 My Drive 根目录；不转换格式，不从 `TEMP/` 或旧 `OUTPUT/` 推断文件。
+- 上传源文件使用 `OUTPUT/RUN_ID.mp4` 的绝对路径，目标文件名固定为 `RUN_ID.mp4`，MIME 类型使用 `video/mp4`；上传参数不传父文件夹 ID，等价于 `parent_folder_id = null`，不创建额外文件夹。
+- 上传返回完成后，通过 My Drive 根目录列表或精确文件名搜索核对结果。同一 `RUN_ID`、同一正式成片已记录为上传成功时跳过重复上传；新 `RUN_ID` 或新成片继续上传。
+- 在 `TEMP/RUN_ID/RUN_ID-run-record.jsonl` 记录 `google_drive/uploaded` 或 `google_drive/failed`。成功时记录文件名、文件 ID、URL、大小和修改时间等实际可用返回信息；无法取得的字段不虚构。
+- 登录、权限、网络、配额、上传或核对失败时记录明确原因和 `needs_retry: true`。`xdy` 继续进入模块 03，`xdysp` 继续进入模块 04；Drive 失败不阻断后续流程。
+- `xdy` 中用户明确要求“发布前确认”“只生成不发布”或“本次不用发布”时，Google Drive 自动上传仍执行；完成后在进入模块 03 前硬停，展示正式视频、首中尾帧、vid prompt、TNS 记录、Drive 上传状态和发布建议，取得明确授权后再进入模块 03。
+- `xdysp` 完成 Drive 上传尝试后直接进入模块 04，不进入模块 03；最终展示正式视频、vid prompt、TNS 记录、Drive 上传状态和关键文件路径。
 
 ## TNS 重试
 
-- `vid-prompt-v1.txt` 是首次提交。仅当 Dreamina 明确返回 TNS/安全拦截且没有可下载 MP4 时，才人工改写 `vid-prompt-v2.txt` 至 `vid-prompt-v5.txt`。
-- 每版重新运行 prompt lint，通过后再提交；始终保持同一张固定角色图和单个 `@图1` 输入。
+- `vid-prompt-v1.txt` 是首次提交。仅当 Dreamina 明确返回 TNS/安全拦截且没有可下载 MP4 时，才回模块 01 在固定合同内重选衣柜款式，生成 `vid-prompt-v2.txt` 至 `vid-prompt-v5.txt`。
+- 每版重新运行 prompt lint，通过后再提交；固定 `@图1` 角色图、`environment-path.txt` 已锁定的 `@图2` 环境图、双图顺序和本次已选动作模板保持不变。
 - 每次记录版本、prompt 路径、Dreamina 状态、失败原因和是否继续。到 `v5` 仍无产物时停止、不发布，并报告完整失败摘要。
-
-## 通过标准
-
-- Dreamina 只收到固定角色图和通过校验的单图 vid prompt。
-- 正式 MP4 已完成媒体信息记录、完整解码和 `OUTPUT/RUN_ID.mp4` 整理。
-- 固定角色代理图与首中尾三帧已经人工对照，人脸身份和身材比例两项硬门通过。
-- 默认分支可进入模块 03；用户要求确认或不发布时已按发布路由暂停。

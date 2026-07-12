@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -25,7 +26,7 @@ class ReferenceMaskTest(unittest.TestCase):
 
     def run_mask(self, *args):
         return subprocess.run(
-            ["python3", str(SCRIPT), str(self.source), *args],
+            [sys.executable, str(SCRIPT), str(self.source), *args],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

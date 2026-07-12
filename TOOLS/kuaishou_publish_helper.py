@@ -464,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
     preflight = run_preflight(args.cdp_url)
     report["steps"]["preflight"] = preflight
     if not preflight["ok"]:
-        return fail(report, out_dir, "当前账户本地 CDP Chrome 预检失败", 3)
+        return fail(report, out_dir, "CDP Chrome 预检失败", 3)
 
     try:
         from playwright.sync_api import sync_playwright

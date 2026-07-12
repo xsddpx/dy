@@ -1,6 +1,7 @@
 # Local process and output files may contain browser state, credentials, dependencies, and large media.
 /TEMP/
 /OUTPUT/
+/logs/
 .env
 .env.*
 !.env.example
@@ -9,6 +10,7 @@
 .DS_Store
 
 # Python runtime caches.
+.venv/
 __pycache__/
 *.pyc
 
