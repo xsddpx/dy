@@ -27,7 +27,6 @@ FORBIDDEN_BODY_TERMS = [
 ]
 
 UNSUPPORTED_TERMS = [
-    "@图2",
     "@图3",
     "附件",
     "节点",
@@ -37,10 +36,10 @@ UNSUPPORTED_TERMS = [
 
 REQUIRED_SECTION_LABELS = [
     "人物",
-    "视频类型",
+    "视频约束",
     "穿搭",
     "环境",
-    "整体动画",
+    "人物动作",
     "背景音乐",
     "其他",
 ]
@@ -48,21 +47,11 @@ REQUIRED_SECTION_LABELS = [
 PERSON_REQUIRED_TERMS = [
     "同一位成年女性",
     "多视角",
-    "多表情",
-    "左下大脸",
-    "正面脸",
-    "五官比例",
-    "脸型",
-    "眼神",
-    "鼻唇结构",
-    "发型分线",
-    "自然神态",
-    "正面、侧面和背面全身图",
-    "上身体量",
-    "胸部体量比例",
-    "纤细腰线",
-    "腰胯比例",
-    "整体 S 型曲线",
+    "多表情角色参考图",
+    "不是多人合照",
+    "脸部严格参考左下角大脸",
+    "身材严格参考正面、侧面和背面全身图",
+    "脸部身份与身材一致",
     "画面中只出现这一位成年女性",
 ]
 
@@ -71,17 +60,18 @@ STANDALONE_SELLPOINT_LABELS = [
     "卖点与锁定",
 ]
 
-ANIMATION_ADAPTED_PRESENTATION_TERMS = [
+ACTION_ADAPTED_PRESENTATION_TERMS = [
     "脸部",
     "表情",
     "视线",
     "肩颈",
     "领口",
+    "上身比例",
     "上身轮廓",
-    "面料张力",
+    "服装轮廓",
     "穿搭轮廓",
     "腰线",
-    "腰胯",
+    "整体身形",
     "手部",
     "步态",
     "腿部",
@@ -89,23 +79,16 @@ ANIMATION_ADAPTED_PRESENTATION_TERMS = [
     "发丝",
 ]
 
-VIDEO_TYPES = [
-    "舞蹈律动",
-    "穿搭展示",
-]
-
 FIXED_ENVIRONMENT_TEMPLATES = {
-    "01": "暖白色哑光墙面、浅灰色哑光地面和水平清晰的墙地交界线组成简洁室内影棚，空间中央保留完整的人物活动区域。均匀柔和的固定白光保持稳定亮度、色温和阴影方向，人物轮廓与背景清晰分离，空间结构、颜色、材质和布局统一。",
+    "01": "@图2 是固定墙面环境，保留左上方抽象画；人物贴墙站立，墙上呈现轻微自然投影。",
 }
 
-FIXED_ANIMATION_TEMPLATES = {
-    "01": "人物以不对称开肩姿态在原位完成轻快连贯的肩胯律动，自然交替重心，手臂围绕头发、肩颈和胸前松弛舒展，发丝随节奏自然飘动。人物保持俏皮自信、松弛妩媚的舞动状态，穿搭轮廓、清晰腰线、腰胯比例、S 型曲线和修身面料张力在动态中持续可读，呈现真实有弹性、连贯自然的成年女性妩媚效果。",
-    "02": "人物以松弛从容的状态在原位缓慢完成一圈同向转身展示，通过小幅自然换步连贯呈现正面、两侧和背面轮廓，在侧面和背面形成短暂清晰的展示状态，再自然回到正面。肩背保持舒展，手臂随身体朝向自然协调，腰线、腰胯比例、腿部轮廓和背面穿搭结构在各个角度持续可读。整体动作舒缓连贯，脚步接触、重心转换和身体朝向真实协调，发丝与服装随转动自然摆动并回落，人物身份、身材比例、肢体连接和服装结构全程保持连续一致。",
+FIXED_ACTION_TEMPLATES = {
+    "01": "人物贴近墙面从正面站姿开始，肩背自然靠墙；全身沿墙面原地同步向左转至清晰的侧身姿态，一侧肩背始终轻靠墙面，侧身短暂停留后再沿墙面转回正面。转身过程中在适当时机自然融入撩头发、整理衣服、看向镜头、表情变化、叉腰、手放胸前等动作，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。转身幅度明确，动作舒展流畅、衔接自然，整体呈现甜美亲切、自然有韵律的状态。",
 }
 
-FIXED_VIDEO_TYPE_TEMPLATES = {
-    "01": "舞蹈律动；固定拍摄，单一连续中全景，呈现原地肩胯轻舞。",
-    "02": "穿搭展示；固定拍摄，单一连续中全景，呈现原地一圈转身展示。",
+FIXED_VIDEO_CONSTRAINT_TEMPLATES = {
+    "01": "固定拍摄，单一连续膝盖以上中景；机位高度大致与人物胸部齐平；人物位于画面中央并贴近墙面，动作范围保持在墙前半步内；头顶保留适度空间，双肩、上身、腰线、腰胯与膝上区域完整清晰，画面下缘稳定落在膝盖附近，脚部始终位于画外；机位、视角、景别和构图全程保持不变。",
 }
 
 INTERNAL_SOURCE_TERMS = [
@@ -187,7 +170,6 @@ SOUND_SENTENCE_BOUNDARIES = "。！？!?；;\n"
 SECTION_RE_TEMPLATE = r"(^|[。！？!?；;\n])\s*({label})："
 SECTION_LABEL_SCAN_RE = re.compile(r"(^|[。！？!?；;\n])\s*([\u4e00-\u9fffA-Za-z0-9_/-]{1,16})：")
 ALLOWED_INLINE_LABELS = set()
-VIDEO_TYPE_RE = re.compile(r"视频类型：\s*(?P<main>[^，,。；;\s]+)")
 EXPLICIT_PROMPT_DURATION_RE = re.compile(
     r"(约\s*)?([0-9一二三四五六七八九十]+)\s*([-~到至]\s*[0-9一二三四五六七八九十]+)?\s*秒"
 )
@@ -384,17 +366,12 @@ def positive_sound_hits(text):
     return hits
 
 
-def video_type_finding(text):
-    matches = list(VIDEO_TYPE_RE.finditer(text))
-    if not matches:
-        return "missing_video_type", "最终 vid prompt 缺少“视频类型：...”段"
-    invalid = []
-    for match in matches:
-        main_type = match.group("main")
-        if main_type not in VIDEO_TYPES:
-            invalid.append(main_type)
-    if invalid:
-        return "invalid_video_type", f"最终 vid prompt 含非法视频类型：{', '.join(invalid)}"
+def video_constraint_finding(text):
+    constraint_text = section_content(text, "视频约束")
+    if constraint_text is None:
+        return "missing_video_constraint", "最终 vid prompt 缺少“视频约束：...”段"
+    if fixed_template_id(constraint_text, FIXED_VIDEO_CONSTRAINT_TEMPLATES) is None:
+        return "invalid_video_constraint", "视频约束必须完整使用固定构图模板 01"
     return None, None
 
 
@@ -518,14 +495,14 @@ def add_prompt_style_findings(findings, text):
             "prompt 堆叠了多组近期常见模板动作，建议换成一个更明确的短视频主动作链",
         )
 
-    animation_text = section_text_or_empty(text, "整体动画")
-    timeline_hits = count_term_hits(animation_text, TIMELINE_MARKERS)
+    person_action_text = section_text_or_empty(text, "人物动作")
+    timeline_hits = count_term_hits(person_action_text, TIMELINE_MARKERS)
     if len(timeline_hits) >= 4:
         add(
             findings,
             "warn",
             "overdirected_timeline",
-            "整体动画逐秒编排过细，建议保留一个连续主动作链",
+            "人物动作逐秒编排过细，建议保留一个连续主动作链",
         )
 
     if EXPLICIT_PROMPT_DURATION_RE.search(text):
@@ -536,14 +513,14 @@ def add_prompt_style_findings(findings, text):
             "prompt 正文聚焦可见画面，视频长度统一由 Dreamina --duration 参数控制",
         )
 
-    action_text = section_text_or_empty(text, "整体动画")
+    action_text = section_text_or_empty(text, "人物动作")
     action_hits = count_term_hits(action_text, ACTION_OVERLOAD_TERMS)
     if len(action_hits) >= 6:
         add(
             findings,
             "warn",
             "action_overload",
-            "整体动画包含过多动作方向，建议压到一个主动作链和一个节奏点",
+            "人物动作包含过多动作方向，建议压到一个主动作链和一个节奏点",
         )
 
     sequence_count = sum(count for _, count in count_term_hits(action_text, ACTION_SEQUENCE_TERMS))
@@ -556,13 +533,13 @@ def add_prompt_style_findings(findings, text):
             "动作编排细节过多，建议删除分解动作，只保留主要动作目标、人物状态和画面结果",
         )
 
-    ending_hits = count_term_hits(animation_text, ENDING_CLICHE_TERMS)
+    ending_hits = count_term_hits(person_action_text, ENDING_CLICHE_TERMS)
     if ending_hits:
         add(
             findings,
             "warn",
             "cliche_stable_ending",
-            "整体动画结尾不要固定写稳定收束、自然收束或卡在最清楚的一刻，优先停在原地舞蹈节奏点、完成原地转身、保持肩胯余韵或以手部造型结束",
+            "人物动作结尾不要固定写稳定收束、自然收束或卡在最清楚的一刻，优先保持自然动作节奏、小幅侧身状态或手臂自然回落状态",
         )
 
     compact = re.sub(r"\s+", "", text)
@@ -585,7 +562,9 @@ def lint_text(text, path, route="anna", channel="auto"):
     if channel != "auto":
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
     if "@图1" not in text:
-        add(findings, "error", "missing_role_image", "auto/fast 视频 prompt 缺少 @图1 单图身份引用或说明")
+        add(findings, "error", "missing_role_image", "auto/fast 视频 prompt 缺少 @图1 角色图身份引用或说明")
+    if "@图2" not in text:
+        add(findings, "error", "missing_environment_image", "auto/fast 视频 prompt 缺少 @图2 固定环境图引用")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
@@ -625,7 +604,7 @@ def lint_text(text, path, route="anna", channel="auto"):
             "out_of_frame_action_terms",
             f"人物必须从开场到结尾始终留在画面内：{', '.join(out_of_frame_hits)}",
         )
-    action_text = section_text_or_empty(text, "整体动画")
+    action_text = section_text_or_empty(text, "人物动作")
     runway_roaming_hits = [term for term in RUNWAY_ROAMING_ACTION_TERMS if term in action_text]
     if runway_roaming_hits:
         add(
@@ -644,7 +623,7 @@ def lint_text(text, path, route="anna", channel="auto"):
             findings,
             "error",
             "standalone_sellpoint_section",
-            f"prompt 不再使用独立卖点段，请把内容并入整体动画：{', '.join(standalone_sellpoint_hits)}",
+            f"prompt 不再使用独立卖点段，请把内容并入人物动作：{', '.join(standalone_sellpoint_hits)}",
         )
     section_code, section_message = section_finding(text)
     if section_code:
@@ -659,9 +638,9 @@ def lint_text(text, path, route="anna", channel="auto"):
                 "missing_person_anchors",
                 f"人物段需完整保留固定身份和身材锚点：{', '.join(missing_person_terms)}",
             )
-    type_code, type_message = video_type_finding(text)
-    if type_code:
-        add(findings, "error", type_code, type_message)
+    constraint_code, constraint_message = video_constraint_finding(text)
+    if constraint_code:
+        add(findings, "error", constraint_code, constraint_message)
     environment_text = section_content(text, "环境")
     if environment_text is not None and fixed_template_id(environment_text, FIXED_ENVIRONMENT_TEMPLATES) is None:
         add(
@@ -670,30 +649,11 @@ def lint_text(text, path, route="anna", channel="auto"):
             "invalid_environment_template",
             "环境必须完整使用固定模板 01",
         )
-    animation_text = section_content(text, "整体动画")
-    animation_template_id = fixed_template_id(animation_text, FIXED_ANIMATION_TEMPLATES)
-    if animation_text is not None and animation_template_id is None:
-        add(
-            findings,
-            "error",
-            "invalid_animation_template",
-            "整体动画必须完整使用固定模板 01 或 02",
-        )
-    video_type_text = section_content(text, "视频类型")
-    if animation_template_id is not None and fixed_template_id(
-        video_type_text,
-        {animation_template_id: FIXED_VIDEO_TYPE_TEMPLATES[animation_template_id]},
-    ) is None:
-        add(
-            findings,
-            "error",
-            "video_type_template_mismatch",
-            f"视频类型必须与动画模板 {animation_template_id} 的固定映射一致",
-        )
+    person_action_text = section_content(text, "人物动作")
     clothing_conflicts = image_one_clothing_conflict(text)
     if clothing_conflicts:
-        add(findings, "error", "image_one_clothing_anchor", "@图1 只能作为身份、五官、发型、脸型、稳定身材比例、上身体量和胸部体量比例依据，auto/fast 不得把 @图1 穿搭作为依据")
-    shooting_text = section_content(text, "视频类型")
+        add(findings, "error", "image_one_clothing_anchor", "@图1 只作为人物脸部和身材参考，auto/fast 不得把 @图1 穿搭作为依据")
+    shooting_text = section_content(text, "视频约束")
     if shooting_text is not None:
         compact_shooting = re.sub(r"\s+", "", shooting_text)
         has_fixed = any(term in compact_shooting for term in FIXED_CAMERA_TERMS)
@@ -703,41 +663,41 @@ def lint_text(text, path, route="anna", channel="auto"):
                 findings,
                 "error",
                 "missing_fixed_camera_relation",
-                "视频类型必须明确使用固定拍摄",
+                "视频约束必须明确使用固定拍摄",
             )
         elif has_fixed and has_other_handheld:
             add(
                 findings,
                 "error",
                 "multiple_camera_relations",
-                "视频类型只能使用固定拍摄，不能同时写手持拍摄",
+                "视频约束只能使用固定拍摄，不能同时写手持拍摄",
             )
-        if "单一连续中全景" not in compact_shooting:
+        if "单一连续膝盖以上中景" not in compact_shooting:
             add(
                 findings,
                 "error",
                 "missing_fixed_shooting_format",
-                "视频类型必须使用单一连续中全景",
+                "视频约束必须使用单一连续膝盖以上中景，并保持脚部位于画外",
             )
-    if animation_text is not None:
-        animation_camera_hits = [
+    if person_action_text is not None:
+        action_camera_hits = [
             term
             for term in FIXED_CAMERA_TERMS + OTHER_HANDHELD_CAMERA_TERMS
-            if term in animation_text
+            if term in person_action_text
         ]
-        if animation_camera_hits:
+        if action_camera_hits:
             add(
                 findings,
                 "error",
-                "camera_relation_in_animation",
-                f"拍摄方式和景别只写入视频类型，整体动画不重复：{', '.join(animation_camera_hits)}",
+                "camera_relation_in_person_action",
+                f"拍摄方式、景别和构图只写入视频约束，人物动作不重复：{', '.join(action_camera_hits)}",
             )
-    if animation_text is not None and not any(term in animation_text for term in ANIMATION_ADAPTED_PRESENTATION_TERMS):
+    if person_action_text is not None and not any(term in person_action_text for term in ACTION_ADAPTED_PRESENTATION_TERMS):
         add(
             findings,
             "warn",
-            "missing_animation_adapted_presentation",
-            "整体动画建议按实际景别写出至少一项可见表现；近景、中近景或全身均可，不要求固定全身",
+            "missing_action_adapted_presentation",
+            "人物动作需写出膝盖以上中景可见的服装轮廓、上身比例、腰线或自然肢体表现",
         )
     forbidden_hits = [term for term in FORBIDDEN_BODY_TERMS if term in text]
     if forbidden_hits:

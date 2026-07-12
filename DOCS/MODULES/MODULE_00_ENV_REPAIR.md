@@ -69,7 +69,6 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 
 - `MATERIAL/fixed-role/anna.png` 缺失、`TEMP/` 或 `OUTPUT/` 不可读写属于环境问题。
 - Python/Playwright 依赖异常或项目刚从其他电脑迁移时，运行 `zsh TOOLS/setup_env.sh --recreate`；脚本先把原 `.venv/` 备份到 `TEMP/env-backups/`，再重建项目环境。
-- `ffmpeg` 与 `ffprobe` 由 `static-ffmpeg` 提供，并链接到用户级命令目录；重建 `.venv/` 后同步刷新链接并复测媒体工具。
 
 ## 环境修复最佳实践记录
 
@@ -101,7 +100,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 - 症状：`dreamina multimodal2video --image MATERIAL/fixed-role/anna.png ...` 返回 `upload phase, no file upload`，未进入生成阶段，不是 TNS。
 - 根因：Dreamina CLI 本次对相对路径图片上传没有实际提交文件。
 - 修复动作：保持同一个 `vid-prompt-v1.txt` 和单图输入不变，从 Git 根目录解析 `MATERIAL/fixed-role/anna.png` 的绝对路径后重提。
-- 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 720x1280、约 5 秒 MP4。
+- 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 MP4。
 - 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先用固定素材绝对路径重试；不要改 prompt、不要进入 TNS 收敛。
 
 ### 2026-07-09 发布前 CDP 端口未启动且存在普通 Chrome
@@ -111,19 +110,11 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 - 验证：`.venv/bin/python TOOLS/douyin_publish_preflight.py --cdp-url http://127.0.0.1:9222` 返回 `ok: true`，进程命令含 CDP 数据目录和 `--remote-debugging-port=9222`。
 - 下次判断：若发布预检显示 `connection refused` 且只有普通 Chrome，直接运行 CDP 启动脚本，再用 preflight 复测后重试发布。
 
-### 2026-07-10 Dreamina 成功任务下载副本被截断
-- 适用边界：本条仅用于文件大小、哈希、播放或解码出现异常迹象的下载排障；默认视频质检按模块 02 使用 `ffprobe` 核对基础规格。
-- 症状：`query_result` 已返回 `success`，但同一 `submit_id` 下载出的 MP4 大小和哈希不一致，`ffprobe` 可读到头信息，`ffmpeg -xerror` 全文件解码时报 `partial file` 或 `Invalid NAL unit size`。
-- 根因：慢速媒体传输尚未真正结束时又向同一路径发起查询或整理文件，下载副本被截断或覆盖；生成任务本身已经成功，不需要重新提交。
-- 修复动作：保留同一 `submit_id`，刷新一次查询结果获得当前临时媒体地址，只向全新目标文件发起一次可重试下载，并等待实际下载进程退出；下载期间不再向同一目标重复调用 `query_result`。
-- 验证：目标文件大小停止增长后，先用 `ffmpeg -xerror -v error -i INPUT -f null -` 做全文件严格解码，再核对 `ffprobe` 的分辨率、方向和时长；全部通过后才复制到 `OUTPUT/`。
-- 下次判断：Dreamina 返回成功但 MP4 哈希或大小不稳定时，按下载传输异常处理，先复用原任务完整取回并严格解码；不得把可读头信息等同于完整成片，也不得因此重提生成。
-
-### 2026-07-12 迁移后 Python 与媒体依赖缺失
-- 症状：系统 Python 缺少 OpenCV、NumPy、Playwright 和 pytest，`ffmpeg`、`ffprobe` 不在 `PATH`，迁移来的 `TEMP/.venv-publish` 含断裂解释器链接。
+### 2026-07-12 迁移后 Python 依赖缺失
+- 症状：系统 Python 缺少 OpenCV、NumPy、Playwright 和 pytest，迁移来的 `TEMP/.venv-publish` 含断裂解释器链接。
 - 根因：虚拟环境和本机命令不能跨电脑直接迁移，仓库此前没有统一的本地环境重建入口。
-- 修复动作：新增并运行 `zsh TOOLS/setup_env.sh --recreate`，将原 `.venv/` 备份到 `TEMP/env-backups/` 后重建，通过 `static-ffmpeg` 安装媒体命令并链接到 `~/.local/bin`。
-- 验证：OpenCV、NumPy、Playwright、pytest 可导入，`ffmpeg` 与 `ffprobe` 可执行，项目全量测试通过。
+- 修复动作：新增并运行 `zsh TOOLS/setup_env.sh --recreate`，将原 `.venv/` 备份到 `TEMP/env-backups/` 后重建。
+- 验证：OpenCV、NumPy、Playwright、pytest 可导入，项目全量测试通过。
 - 下次判断：迁移或 `.venv/` 失效时直接运行 `zsh TOOLS/setup_env.sh --recreate`；普通依赖补装才使用不带参数的 `zsh TOOLS/setup_env.sh`。
 
 ### 2026-07-12 CDP 启动脚本残留旧设备 Profile 名称

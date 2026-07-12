@@ -2,11 +2,18 @@
 
 ## 核心目标
 
-本项目固定执行 `anna auto/fast` 单图日更链路，其中 `auto` 即 `fast`；稳定生成 9:16、720p、5–7 秒的 Anna 单人竖屏短视频，并同步发布到抖音和快手。视频由 Dreamina CLI 生成；两个平台发布前都必须设置 `自主声明/作品声明 -> 内容由AI生成`。
+本项目固定执行 `anna auto/fast` 双图参考日更链路，其中 `auto` 即 `fast`；稳定生成 9:16、720p、5–7 秒的 Anna 单人竖屏短视频，自动上传到 Google Drive 的 My Drive 根目录，并同步发布到抖音和快手。`@图1` 固定锚定 Anna，`@图2` 固定锚定环境；视频由 Dreamina CLI 生成，两个平台发布前都必须设置 `自主声明/作品声明 -> 内容由AI生成`。
+
+## 核心卖点
+
+本模块由用户本人进行修改。
+
+- 视觉：成熟身材、S 型曲线、上身视觉体量、修身穿搭、清晰腰线和上身辨识度。
+- 调性：纯欲反差、轻熟性感、克制诱惑感、成熟女性妩媚感、活泼互动、可见才艺与生活化动作。
 
 ## 流程路由
 
-- 默认日更：`DOCS/MODULES/MODULE_01_REFERENCE.md` 自主选题、衣柜匹配与七段式 prompt -> `DOCS/MODULES/MODULE_02_DREAMINA_VIDEO.md` 生成与质检 -> `DOCS/MODULES/MODULE_03_PUBLISH.md` 双平台发布 -> `DOCS/MODULES/MODULE_04_RECORDS.md` 记录收尾。
+- 默认日更：`DOCS/MODULES/MODULE_01_REFERENCE.md` 自主选题、衣柜匹配与七段式 prompt -> `DOCS/MODULES/MODULE_02_DREAMINA_VIDEO.md` 生成、质检与 Google Drive 上传 -> `DOCS/MODULES/MODULE_03_PUBLISH.md` 双平台发布 -> `DOCS/MODULES/MODULE_04_RECORDS.md` 记录收尾。
 - 环境修复：`DOCS/MODULES/MODULE_00_ENV_REPAIR.md`；默认跳过，仅在出现环境问题或用户明确要求时执行。
 - 评论任务：`DOCS/MODULES/MODULE_06_COMMENT_REPLY.md`；仅在用户明确要求查看或回复评论时执行。
 
@@ -19,14 +26,15 @@
 
 ## 创作总则
 
-- prompt 是核心创作产物；人物表现和穿搭与模块 01 的固定环境、动画套装组合。
+- prompt 是核心创作产物；人物表现和穿搭与模块 01 的固定环境图和靠墙动作套装组合，人物与墙面保持真实接触并形成轻微自然投影。
 - 全程固定拍摄，拍摄设备位于画外；prompt 只写可见画面、主要动作、人物状态和画面结果。
 - Anna 保持明确成年形象、完整穿着、克制表达和平台可发布状态；七段结构与具体写法统一看模块 01。
 
 ## 固定资产与目录
 
 - 固定角色图：`MATERIAL/fixed-role/anna.png`，用于锚定同一位成年女性的脸部身份、上身体量、胸部体量比例、纤细腰线、腰胯比例和整体 S 型曲线。
-- Anna 衣柜：`MATERIAL/anna-wardrobe.md`。默认按当天日期优先选择对应编号；与卖点或动画模板不适配时可改选，并记录原因。
+- 固定环境图：`MATERIAL/fixed-environment/anna-room.png`，采用适配膝盖以上中景的纯墙面纵向裁切，完整去除踢脚线和地板；墙面保留暖白灰泥质感、轻微纵向批刮纹、少量浅色修补痕和柔和明暗变化，左上方固定一幅浅色窄框抽象画，中央约 60% 作为干净的贴墙动作与投影区，用于锚定可识别墙面特征、装饰位置、正面空间透视和光影关系；含地板的修改前版本保存在 `MATERIAL/fixed-environment/anna-room-with-floor.png`，纯墙面无特征版本保存在 `MATERIAL/fixed-environment/anna-room-wall-plain.png`，添加装饰前的纹理墙版本保存在 `MATERIAL/fixed-environment/anna-room-textured-only.png`，原始宽视角版本保存在 `MATERIAL/fixed-environment/anna-room-original.png`。
+- Anna 衣柜：`MATERIAL/anna-wardrobe.md`。默认按当天日期优先选择对应编号；当天对应编号不存在时，从现有衣柜条目中随机选择；与卖点或动作模板不适配时可改选，并记录原因。
 - `TEMP/` 保存可清理的过程文件，不作为下次默认续跑状态；`OUTPUT/RUN_ID.mp4` 保存正式成片；`DOCS/`、`TOOLS/`、`MATERIAL/` 分别保存规则、自动化脚本和固定资产。
 
 ## 运行建档
@@ -40,8 +48,8 @@
 - 所有项目命令先切换到当前 Git 仓库根目录；需要绝对路径时从 `git rev-parse --show-toplevel` 解析，不写死 macOS 用户名。
 - CDP Chrome 由 `TOOLS/open_cdp_chrome.sh` 启动，默认地址为 `http://127.0.0.1:9222`；脚本从普通 Chrome 当前使用的 Profile 初始化独立 CDP 数据目录，普通 Chrome 可与 CDP Chrome 并存。
 - CDP 默认使用 Playwright `connect_over_cdp`；AppleScript 和系统文件选择器仅作兼容兜底。
-- Python 依赖使用项目根目录 `.venv/`；媒体检查依赖 `ffmpeg` 与 `ffprobe`。
-- Dreamina 固定只上传 `MATERIAL/fixed-role/anna.png`，参数为 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6|7`。
+- Python 依赖使用项目根目录 `.venv/`。
+- Dreamina 固定依次上传 `MATERIAL/fixed-role/anna.png` 和 `MATERIAL/fixed-environment/anna-room.png`，分别对应 `@图1` 和 `@图2`；参数为 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6|7`。
 
 ## 发布数量与重复阻断
 
@@ -50,7 +58,8 @@
 
 ## 全局硬阻断
 
-- 生成前必须具备固定角色图，七段式 prompt 必须通过固定环境、动画与视频类型映射校验；prompt 与 Dreamina 命令保持同一个 `@图1` 单图输入。
+- 生成前必须同时具备固定角色图和固定环境图，七段式 prompt 必须通过 `@图1` 人物、`@图2` 环境、视频约束与构图校验并包含人物动作段；人物动作正文不做逐字校验；prompt 与 Dreamina 命令必须保持同一组双图输入和固定顺序。
 - Dreamina 明确返回 TNS/安全拦截时最多收敛到 `v5`；仍无产物则停止。网络、登录、积分、参数、上传、下载或超时等环境问题转模块 00 修复并复测。
-- 发布前必须人工对照固定角色代理图与首中尾三帧。仅人脸身份明显不一致，或胸部大小、上身体量、腰线、腰胯比例和整体 S 型身材明显不一致或漂移时阻断；其他画面差异记为 warning。
+- 发布前必须人工对照固定角色代理图与首中尾三帧。仅胸部体量明显偏小时阻断，其余全部通过。
 - 任一平台发布前必须设置 `内容由AI生成`。单个平台受登录、验证、风控、上传或按钮状态阻断时记录失败，并继续尝试另一个平台。
+- 正式视频整理完成后必须尝试上传到 Google Drive 的 My Drive 根目录；上传失败时记录失败原因并继续双平台发布，不把云端归档失败作为平台发布阻断项。
