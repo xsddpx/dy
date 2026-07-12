@@ -95,11 +95,11 @@ class PublishAdapterTest(unittest.TestCase):
             passthrough = [
                 "demo.mp4",
                 "--title",
-                "窗边随拍",
+                "轻熟针织穿搭",
                 "--description",
-                "旅行片段",
+                "今天心情很轻松",
                 "--tag",
-                "旅行",
+                "好心情",
                 "--tag",
                 "穿搭",
                 "--location",
@@ -135,7 +135,7 @@ class PublishAdapterTest(unittest.TestCase):
             passthrough = [
                 "demo.mp4",
                 "--title",
-                "窗边随拍",
+                "轻熟针织穿搭",
                 "--out-dir",
                 str(out_dir),
             ]

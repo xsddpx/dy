@@ -25,35 +25,23 @@ def clean_tags(tags: list[str], blocked: set[str]) -> list[str]:
     return result
 
 
-def sample_tags(pool: dict, count: int, scene: str | None = None) -> list[str]:
+def sample_tags(pool: dict, count: int) -> list[str]:
     blocked = set(pool.get("blocked_tags") or [])
     tags = clean_tags(pool.get("tags") or [], blocked)
-    scene_tags = []
-    if scene:
-        scene_tags = clean_tags((pool.get("scene_tags") or {}).get(scene) or [], blocked)
-
-    selected = []
-    for tag in scene_tags:
-        if tag not in selected:
-            selected.append(tag)
-
-    available = [tag for tag in tags if tag not in selected]
-    random.SystemRandom().shuffle(available)
-    selected.extend(available[: max(0, count - len(selected))])
-    return selected[:count]
+    random.SystemRandom().shuffle(tags)
+    return tags[:count]
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="从发布热门 tag 池随机抽取话题。")
     parser.add_argument("--pool", default="MATERIAL/publish-tag-pool.json")
     parser.add_argument("--count", type=int, default=None)
-    parser.add_argument("--scene", default=None, help="可选：优先包含 scene_tags 中的场景标签")
     parser.add_argument("--shell-args", action="store_true", help="输出为 douyin_publish_helper.py 可直接拼接的 --tag 参数")
     args = parser.parse_args()
 
     pool = load_pool(Path(args.pool))
     count = args.count or int(pool.get("default_count") or 4)
-    tags = sample_tags(pool, count, args.scene)
+    tags = sample_tags(pool, count)
 
     if args.shell_args:
         print(" ".join(f"--tag {json.dumps(tag, ensure_ascii=False)}" for tag in tags))

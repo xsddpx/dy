@@ -12,12 +12,12 @@
 
 ## 执行入口
 
-`TOOLS/publish_adapter.py both` 固定先抖音、后快手；抖音失败也继续尝试快手。标签先从 `MATERIAL/publish-tag-pool.json` 生成候选，再选择与人物、场景、动作和穿搭一致的四个。
+`TOOLS/publish_adapter.py both` 固定先抖音、后快手；抖音失败也继续尝试快手。标签使用 `MATERIAL/publish-tag-pool.json` 的早期通用标签池生成候选，再选择与本次穿搭展示内容一致的四个，不直接照抄核心卖点措辞。
 
 ```bash
 python3 TOOLS/publish_tag_pool.py --count 4 --shell-args
 
-.venv/bin/python TOOLS/publish_adapter.py both OUTPUT/RUN_ID.mp4 \
+.venv/bin/python TOOLS/publish_adapter.py both "OUTPUT/$RUN_ID.mp4" \
   --title "作品标题" \
   --description "与本次成片一致的作品简介" \
   --tag "标签1" \
@@ -26,13 +26,13 @@ python3 TOOLS/publish_tag_pool.py --count 4 --shell-args
   --tag "标签4" \
   --no-location \
   --cdp-url http://127.0.0.1:9222 \
-  --out-dir TEMP/RUN_ID/logs/publish \
-  --record-jsonl TEMP/RUN_ID/RUN_ID-run-record.jsonl
+  --out-dir "TEMP/$RUN_ID/logs/publish" \
+  --record-jsonl "TEMP/$RUN_ID/$RUN_ID-run-record.jsonl"
 ```
 
 ## 发布要求
 
-- 标题必须来自本次画面、场景或穿搭品类；简介使用正常文案，话题统一通过 `--tag` 传入。
+- 标题和简介只围绕本次穿搭、人物气质与当下心情表达，例如服装款式、色彩、风格、状态和情绪，不写环境、场景、地点、镜头、拍摄方式、人物动作或姿势。话题从早期通用标签池选择，并统一通过 `--tag` 传入。
 - 默认不填写发布地址。抖音仅在显式传入 `--location` 且未传 `--no-location` 时尝试位置，失败只记 warning；快手兼容位置参数但固定跳过地址设置。
 - 抖音默认使用视频中间帧封面和 `--upload-mode cdp`，不等待 AI 智能推荐封面，也不主动切换 `auto`、`dialog` 或 `--current-tab`。
 - 快手必须使用常规视频入口；进入 VR360° 模式时阻断。上传或转码尚未完成时等待，不提前点击发布。
