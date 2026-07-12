@@ -34,7 +34,7 @@
 ## 固定资产与目录
 
 - 固定角色图：`MATERIAL/fixed-role/anna.png`，用于锚定同一位成年女性的脸部身份、上身体量、胸部体量比例、纤细腰线、腰胯比例和整体 S 型曲线。
-- 固定环境图：`MATERIAL/fixed-environment/anna-room.png`，采用适配膝盖以上中景的纯墙面纵向裁切，完整去除踢脚线和地板；墙面保留暖白灰泥质感、轻微纵向批刮纹、少量浅色修补痕和柔和明暗变化，左上方固定一幅浅色窄框抽象画，中央约 60% 作为干净的贴墙动作与投影区，用于锚定可识别墙面特征、装饰位置、正面空间透视和光影关系；含地板的修改前版本保存在 `MATERIAL/fixed-environment/anna-room-with-floor.png`，纯墙面无特征版本保存在 `MATERIAL/fixed-environment/anna-room-wall-plain.png`，添加装饰前的纹理墙版本保存在 `MATERIAL/fixed-environment/anna-room-textured-only.png`，原始宽视角版本保存在 `MATERIAL/fixed-environment/anna-room-original.png`。
+- 固定环境图集合：正式环境图统一存放在 `MATERIAL/fixed-environment/`，文件名使用 `anna-room-NN.png`；每次运行从全部正式编号图中随机选择一张，并将绝对路径锁定到 `TEMP/RUN_ID/environment-path.txt`。环境图 01 为 `anna-room-01.png`：适配膝盖以上中景的 9:16 纯墙面纵图，墙面为干净白墙，左上方固定一幅木色窄框米色抽象画，中央约 60% 作为干净的贴墙动作与投影区。替换前版本、历史版本和 `candidates/` 均不进入随机池。
 - Anna 衣柜：`MATERIAL/anna-wardrobe.md`。默认按当天日期优先选择对应编号；当天对应编号不存在时，从现有衣柜条目中随机选择；与卖点或动作模板不适配时可改选，并记录原因。
 - `TEMP/` 保存可清理的过程文件，不作为下次默认续跑状态；`OUTPUT/RUN_ID.mp4` 保存正式成片；`DOCS/`、`TOOLS/`、`MATERIAL/` 分别保存规则、自动化脚本和固定资产。
 
@@ -50,7 +50,7 @@
 - CDP Chrome 由 `TOOLS/open_cdp_chrome.sh` 启动，默认地址为 `http://127.0.0.1:9222`；脚本从普通 Chrome 当前使用的 Profile 初始化独立 CDP 数据目录，普通 Chrome 可与 CDP Chrome 并存。
 - CDP 默认使用 Playwright `connect_over_cdp`；AppleScript 和系统文件选择器仅作兼容兜底。
 - Python 依赖使用项目根目录 `.venv/`。
-- Dreamina 固定依次上传 `MATERIAL/fixed-role/anna.png` 和 `MATERIAL/fixed-environment/anna-room.png`，分别对应 `@图1` 和 `@图2`；参数为 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6|7`。
+- Dreamina 固定依次上传 `MATERIAL/fixed-role/anna.png` 和本次 `TEMP/RUN_ID/environment-path.txt` 锁定的随机环境图，分别对应 `@图1` 和 `@图2`；参数为 `--model_version seedance2.0_vip --video_resolution 720p --duration 5|6|7`。
 
 ## 发布数量与重复阻断
 
@@ -59,7 +59,7 @@
 
 ## 全局硬阻断
 
-- 生成前必须同时具备固定角色图和固定环境图，七段式 prompt 必须通过 `@图1` 人物、`@图2` 环境、视频约束与构图校验并包含人物动作段；人物动作正文不做逐字校验；prompt 与 Dreamina 命令必须保持同一组双图输入和固定顺序。
+- 生成前必须具备固定角色图和至少一张 `anna-room-NN.png` 正式环境图，并在本次运行中锁定一张环境图；七段式 prompt 必须通过 `@图1` 人物、`@图2` 环境、视频约束与构图校验并包含人物动作段；人物动作正文不做逐字校验；prompt 与 Dreamina 命令必须保持同一组双图输入和固定顺序。
 - Dreamina 明确返回 TNS/安全拦截时最多收敛到 `v5`；仍无产物则停止。网络、登录、积分、参数、上传、下载或超时等环境问题转模块 00 修复并复测。
 - 发布前必须人工对照固定角色代理图与首中尾三帧。仅胸部体量明显偏小时阻断，其余全部通过。
 - 任一平台发布前必须设置 `内容由AI生成`。单个平台受登录、验证、风控、上传或按钮状态阻断时记录失败，并继续尝试另一个平台。

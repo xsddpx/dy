@@ -51,11 +51,11 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_documented_fixed_templates_match_linter_contract(self):
         doc = (PROJECT_ROOT / "DOCS/MODULES/MODULE_01_REFERENCE.md").read_text(encoding="utf-8")
-        self.assertTrue((PROJECT_ROOT / "MATERIAL/fixed-environment/anna-room.png").exists())
+        self.assertTrue((PROJECT_ROOT / "MATERIAL/fixed-environment/anna-room-01.png").exists())
+        self.assertIn("未指定时，在动作模板 01、02 中随机选择一个", doc)
         environment = re.search(r"### 固定环境引用\n\n```text\n(.*?)\n```", doc, re.S).group(1)
         self.assertEqual(environment, "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"])
-        self.assertIn("@图2 是固定墙面环境", environment)
-        self.assertIn("保留左上方抽象画", environment)
+        self.assertIn("@图2 是本次随机选中的固定墙面环境", environment)
         self.assertIn("人物贴墙站立", environment)
         self.assertIn("墙上呈现轻微自然投影", environment)
         for template_id, name in (("01", "靠墙完整侧身转回"),):
@@ -80,6 +80,16 @@ class PromptLintFlowTest(unittest.TestCase):
             self.assertNotIn("镜子", action)
             for high_risk_term in ("舞蹈", "跳舞", "肩胯", "妩媚", "S 型曲线", "面料张力"):
                 self.assertNotIn(high_risk_term, action)
+        action_02 = re.search(r"### 动作模板 02：靠墙自然摆姿回正\n\n```text\n(.*?)\n```", doc, re.S).group(1)
+        self.assertEqual(action_02, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["02"])
+        self.assertIn("从正面自然站姿开始", action_02)
+        self.assertIn("一个常见的女性拍照姿态", action_02)
+        self.assertIn("恢复正面自然站姿", action_02)
+        self.assertIn("面向镜头比心或比出 V 手势", action_02)
+        self.assertIn("撩头发、视线移动和表情变化", action_02)
+        self.assertIn("人物位置保持稳定", action_02)
+        self.assertIn("墙上轻微投影随动作同步变化", action_02)
+        self.assertIn("整体动作清晰流畅、衔接自然", action_02)
         self.assertIn("单一连续膝盖以上中景", VIDEO_CONSTRAINT_PROMPT)
         self.assertIn("机位高度大致与人物胸部齐平", VIDEO_CONSTRAINT_PROMPT)
         self.assertIn("人物位于画面中央并贴近墙面", VIDEO_CONSTRAINT_PROMPT)
@@ -110,6 +120,14 @@ class PromptLintFlowTest(unittest.TestCase):
         ).replace(
             PERSON_ACTION_PROMPT,
             "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["01"],
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_action_template_02_with_fixed_video_constraint_passes(self):
+        text = GOOD_PROMPT.replace(
+            PERSON_ACTION_PROMPT,
+            "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["02"],
         )
         result = self.lint(text)
         self.assertEqual(result["decision"], "pass", result["findings"])

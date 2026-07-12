@@ -6,18 +6,20 @@
 
 ## 输入合同与命令
 
-- 固定使用两张图片输入：`MATERIAL/fixed-role/anna.png` 是第一张图，prompt 以 `@图1` 指代；`MATERIAL/fixed-environment/anna-room.png` 是第二张图，prompt 以 `@图2` 指代。图片路径和顺序均固定。
+- 固定使用两张图片输入：`MATERIAL/fixed-role/anna.png` 是第一张图，prompt 以 `@图1` 指代；`TEMP/RUN_ID/environment-path.txt` 中锁定的环境图是第二张图，prompt 以 `@图2` 指代。同一次运行的图片路径和顺序固定。
 - `TEMP/RUN_ID/vid-prompt-v1.txt` 必须由模块 01 的 `derive --mode fast` 生成并通过校验；内容不合格时回模块 01 重写 `grid-prompt.txt`。
 - 图片使用绝对路径提交；`--duration` 按画面节奏选择 `5`、`6` 或 `7`。
 
 ```bash
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+ENV_IMAGE="$(cat "TEMP/$RUN_ID/environment-path.txt")"
+test -f "$ENV_IMAGE"
 
 dreamina multimodal2video \
   --image "$ROOT_DIR/MATERIAL/fixed-role/anna.png" \
-  --image "$ROOT_DIR/MATERIAL/fixed-environment/anna-room.png" \
-  --prompt "$(cat TEMP/RUN_ID/vid-prompt-v1.txt)" \
+  --image "$ENV_IMAGE" \
+  --prompt "$(cat "TEMP/$RUN_ID/vid-prompt-v1.txt")" \
   --model_version seedance2.0_vip \
   --ratio 9:16 \
   --video_resolution 720p \
@@ -46,5 +48,5 @@ dreamina multimodal2video \
 ## TNS 重试
 
 - `vid-prompt-v1.txt` 是首次提交。仅当 Dreamina 明确返回 TNS/安全拦截且没有可下载 MP4 时，才回模块 01 在固定合同内重选衣柜款式，生成 `vid-prompt-v2.txt` 至 `vid-prompt-v5.txt`。
-- 每版重新运行 prompt lint，通过后再提交；固定 `@图1` 角色图、`@图2` 环境图、双图顺序和动作模板 01 保持不变。
+- 每版重新运行 prompt lint，通过后再提交；固定 `@图1` 角色图、`environment-path.txt` 已锁定的 `@图2` 环境图、双图顺序和本次已选动作模板保持不变。
 - 每次记录版本、prompt 路径、Dreamina 状态、失败原因和是否继续。到 `v5` 仍无产物时停止、不发布，并报告完整失败摘要。

@@ -80,11 +80,12 @@ ACTION_ADAPTED_PRESENTATION_TERMS = [
 ]
 
 FIXED_ENVIRONMENT_TEMPLATES = {
-    "01": "@图2 是固定墙面环境，保留左上方抽象画；人物贴墙站立，墙上呈现轻微自然投影。",
+    "01": "@图2 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
 }
 
 FIXED_ACTION_TEMPLATES = {
     "01": "人物贴近墙面从正面站姿开始，肩背自然靠墙；全身沿墙面原地同步向左转至清晰的侧身姿态，一侧肩背始终轻靠墙面，侧身短暂停留后再沿墙面转回正面。转身过程中在适当时机自然融入撩头发、整理衣服、看向镜头、表情变化、叉腰、手放胸前等动作，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。转身幅度明确，动作舒展流畅、衔接自然，整体呈现甜美亲切、自然有韵律的状态。",
+    "02": "人物贴近墙面从正面自然站姿开始，肩背自然靠墙；在原地摆出一个常见的女性拍照姿态，短暂停留后恢复正面自然站姿，随后面向镜头比心或比出 V 手势。动作过程中可自然融入撩头发、视线移动和表情变化，人物位置保持稳定，墙上轻微投影随动作同步变化。整体动作清晰流畅、衔接自然。",
 }
 
 FIXED_VIDEO_CONSTRAINT_TEMPLATES = {
@@ -854,9 +855,9 @@ def top_level_help():
             "  derive  从 grid-prompt.txt 机械派生阶段 prompt\n"
             "\n"
             "常用:\n"
-            "  python3 TOOLS/prompt_lint.py derive TEMP/RUN_ID/grid-prompt.txt --mode fast --out TEMP/RUN_ID/vid-prompt-v1.txt\n"
-            "  python3 TOOLS/prompt_lint.py lint TEMP/RUN_ID/vid-prompt-v1.txt\n"
-            "  python3 TOOLS/prompt_lint.py TEMP/RUN_ID/vid-prompt-v1.txt\n"
+            "  python3 TOOLS/prompt_lint.py derive \"TEMP/$RUN_ID/grid-prompt.txt\" --mode fast --out \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
+            "  python3 TOOLS/prompt_lint.py lint \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
+            "  python3 TOOLS/prompt_lint.py \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
             "\n"
             "查看子命令参数:\n"
             "  python3 TOOLS/prompt_lint.py derive --help\n"

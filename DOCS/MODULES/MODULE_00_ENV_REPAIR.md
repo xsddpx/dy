@@ -67,7 +67,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 
 ### 文件与依赖
 
-- `MATERIAL/fixed-role/anna.png`、`MATERIAL/fixed-environment/anna-room.png` 任一缺失，或 `TEMP/`、`OUTPUT/` 不可读写，均属于环境问题。
+- `MATERIAL/fixed-role/anna.png` 缺失、找不到任何 `MATERIAL/fixed-environment/anna-room-NN.png` 正式环境图、本次 `environment-path.txt` 指向无效文件，或 `TEMP/`、`OUTPUT/` 不可读写，均属于环境问题。
 - Python/Playwright 依赖异常或项目刚从其他电脑迁移时，运行 `zsh TOOLS/setup_env.sh --recreate`；脚本先把原 `.venv/` 备份到 `TEMP/env-backups/`，再重建项目环境。
 
 ## 环境修复最佳实践记录
