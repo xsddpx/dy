@@ -26,6 +26,36 @@ FORBIDDEN_BODY_TERMS = [
     "勾引",
 ]
 
+TNS_STACKING_TERMS = [
+    "胸部",
+    "上围",
+    "饱满",
+    "丰满",
+    "臀部",
+    "腰胯",
+    "腰臀",
+    "体量",
+    "S 型",
+    "沙漏",
+    "包臀",
+    "迷你",
+    "抹胸",
+    "无肩带",
+    "低腰",
+    "紧身",
+    "极细肩带",
+    "低圆领",
+    "低弧形",
+    "低方领",
+]
+
+TNS_RISK_SECTION_LABELS = ("穿搭", "人物动作", "其他")
+APPEARANCE_SECTION_LABELS = ("人物", "穿搭", "人物动作", "其他")
+APPEARANCE_CHANGE_RE = re.compile(
+    r"(?:服装|穿搭|上衣|内搭|外套|下装|短裙|短裤|长裤|连衣裙|颜色|领型|袖型|发型|头发)"
+    r".{0,12}(?:变成|变为|换成|转为|逐渐变|更换|改变)"
+)
+
 UNSUPPORTED_TERMS = [
     "@图3",
     "附件",
@@ -631,6 +661,38 @@ def lint_text(text, path, route="anna", channel="auto"):
     section_code, section_message = section_finding(text)
     if section_code:
         add(findings, "error", section_code, section_message)
+    tns_section_hits = {}
+    for label in TNS_RISK_SECTION_LABELS:
+        content = section_content(text, label)
+        if content is None:
+            continue
+        hits = [term for term in TNS_STACKING_TERMS if term in content]
+        if hits:
+            tns_section_hits[label] = hits
+    if tns_section_hits:
+        details = "; ".join(
+            f"{label}：{', '.join(hits)}"
+            for label, hits in tns_section_hits.items()
+        )
+        add(
+            findings,
+            "error",
+            "tns_stacking_terms",
+            f"人物身材强化与高风险服装词不进入最终 prompt：{details}",
+        )
+    appearance_change_sections = []
+    for label in APPEARANCE_SECTION_LABELS:
+        content = section_content(text, label)
+        if content is not None and APPEARANCE_CHANGE_RE.search(content):
+            appearance_change_sections.append(label)
+    if appearance_change_sections:
+        add(
+            findings,
+            "error",
+            "appearance_change_terms",
+            "人物与服装外观需全程一致，不写换装、变色或发型变化："
+            + ", ".join(appearance_change_sections),
+        )
     person_text = section_content(text, "人物")
     if person_text is not None:
         missing_person_terms = [term for term in PERSON_REQUIRED_TERMS if term not in person_text]
