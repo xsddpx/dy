@@ -1,12 +1,21 @@
-# 模块 04：记录与收尾
+# 模块 04：启动建档、记录与收尾
 
 ## 职责
 
+- 本模块在正式流程首尾各执行一次：流程开始时先执行“启动建档”，流程结束时再执行“记录与收尾”。
 - 启动时创建本次 `RUN_ID`、正式运行目录和 `run/started` 首条事件；本模块是 RUN_ID 与记录规则的唯一事实源。
 - 刷新 `RUN_ID-run-record.jsonl` 和 `RUN_ID-run-record.md`，不把本次状态作为下次默认续跑依据。
 - 记录本次随机选中的固定环境图路径和正式视频路径。`xdy` 记录固定角色代理图、首中尾视频代理图，以及胸部体量是否明显偏小的质检结论；`xdysp` 不要求代理图，质检状态记录为 `not_performed` 并注明由用户本人检查。
 - 只要正式视频已经生成，就记录 Google Drive 根目录上传状态；成功时记录文件名、文件 ID 或 URL 等可用返回信息，失败时记录原因和是否需要补传。
 - 已尝试发布时，补充抖音、快手和整体结论及报告路径；未发布时记录 `not_requested` 或 `awaiting_confirmation`。
+
+## 执行顺序
+
+1. 读取 `DOCS/PROJECT.md` 并确定本次路线。
+2. 立即执行本模块的“启动建档”，取得唯一 `RUN_ID`。
+3. 确认 `TEMP/RUN_ID/`、`TEMP/RUN_ID/logs/` 和 `RUN_ID-run-record.jsonl` 已创建，且首条事件为 `run/started`。
+4. 将同一 RUN_ID 传递给模块 01–03；这些模块不得自行生成 RUN_ID，也不得借用旧运行目录。
+5. 生成、上传或发布结束后返回本模块，执行摘要刷新与命名审计。
 
 ## 启动建档
 
@@ -17,9 +26,16 @@ RUN_ID="$(.venv/bin/python TOOLS/run_workspace.py init --source "$RUN_SOURCE" --
 
 `init` 按 `Asia/Shanghai` 时间原子创建 `TEMP/RUN_ID/logs/` 和 `OUTPUT/`，并向 `TEMP/RUN_ID/RUN_ID-run-record.jsonl` 写入 `run/started` 首条事件。RUN_ID 唯一合法格式为 `YYYYMMDD-HHMMSS`；同一秒内首个运行使用纯时间，后续依次追加 `-01` 至 `-99`。主题、模式、来源、定时任务、补跑或 Codex thread 标识通过 `--source` 和 `--data` 写入事件，不得写入 RUN_ID。
 
+启动建档是模块 01 的前置硬门。以下任一条件不满足时必须停止，不得继续选题、生成 prompt、下载素材、调用 Dreamina 或进入发布：
+
+- `RUN_ID` 非空且格式合法。
+- `TEMP/$RUN_ID/` 与 `TEMP/$RUN_ID/logs/` 已存在。
+- `TEMP/$RUN_ID/$RUN_ID-run-record.jsonl` 已存在。
+- 运行记录首条事件为 `run/started`。
+
 后续所有 prompt、下载、代理图、发布报告和运行记录都使用本次 RUN_ID，不从旧目录推断本次状态。`TEMP/` 是可清理的过程目录，不作为下次默认续跑状态；正式运行目录固定为 `TEMP/RUN_ID/`，正式成片固定为 `OUTPUT/RUN_ID.mp4`，两者必须使用完全相同的 RUN_ID。
 
-## 命令
+## 记录与收尾
 
 ```bash
 python3 TOOLS/run_record.py summary "TEMP/$RUN_ID/$RUN_ID-run-record.jsonl" --md "TEMP/$RUN_ID/$RUN_ID-run-record.md"
