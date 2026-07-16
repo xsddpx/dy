@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "source_wardrobe_document": "50f8fc121972bcf5932daa56e5b49fb9082d4690:MATERIAL/anna-wardrobe.md",
+  "numbering": "每个季节独立使用三位编号",
+  "aliases": {
+    "001": "衣柜图-夏季-032",
+    "002": "衣柜图-夏季-033",
+    "003": "衣柜图-夏季-034",
+    "004": "衣柜图-夏季-035",
+    "005": "衣柜图-夏季-036",
+    "006": "衣柜图-夏季-037",
+    "007": "衣柜图-夏季-038",
+    "008": "衣柜图-夏季-039",
+    "009": "衣柜图-夏季-040",
+    "011": "衣柜图-夏季-041",
+    "012": "衣柜图-夏季-042",
+    "图-001": "衣柜图-夏季-032",
+    "夏-01": "衣柜图-夏季-001",
+    "夏-02": "衣柜图-夏季-002",
+    "夏-03": "衣柜图-夏季-003",
+    "夏-04": "衣柜图-夏季-004",
+    "夏-05": "衣柜图-夏季-005",
+    "夏-06": "衣柜图-夏季-006",
+    "夏-07": "衣柜图-夏季-007",
+    "夏-08": "衣柜图-夏季-008",
+    "夏-09": "衣柜图-夏季-009",
+    "夏-10": "衣柜图-夏季-010",
+    "夏-11": "衣柜图-夏季-011",
+    "夏-12": "衣柜图-夏季-012",
+    "夏-13": "衣柜图-夏季-013",
+    "夏-14": "衣柜图-夏季-014",
+    "夏-15": "衣柜图-夏季-015",
+    "夏-16": "衣柜图-夏季-016",
+    "夏-17": "衣柜图-夏季-017",
+    "夏-18": "衣柜图-夏季-018",
+    "夏-19": "衣柜图-夏季-019",
+    "夏-20": "衣柜图-夏季-020",
+    "夏-21": "衣柜图-夏季-021",
+    "夏-22": "衣柜图-夏季-022",
+    "夏-23": "衣柜图-夏季-023",
+    "夏-24": "衣柜图-夏季-024",
+    "夏-25": "衣柜图-夏季-025",
+    "夏-26": "衣柜图-夏季-026",
+    "夏-27": "衣柜图-夏季-027",
+    "夏-28": "衣柜图-夏季-028",
+    "夏-29": "衣柜图-夏季-029",
+    "夏-30": "衣柜图-夏季-030",
+    "夏-31": "衣柜图-夏季-031"
+  },
+  "legacy_image_assets": [
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-001/衣柜图-001.png",
+      "wardrobe_id": "衣柜图-夏季-032",
+      "sha256": "80e5cf8a9dfe6169d9bd01a07387d9a87c6afe2d8b83bab9dbe47afb91140b49"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-002/衣柜图-002.png",
+      "wardrobe_id": "衣柜图-夏季-033",
+      "sha256": "6fedcc06bc194c291d3f57f298dcbacd9f085620866b9b043a5b5eff61064ada"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-003/衣柜图-003.png",
+      "wardrobe_id": "衣柜图-夏季-034",
+      "sha256": "af461eea82fe46152cbee1c595ae1446965b3dba6f016aa6ad3b3662b0045033"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-004/衣柜图-004.png",
+      "wardrobe_id": "衣柜图-夏季-035",
+      "sha256": "d7cdaa96c328e2010cadb828efd253835e008f5fb35fd406f6b629dd2bf452bb"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-005/衣柜图-005.png",
+      "wardrobe_id": "衣柜图-夏季-036",
+      "sha256": "84d2a4efedaed263f75da03625f1fa752d75bbc66a8d45a9ee1e32825e96eada"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-006/衣柜图-006.png",
+      "wardrobe_id": "衣柜图-夏季-037",
+      "sha256": "9455947727f5948b36339ffb82e7d59a09bd7dbd2c29e928db0a679fcd25bc93"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-007/衣柜图-007.png",
+      "wardrobe_id": "衣柜图-夏季-038",
+      "sha256": "fe870bebdf9909bd16f26ecd48a671f1b587ed8864da8f691d00edb882d2fe45"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-008/衣柜图-008.png",
+      "wardrobe_id": "衣柜图-夏季-039",
+      "sha256": "789254f98a4cd08dd62babd60061b9691390a3431b9ab20d413763b3368d3c99"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-009/衣柜图-009.png",
+      "wardrobe_id": "衣柜图-夏季-040",
+      "sha256": "01cb79d2bfba077cb6162ee39e02d6c7c832121f53d3ee7a0b55f4062595b16d"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-011/衣柜图-011.png",
+      "wardrobe_id": "衣柜图-夏季-041",
+      "sha256": "c704317b84cddca2d155e2c7ac03b8c21ad9f7f3b265bd05a5b2bdaddba3ff26"
+    },
+    {
+      "legacy_path": "MATERIAL/wardrobe-images/衣柜图-012/衣柜图-012.png",
+      "wardrobe_id": "衣柜图-夏季-042",
+      "sha256": "8d6bf970141daee136ba8b511d6e4dbe71eee298bc5f5f8bb62bef7a00a9d31f"
+    }
+  ]
+}

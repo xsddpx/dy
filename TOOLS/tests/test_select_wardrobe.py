@@ -15,7 +15,7 @@ SELECTOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SELECTOR)
 
 
-def write_png(path, width=9, height=16):
+def write_png(path, width=720, height=1280):
     path.write_bytes(
         b"\x89PNG\r\n\x1a\n"
         + struct.pack(">I", 13)
@@ -25,7 +25,17 @@ def write_png(path, width=9, height=16):
     )
 
 
-def write_entry(root, identifier, *, prompt="黑色上衣搭配白色高腰短裙。", extra=None, width=9, height=16):
+def write_entry(
+    root,
+    number,
+    *,
+    season="夏季",
+    prompt="黑色上衣搭配白色高腰短裙。",
+    extra=None,
+    width=720,
+    height=1280,
+):
+    identifier = f"{season}-{number}"
     directory = root / f"衣柜图-{identifier}"
     directory.mkdir()
     write_png(directory / f"衣柜图-{identifier}.png", width, height)
@@ -47,7 +57,19 @@ class SelectWardrobeTest(unittest.TestCase):
             write_entry(root, "001")
             write_entry(root, "002")
             entries = SELECTOR.discover(root)
-            self.assertEqual([entry.identifier for entry in entries], ["001", "002"])
+            self.assertEqual([entry.wardrobe_id for entry in entries], ["衣柜图-夏季-001", "衣柜图-夏季-002"])
+
+    def test_discover_sorts_seasons_and_allows_same_number_across_seasons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_entry(root, "001", season="冬季")
+            write_entry(root, "001", season="春季")
+            write_entry(root, "002", season="夏季")
+            entries = SELECTOR.discover(root)
+            self.assertEqual(
+                [entry.wardrobe_id for entry in entries],
+                ["衣柜图-春季-001", "衣柜图-夏季-002", "衣柜图-冬季-001"],
+            )
 
     def test_entry_rejects_extra_file_and_non_nine_sixteen_image(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -61,45 +83,63 @@ class SelectWardrobeTest(unittest.TestCase):
             with self.assertRaises(SELECTOR.WardrobeError):
                 SELECTOR.read_entry(wrong_ratio)
 
-    def test_entry_allows_optional_ori_directory_with_arbitrary_contents(self):
+    def test_entry_rejects_low_resolution_nine_sixteen_image(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            low_resolution = write_entry(root, "001", width=9, height=16)
+            with self.assertRaises(SELECTOR.WardrobeError):
+                SELECTOR.read_entry(low_resolution)
+
+    def test_entry_allows_one_optional_original_reference(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             directory = write_entry(root, "001")
-            archive = directory / "ori"
-            nested = archive / "references"
-            nested.mkdir(parents=True)
-            (archive / "source.jpg").write_bytes(b"source")
-            (nested / "notes.txt").write_text("补充说明\n", encoding="utf-8")
+            (directory / "原始参考图.jpg").write_bytes(b"source")
 
             entry = SELECTOR.read_entry(directory)
 
-            self.assertEqual(entry.identifier, "001")
-            self.assertEqual(entry.image.name, "衣柜图-001.png")
+            self.assertEqual(entry.identifier, "夏季-001")
+            self.assertEqual(entry.image.name, "衣柜图-夏季-001.png")
             self.assertEqual(entry.description_file.name, "服装描述.md")
 
-    def test_entry_rejects_ori_file_or_symlink(self):
+    def test_entry_rejects_ori_and_original_reference_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            ori_file = write_entry(root, "001")
-            (ori_file / "ori").touch()
+            ori_directory = write_entry(root, "001")
+            (ori_directory / "ori").mkdir()
             with self.assertRaises(SELECTOR.WardrobeError):
-                SELECTOR.read_entry(ori_file)
+                SELECTOR.read_entry(ori_directory)
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            ori_link = write_entry(root, "001")
-            archive_target = root / "archive-target"
-            archive_target.mkdir()
-            (ori_link / "ori").symlink_to(archive_target, target_is_directory=True)
+            source_link = write_entry(root, "001")
+            source_target = root / "source.jpg"
+            source_target.write_bytes(b"source")
+            (source_link / "原始参考图.jpg").symlink_to(source_target)
             with self.assertRaises(SELECTOR.WardrobeError):
-                SELECTOR.read_entry(ori_link)
+                SELECTOR.read_entry(source_link)
+
+    def test_entry_rejects_multiple_original_references(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = write_entry(root, "001")
+            (directory / "原始参考图.jpg").write_bytes(b"source")
+            (directory / "原始参考图.png").write_bytes(b"source")
+            with self.assertRaises(SELECTOR.WardrobeError):
+                SELECTOR.read_entry(directory)
 
     def test_entry_rejects_number_mismatch_and_empty_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             directory = write_entry(root, "001")
             description = directory / "服装描述.md"
-            description.write_text(description.read_text(encoding="utf-8").replace("# 衣柜图-001", "# 衣柜图-002"), encoding="utf-8")
+            description.write_text(
+                description.read_text(encoding="utf-8").replace(
+                    "# 衣柜图-夏季-001",
+                    "# 衣柜图-冬季-001",
+                ),
+                encoding="utf-8",
+            )
             with self.assertRaises(SELECTOR.WardrobeError):
                 SELECTOR.read_entry(directory)
         with tempfile.TemporaryDirectory() as tmp:
@@ -112,27 +152,59 @@ class SelectWardrobeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             entries = [SELECTOR.read_entry(write_entry(root, value)) for value in ("001", "002")]
-            selected = SELECTOR.select_entry(entries, previous_id="001", seed=7)
-            self.assertEqual(selected.identifier, "002")
+            selected = SELECTOR.select_entry(entries, previous_id="衣柜图-夏季-001", seed=7)
+            self.assertEqual(selected.wardrobe_id, "衣柜图-夏季-002")
 
     def test_single_entry_can_repeat_and_requested_id_is_exact(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             entries = [SELECTOR.read_entry(write_entry(root, "001"))]
-            self.assertEqual(SELECTOR.select_entry(entries, previous_id="001").identifier, "001")
-            self.assertEqual(SELECTOR.select_entry(entries, wardrobe_id="衣柜图-001").identifier, "001")
+            self.assertEqual(
+                SELECTOR.select_entry(entries, previous_id="衣柜图-夏季-001").wardrobe_id,
+                "衣柜图-夏季-001",
+            )
+            self.assertEqual(
+                SELECTOR.select_entry(entries, wardrobe_id="衣柜图-夏季-001").wardrobe_id,
+                "衣柜图-夏季-001",
+            )
+            self.assertEqual(
+                SELECTOR.select_entry(entries, wardrobe_id="夏季-001").wardrobe_id,
+                "衣柜图-夏季-001",
+            )
             with self.assertRaises(SELECTOR.WardrobeError):
-                SELECTOR.select_entry(entries, wardrobe_id="002")
+                SELECTOR.select_entry(entries, wardrobe_id="001")
 
     def test_previous_id_reads_latest_formal_record(self):
         with tempfile.TemporaryDirectory() as tmp:
             temp_root = Path(tmp)
-            for run_id, wardrobe_id in (("20260716-100000", "001"), ("20260716-110000", "002")):
+            for run_id, wardrobe_id in (
+                ("20260716-100000", "衣柜图-夏季-001"),
+                ("20260716-110000", "衣柜图-冬季-002"),
+            ):
                 run_dir = temp_root / run_id
                 run_dir.mkdir()
                 event = {"stage": "wardrobe", "event": "selected", "data": {"wardrobe_id": wardrobe_id}}
                 (run_dir / f"{run_id}-run-record.jsonl").write_text(json.dumps(event) + "\n", encoding="utf-8")
-            self.assertEqual(SELECTOR.previous_wardrobe_id(temp_root), "002")
+            self.assertEqual(SELECTOR.previous_wardrobe_id(temp_root), "衣柜图-冬季-002")
+
+    def test_previous_id_maps_legacy_numeric_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            temp_root = root / "TEMP"
+            run_id = "20260716-110000"
+            run_dir = temp_root / run_id
+            run_dir.mkdir(parents=True)
+            event = {"stage": "wardrobe", "event": "selected", "data": {"wardrobe_id": "001"}}
+            (run_dir / f"{run_id}-run-record.jsonl").write_text(json.dumps(event) + "\n", encoding="utf-8")
+            migration = root / "migration.json"
+            migration.write_text(
+                json.dumps({"aliases": {"001": "衣柜图-夏季-032"}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                SELECTOR.previous_wardrobe_id(temp_root, migration_file=migration),
+                "衣柜图-夏季-032",
+            )
 
     def test_lock_entry_writes_paths_prompt_and_record(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -149,6 +221,10 @@ class SelectWardrobeTest(unittest.TestCase):
             record = SELECTOR.lock_entry(run_dir, entry)
             self.assertEqual((run_dir / "wardrobe-image-path.txt").read_text().strip(), str(entry.image))
             self.assertEqual((run_dir / "wardrobe-description.txt").read_text().strip(), entry.prompt)
+            event = json.loads(record.read_text(encoding="utf-8").splitlines()[-1])
+            self.assertEqual(event["data"]["wardrobe_id"], "衣柜图-夏季-001")
+            self.assertEqual(event["data"]["wardrobe_season"], "夏季")
+            self.assertEqual(event["data"]["wardrobe_number"], "001")
             self.assertTrue(record.is_file())
             with self.assertRaises(SELECTOR.WardrobeError):
                 SELECTOR.lock_entry(run_dir, entry)

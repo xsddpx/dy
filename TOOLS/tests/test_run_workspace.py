@@ -53,6 +53,15 @@ def make_run(root: Path, run_id: str, created_at: str, extra_event=None) -> Path
 
 
 class RunWorkspaceTest(unittest.TestCase):
+    def test_run_id_only_allows_no_suffix_or_01_through_99(self):
+        base = "20260712-080910"
+        for run_id in (base, f"{base}-01", f"{base}-09", f"{base}-10", f"{base}-99"):
+            with self.subTest(run_id=run_id):
+                self.assertIsNotNone(RUN_WORKSPACE.RUN_ID_RE.fullmatch(run_id))
+        for run_id in (f"{base}-00", f"{base}-1", f"{base}-100"):
+            with self.subTest(run_id=run_id):
+                self.assertIsNone(RUN_WORKSPACE.RUN_ID_RE.fullmatch(run_id))
+
     def test_parse_time_normalizes_naive_and_utc(self):
         naive = RUN_WORKSPACE.parse_time("2026-07-12T08:09:10")
         utc = RUN_WORKSPACE.parse_time("2026-07-12T00:09:10Z")
@@ -152,14 +161,14 @@ class RunWorkspaceTest(unittest.TestCase):
                 "event": "uploaded",
                 "data": {
                     "run_id": old_id,
-                    "local_temp": f"TEMP/{old_id}/grid-prompt.txt",
+                    "local_temp": f"TEMP/{old_id}/vid-prompt-v1.txt",
                     "local_output": f"OUTPUT/{old_id}.mp4",
                     "file_name": f"{old_id}.mp4",
                     "url": "https://drive.google.com/file/d/unchanged",
                 },
             }
             directory = make_run(root, old_id, "2026-07-12T08:09:10", external)
-            (directory / "grid-prompt.txt").write_text("prompt\n", encoding="utf-8")
+            (directory / "vid-prompt-v1.txt").write_text("prompt\n", encoding="utf-8")
             output = root / "OUTPUT" / f"{old_id}.mp4"
             output.write_bytes(b"unchanged-video")
             original_hash = RUN_WORKSPACE.sha256_file(output)
@@ -170,7 +179,7 @@ class RunWorkspaceTest(unittest.TestCase):
             new_record = root / "TEMP" / new_id / f"{new_id}-run-record.jsonl"
             text = new_record.read_text(encoding="utf-8")
             self.assertIn(f'"run_id": "{new_id}"', text)
-            self.assertIn(f"TEMP/{new_id}/grid-prompt.txt", text)
+            self.assertIn(f"TEMP/{new_id}/vid-prompt-v1.txt", text)
             self.assertIn(f"OUTPUT/{new_id}.mp4", text)
             self.assertIn(f'"file_name": "{old_id}.mp4"', text)
             self.assertIn("https://drive.google.com/file/d/unchanged", text)
@@ -180,7 +189,7 @@ class RunWorkspaceTest(unittest.TestCase):
             RUN_WORKSPACE.rollback_migration(root, manifest)
             restored_record = root / "TEMP" / old_id / f"{old_id}-run-record.jsonl"
             self.assertTrue(restored_record.is_file())
-            self.assertIn(f"TEMP/{old_id}/grid-prompt.txt", restored_record.read_text(encoding="utf-8"))
+            self.assertIn(f"TEMP/{old_id}/vid-prompt-v1.txt", restored_record.read_text(encoding="utf-8"))
             self.assertEqual(RUN_WORKSPACE.sha256_file(root / "OUTPUT" / f"{old_id}.mp4"), original_hash)
 
     def test_migration_accepts_an_already_canonical_run(self):
@@ -226,7 +235,52 @@ class RunWorkspaceTest(unittest.TestCase):
             directory.mkdir()
             (directory / "old-run-record.jsonl").touch()
             result = RUN_WORKSPACE.audit_workspace(root)
+            self.assertEqual(result["decision"], "failed")
+            self.assertTrue(
+                any(
+                    "运行记录缺失：TEMP/20260712-080910/20260712-080910-run-record.jsonl" in error
+                    for error in result["errors"]
+                )
+            )
             self.assertTrue(any("运行目录与记录文件名不一致" in error for error in result["errors"]))
+
+    def test_audit_rejects_canonical_directory_without_exact_jsonl(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))
+            (root / "TEMP" / "20260712-080910-01").mkdir()
+            result = RUN_WORKSPACE.audit_workspace(root)
+            self.assertEqual(result["decision"], "failed")
+            self.assertTrue(
+                any(
+                    "运行记录缺失：TEMP/20260712-080910-01/20260712-080910-01-run-record.jsonl"
+                    in error
+                    for error in result["errors"]
+                )
+            )
+
+    def test_audit_rejects_zero_suffix_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))
+            (root / "TEMP" / "20260712-080910-00").mkdir()
+            result = RUN_WORKSPACE.audit_workspace(root)
+            self.assertEqual(result["decision"], "failed")
+            self.assertTrue(any("非法正式运行目录" in error for error in result["errors"]))
+
+    def test_audit_allows_explicit_auxiliary_directory_with_timestamp_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))
+            directory = root / "TEMP" / "20260712-080910"
+            directory.mkdir()
+            (directory / RUN_WORKSPACE.AUXILIARY_MARKER).write_text(
+                "not a video run workspace\n",
+                encoding="utf-8",
+            )
+            (directory / "wardrobe-assets").mkdir()
+
+            result = RUN_WORKSPACE.audit_workspace(root)
+
+            self.assertEqual(result["decision"], "pass")
+            self.assertEqual(result["errors"], [])
 
 
 if __name__ == "__main__":

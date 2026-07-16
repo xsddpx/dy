@@ -30,17 +30,34 @@ def select_environment(directory: Path, seed: int | None = None) -> Path:
     return chooser.choice(candidates)
 
 
-def main() -> int:
+def refuse_existing_lock(path: Path) -> None:
+    if path.exists() or path.is_symlink():
+        raise SystemExit(f"refusing to overwrite existing environment lock: {path}")
+
+
+def write_environment_lock(path: Path, selected: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(str(selected) + "\n")
+    except FileExistsError as exc:
+        raise SystemExit(
+            f"refusing to overwrite existing environment lock: {path}"
+        ) from exc
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", type=Path, default=DEFAULT_DIRECTORY)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--seed", type=int)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
+    if args.out:
+        refuse_existing_lock(args.out)
     selected = select_environment(args.directory, args.seed)
     if args.out:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(str(selected) + "\n", encoding="utf-8")
+        write_environment_lock(args.out, selected)
     print(selected)
     return 0
 

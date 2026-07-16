@@ -2,7 +2,7 @@
 
 ## 项目结构
 
-`DOCS/PROJECT.md` 是跨模块项目合同，`DOCS/MODULES/` 保存各阶段执行细则。Python 与 Shell 自动化位于 `TOOLS/`，测试位于 `TOOLS/tests/`，稳定素材和数据账本位于 `MATERIAL/`。运行目录、成片命名及流程硬阻断统一查阅 `DOCS/PROJECT.md`，不要在本文件重复维护。
+`DOCS/PROJECT.md` 是跨阶段项目合同；`DOCS/PIPELINE/` 按编号保存视频主链，`DOCS/WORKFLOWS/` 保存独立工作流，`DOCS/RUNBOOKS/` 保存按需调用的修复手册。Python 与 Shell 自动化位于 `TOOLS/`，测试位于 `TOOLS/tests/`，稳定素材和数据账本位于 `MATERIAL/`。运行目录、成片命名及流程硬阻断统一查阅 `DOCS/PROJECT.md`，不要在本文件重复维护。
 
 ## 开发与测试命令
 
@@ -24,6 +24,6 @@ Python 使用四空格缩进；函数和文件采用 `snake_case`，测试类采
 
 ## Agent 启动与汇报
 
-启动时依次读取本文件、`DOCS/PROJECT.md`、`~/.codex/AGENTS.md`，再按项目路由读取当前模块。默认使用中文，只汇报已验证结果。生成任务按“成片信息、Google Drive 链接、最终 prompt、生成与 TNS 状态”汇报；仅在用户明确要求时内嵌媒体。
+启动时依次读取本文件、`DOCS/PROJECT.md`、`~/.codex/AGENTS.md`，再按项目路由读取当前阶段、独立工作流或运行手册。默认使用中文，只汇报已验证结果。生成任务按“成片信息、Google Drive 链接、最终 prompt、生成与 TNS 状态”汇报；仅在用户明确要求时内嵌媒体。
 
-正文已展示代理图时，不再展示、附上或链接原图；原图仅保留在本地，只在用户明确要求时提供。
+会话交付中，只要已附上 Google Drive 链接，就不再展示、附上或链接任何图片（包括代理图和原图）。未附 Drive 链接且正文已展示代理图时，不再展示、附上或链接原图；原图仅保留在本地，只在用户明确要求时提供。

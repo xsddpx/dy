@@ -150,7 +150,7 @@ class PromptLintFlowTest(unittest.TestCase):
                 )
 
     def test_documented_fixed_templates_match_linter_contract(self):
-        doc = (PROJECT_ROOT / "DOCS/MODULES/MODULE_01_REFERENCE.md").read_text(encoding="utf-8")
+        doc = (PROJECT_ROOT / "DOCS/PIPELINE/02_CONTENT_AND_PROMPT.md").read_text(encoding="utf-8")
         self.assertTrue((PROJECT_ROOT / "MATERIAL/fixed-environment/anna-room-01.png").exists())
         self.assertIn("未指定时，在动作模板 01–04 中随机选择一个", doc)
         environment = re.search(r"### 固定环境引用\n\n```text\n(.*?)\n```", doc, re.S).group(1)
@@ -295,71 +295,53 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "standalone_sellpoint_section" for f in result["findings"]), result["findings"])
 
-    def test_derive_fast_copies_grid_prompt(self):
-        self.assertEqual(PROMPT_LINT.derive_prompt(GOOD_PROMPT, "fast"), GOOD_PROMPT + "\n")
-
-    def test_derive_main_writes_output(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "grid-prompt.txt"
-            out = Path(tmp) / "vid-prompt-v1.txt"
-            source.write_text(GOOD_PROMPT, encoding="utf-8")
-            stdout = io.StringIO()
-            with redirect_stdout(stdout):
-                code = PROMPT_LINT.main(["derive", str(source), "--mode", "fast", "--out", str(out)])
-            self.assertEqual(code, 0, stdout.getvalue())
-            self.assertEqual(out.read_text(encoding="utf-8"), GOOD_PROMPT + "\n")
-
-    def test_derive_main_supports_wardrobe_image_reference_mode(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "grid-prompt.txt"
-            out = Path(tmp) / "vid-prompt-v1.txt"
-            source.write_text(WARDROBE_IMAGE_PROMPT, encoding="utf-8")
-            stdout = io.StringIO()
-            with redirect_stdout(stdout):
-                code = PROMPT_LINT.main(
-                    [
-                        "derive",
-                        str(source),
-                        "--mode",
-                        "fast",
-                        "--reference-mode",
-                        "wardrobe-image",
-                        "--out",
-                        str(out),
-                    ]
-                )
-            self.assertEqual(code, 0, stdout.getvalue())
-            self.assertEqual(out.read_text(encoding="utf-8"), WARDROBE_IMAGE_PROMPT + "\n")
-
     def test_standard_two_image_reference_mode_is_not_executable(self):
         with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "grid-prompt.txt"
-            out = Path(tmp) / "vid-prompt-v1.txt"
+            source = Path(tmp) / "vid-prompt-v1.txt"
             source.write_text(WARDROBE_IMAGE_PROMPT, encoding="utf-8")
             with self.assertRaises(SystemExit):
                 PROMPT_LINT.main(
                     [
-                        "derive",
+                        "lint",
                         str(source),
-                        "--mode",
-                        "fast",
                         "--reference-mode",
                         "standard",
-                        "--out",
-                        str(out),
                     ]
                 )
 
-    def test_top_level_help_mentions_derive_and_legacy_lint(self):
+    def test_top_level_help_only_mentions_direct_lint_with_project_python(self):
         stdout = io.StringIO()
         with redirect_stdout(stdout):
             code = PROMPT_LINT.main(["--help"])
         help_text = stdout.getvalue()
         self.assertEqual(code, 0)
-        self.assertIn("derive", help_text)
         self.assertIn("lint", help_text)
-        self.assertIn("python3 TOOLS/prompt_lint.py derive", help_text)
-        self.assertIn("省略 lint", help_text)
+        self.assertNotIn("derive", help_text)
+        self.assertNotIn("grid-prompt", help_text)
+        self.assertNotIn("python3", help_text)
+        self.assertIn(
+            '.venv/bin/python TOOLS/prompt_lint.py lint "TEMP/$RUN_ID/vid-prompt-v1.txt"',
+            help_text,
+        )
+        self.assertIn(
+            '.venv/bin/python TOOLS/prompt_lint.py "TEMP/$RUN_ID/vid-prompt-v1.txt"',
+            help_text,
+        )
+
+    def test_lint_subcommand_help_uses_project_python(self):
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as raised:
+            PROMPT_LINT.main(["lint", "--help"])
+        help_text = stdout.getvalue()
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn(
+            "usage: .venv/bin/python TOOLS/prompt_lint.py lint",
+            help_text,
+        )
+        self.assertNotIn("python3", help_text)
+        self.assertNotIn("auto", help_text)
+        self.assertNotIn("fast", help_text)
+        self.assertIn("/xdy", help_text)
 
     def test_lint_subcommand_writes_report(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -393,16 +375,20 @@ class PromptLintFlowTest(unittest.TestCase):
             report = (out_dir / "report.json").read_text(encoding="utf-8")
             self.assertIn('"reference_mode": "wardrobe-image"', report)
 
-    def test_legacy_lint_invocation_still_writes_report(self):
+    def test_direct_lint_invocation_writes_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "vid-prompt-v1.txt"
-            out_dir = Path(tmp) / "legacy-lint-report"
+            out_dir = Path(tmp) / "direct-lint-report"
             source.write_text(GOOD_PROMPT, encoding="utf-8")
             stdout = io.StringIO()
             with redirect_stdout(stdout):
                 code = PROMPT_LINT.main([str(source), "--out-dir", str(out_dir)])
             self.assertEqual(code, 0, stdout.getvalue())
             self.assertTrue((out_dir / "report.json").exists())
+            report_md = (out_dir / "report.md").read_text(encoding="utf-8")
+            self.assertIn("# /xdy prompt 校验报告", report_md)
+            self.assertIn("| pass | /xdy | wardrobe-image |", report_md)
+            self.assertNotIn("| anna | auto | fast |", report_md)
 
     def test_without_role_image_fails(self):
         result = self.lint("室内镜前自然移动。")
@@ -619,7 +605,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "pass", result["findings"])
 
     def test_internal_source_terms_fail(self):
-        result = self.lint(GOOD_PROMPT + "环境：同时吸收 grid-prompt.txt 中的参考宫格内容。参考类型识别：主类型=穿搭展示。")
+        result = self.lint(GOOD_PROMPT + "环境：同时吸收参考宫格内容。参考类型识别：主类型=穿搭展示。")
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "internal_source_terms" for f in result["findings"]), result["findings"])
 

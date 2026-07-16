@@ -58,13 +58,19 @@ class AnnaWardrobeTest(unittest.TestCase):
     def test_all_entries_use_folder_contract(self):
         self.assertTrue(self.entries)
         self.assertEqual(
-            [entry.identifier for entry in self.entries],
-            sorted(entry.identifier for entry in self.entries),
+            [entry.wardrobe_id for entry in self.entries],
+            sorted(
+                (entry.wardrobe_id for entry in self.entries),
+                key=lambda value: (
+                    SELECTOR.SEASON_ORDER[value.split("-")[1]],
+                    int(value.rsplit("-", 1)[1]),
+                ),
+            ),
         )
         for entry in self.entries:
-            with self.subTest(identifier=entry.identifier):
-                self.assertEqual(entry.directory.name, f"衣柜图-{entry.identifier}")
-                self.assertEqual(entry.image.name, f"衣柜图-{entry.identifier}.png")
+            with self.subTest(identifier=entry.wardrobe_id):
+                self.assertEqual(entry.directory.name, entry.wardrobe_id)
+                self.assertEqual(entry.image.name, f"{entry.wardrobe_id}.png")
                 self.assertEqual(entry.description_file.name, "服装描述.md")
                 self.assertTrue(entry.prompt)
 

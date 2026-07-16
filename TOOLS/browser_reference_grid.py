@@ -992,7 +992,7 @@ def write_report(out_dir, report):
             lines.extend([
                 "",
                 "## 头脸信息检测",
-                f"- 作用范围：供 img prompt 和 grid prompt 分析参考",
+                f"- 作用范围：供图片与视频 prompt 分析参考",
                 f"- 结论：{head_face.get('decision')}",
                 f"- 是否检测到头脸信息：{head_face.get('has_head_face_info')}",
                 f"- 检测帧数：{head_face.get('frame_count', 0)}",
@@ -1003,7 +1003,7 @@ def write_report(out_dir, report):
             lines.extend([
                 "",
                 "## 头脸信息检测",
-                f"- 作用范围：供 img prompt 和 grid prompt 分析参考",
+                f"- 作用范围：供图片与视频 prompt 分析参考",
                 f"- 结论：{head_face.get('decision') or 'unavailable'}",
                 f"- 原因：{head_face.get('reason') or head_face.get('error') or 'unknown'}",
             ])

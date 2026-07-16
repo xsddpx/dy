@@ -2587,7 +2587,7 @@ return {
             tag_result["ok"] = True
             tag_result["degraded"] = True
             tag_result["degraded_reason"] = tag_result.get("reason")
-            tag_result["reason"] = "标签控件不可用，话题已写入简介，按模块 03 降级通过"
+            tag_result["reason"] = "标签控件不可用，话题已写入简介，按阶段 05 降级通过"
             report["warnings"].append("标签控件未找到；本次按简介内话题降级通过")
         else:
             report["warnings"].append(f"标签填写失败：{tag_result.get('reason')}")

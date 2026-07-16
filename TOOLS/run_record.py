@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append compact per-run records for the Douyin workflow."""
+"""Append compact per-run records for the dy video workflow."""
 
 from __future__ import annotations
 
@@ -239,7 +239,7 @@ def refresh_markdown(record_jsonl: str | Path, md_path: str | Path | None = None
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="追加或刷新抖音日更任务增量记录。")
+    parser = argparse.ArgumentParser(description="追加或刷新 dy 视频任务增量记录。")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     append_parser = subparsers.add_parser("append", help="追加一条结构化事件")

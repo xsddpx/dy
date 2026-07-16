@@ -23,11 +23,13 @@ from run_record import append_event, refresh_markdown
 
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
-RUN_ID_RE = re.compile(r"^\d{8}-\d{6}(?:-\d{2})?$")
+RUN_ID_RE = re.compile(r"^[0-9]{8}-[0-9]{6}(?:-(?:0[1-9]|[1-9][0-9]))?$")
+RUN_ID_LIKE_RE = re.compile(r"^[0-9]{8}-[0-9]{6}(?:-[0-9]+)?$")
 LEGACY_TIME_RE = re.compile(r"^(?:dy-)?(?P<date>\d{8})-(?P<time>\d{4}|\d{6})(?:-|$)")
 TEXT_SUFFIXES = {".json", ".jsonl", ".md", ".txt", ".log"}
 LOCK_NAME = ".run-id-migration.lock"
 MIGRATIONS_DIR = "_run-id-migrations"
+AUXILIARY_MARKER = ".run-workspace-auxiliary"
 
 
 class WorkspaceError(RuntimeError):
@@ -590,9 +592,16 @@ def audit_workspace(root: Path) -> dict[str, Any]:
     formal_directories = {directory for _, directory, _ in runs}
     if temp_root(root).exists():
         for directory in (path for path in temp_root(root).iterdir() if path.is_dir()):
+            if (directory / AUXILIARY_MARKER).is_file():
+                continue
             if directory in formal_directories or directory.name.startswith("candidate-"):
                 continue
             root_records = list(directory.glob("*-run-record.jsonl"))
+            if RUN_ID_RE.fullmatch(directory.name):
+                expected_record = directory / f"{directory.name}-run-record.jsonl"
+                errors.append(f"运行记录缺失：{expected_record.relative_to(root)}")
+            elif RUN_ID_LIKE_RE.fullmatch(directory.name):
+                errors.append(f"非法正式运行目录：{directory.relative_to(root)}")
             if root_records:
                 errors.append(
                     f"运行目录与记录文件名不一致：{directory.relative_to(root)} -> "

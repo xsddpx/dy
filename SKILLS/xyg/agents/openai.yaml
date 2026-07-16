@@ -1,4 +1,4 @@
 interface:
-  display_name: "衣柜图入库"
-  short_description: "将本次服装参考图转换为标准人台商品图并完成衣柜入库"
-  default_prompt: "使用 $xyg 根据我本次提供的服装参考图生成标准人台商品图并入库。"
+  display_name: "/xyg｜衣柜图入库"
+  short_description: "将服装参考或历史衣柜文档图片化并上传 Drive"
+  default_prompt: "使用 $xyg 根据我本次提供的服装参考图，或我明确指定的历史衣柜文档，生成标准人台商品图，入库并上传 Google Drive。"

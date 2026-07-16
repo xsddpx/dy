@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint and derive final prompts for the anna auto workflow."""
+"""Lint final prompts for the /xdy workflow."""
 
 import argparse
 import json
@@ -7,6 +7,9 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+
+
+CLI_PROG = ".venv/bin/python TOOLS/prompt_lint.py"
 
 
 def add(findings, severity, code, message):
@@ -133,7 +136,6 @@ FIXED_VIDEO_CONSTRAINT_TEMPLATES = {
 }
 
 INTERNAL_SOURCE_TERMS = [
-    "grid-prompt.txt",
     "reference-grid",
     "参考宫格",
     "参考类型识别",
@@ -618,9 +620,9 @@ def lint_text(
 ):
     findings = []
     if route != "anna":
-        add(findings, "error", "unsupported_route", "dy 项目只支持 anna 路线")
+        add(findings, "error", "unsupported_route", "dy 项目的 prompt 校验入口固定为 /xdy")
     if channel != "auto":
-        add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
+        add(findings, "error", "unsupported_channel", "dy 项目的 prompt 校验入口固定为 /xdy")
     if reference_mode not in REFERENCE_MODES:
         add(
             findings,
@@ -629,7 +631,7 @@ def lint_text(
             f"不支持的图片参考模式：{reference_mode}",
         )
     if "@图1" not in text:
-        add(findings, "error", "missing_role_image", "auto/fast 视频 prompt 缺少 @图1 角色图身份引用或说明")
+        add(findings, "error", "missing_role_image", "/xdy 视频 prompt 缺少 @图1 角色图身份引用或说明")
     if "@图2" not in text:
         add(findings, "error", "missing_wardrobe_image", "三图模式缺少 @图2 衣柜人台商品图引用")
     if "@图3" not in text:
@@ -795,7 +797,7 @@ def lint_text(
     person_action_text = section_content(text, "人物动作")
     clothing_conflicts = image_one_clothing_conflict(text)
     if clothing_conflicts:
-        add(findings, "error", "image_one_clothing_anchor", "@图1 只作为人物脸部和身材参考，auto/fast 不得把 @图1 穿搭作为依据")
+        add(findings, "error", "image_one_clothing_anchor", "@图1 只作为人物脸部和身材参考，/xdy 不得把 @图1 穿搭作为依据")
     shooting_text = section_content(text, "视频约束")
     if shooting_text is not None:
         compact_shooting = re.sub(r"\s+", "", shooting_text)
@@ -868,112 +870,39 @@ def lint_text(
     }
 
 
-def derive_prompt(text, mode):
-    if mode == "fast":
-        return text.rstrip() + "\n"
-    raise ValueError(f"未知派生模式：{mode}")
-
-
-def lint_derived_prompt(text, path, mode, reference_mode=REFERENCE_MODE_WARDROBE_IMAGE):
-    return lint_text(text, path, reference_mode=reference_mode)
-
-
-def build_derive_parser():
-    parser = argparse.ArgumentParser(
-        prog="prompt_lint.py derive",
-        description="从 grid-prompt.txt 机械派生阶段 prompt。",
-    )
-    parser.add_argument("grid_prompt", help="模块 01 写出的 TEMP/RUN_ID/grid-prompt.txt")
-    parser.add_argument("--mode", choices=["fast"], required=True)
-    parser.add_argument(
-        "--reference-mode",
-        choices=REFERENCE_MODES,
-        default=REFERENCE_MODE_WARDROBE_IMAGE,
-        help="固定使用 wardrobe-image：人物+衣柜图+环境三图",
-    )
-    parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
-    return parser
-
-
-def derive_main(argv):
-    parser = build_derive_parser()
-    args = parser.parse_args(argv)
-
-    source = Path(args.grid_prompt).expanduser().resolve()
-    out_path = Path(args.out).expanduser().resolve()
-    if not source.exists():
-        print(json.dumps({"error": "grid-prompt 文件不存在", "missing": str(source)}, ensure_ascii=False), file=sys.stderr)
-        return 2
-
-    source_text = source.read_text(encoding="utf-8", errors="replace")
-    source_lint = lint_text(source_text, source, reference_mode=args.reference_mode)
-    if source_lint["decision"] != "pass":
-        print(json.dumps({"decision": "fail", "source_lint": source_lint}, ensure_ascii=False, indent=2))
-        return 1
-
-    try:
-        derived = derive_prompt(source_text, args.mode)
-    except ValueError as exc:
-        print(json.dumps({"decision": "fail", "error": str(exc)}, ensure_ascii=False, indent=2))
-        return 1
-
-    derived_lint = lint_derived_prompt(
-        derived,
-        out_path,
-        args.mode,
-        reference_mode=args.reference_mode,
-    )
-    if derived_lint["decision"] != "pass":
-        print(json.dumps({"decision": "fail", "source_lint": source_lint, "derived_lint": derived_lint}, ensure_ascii=False, indent=2))
-        return 1
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(derived, encoding="utf-8")
-    print(json.dumps({
-        "decision": "pass",
-        "mode": args.mode,
-        "reference_mode": args.reference_mode,
-        "source": str(source),
-        "out": str(out_path),
-        "source_lint": source_lint["decision"],
-        "derived_lint": derived_lint["decision"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
-
 def write_reports(results, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     report_json = out_dir / "report.json"
     report_md = out_dir / "report.md"
     report_json.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = [
-        "# TNS final prompt lint 报告",
+        "# /xdy prompt 校验报告",
         "",
         f"- 样本数：{len(results)}",
         f"- 通过：{sum(1 for r in results if r['decision'] == 'pass')}",
         f"- 失败：{sum(1 for r in results if r['decision'] == 'fail')}",
         "",
-        "| 结论 | 路线 | 通道 | 视频模式 | 图片参考模式 | 错误数 | 文件 | 主要发现 |",
-        "|---|---|---|---|---|---:|---|---|",
+        "| 结论 | 入口 | 图片参考模式 | 错误数 | 文件 | 主要发现 |",
+        "|---|---|---|---:|---|---|",
     ]
     for item in results:
         top = "; ".join(f["message"] for f in item["findings"][:4]) or "无"
         lines.append(
-            f"| {item['decision']} | anna | auto | fast | {item['reference_mode']} | "
+            f"| {item['decision']} | /xdy | {item['reference_mode']} | "
             f"{item['errors']} | {Path(item['path']).name} | {top} |"
         )
     report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_json, report_md
 
 
-def build_lint_parser(prog="prompt_lint.py"):
+def build_lint_parser(prog=CLI_PROG):
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="检查 dy 项目的最终 prompt 是否满足 TNS 收敛硬门。",
+        description="检查 /xdy 的最终 prompt 是否满足 TNS 收敛硬门。",
     )
     parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
-    parser.add_argument("--route", choices=["anna"], default="anna")
-    parser.add_argument("--channel", choices=["auto"], default="auto")
+    parser.add_argument("--route", choices=["anna"], default="anna", help=argparse.SUPPRESS)
+    parser.add_argument("--channel", choices=["auto"], default="auto", help=argparse.SUPPRESS)
     parser.add_argument(
         "--reference-mode",
         choices=REFERENCE_MODES,
@@ -983,7 +912,7 @@ def build_lint_parser(prog="prompt_lint.py"):
     return parser
 
 
-def lint_main(argv=None, prog="prompt_lint.py"):
+def lint_main(argv=None, prog=CLI_PROG):
     parser = build_lint_parser(prog)
     args = parser.parse_args(argv)
 
@@ -1018,25 +947,22 @@ def lint_main(argv=None, prog="prompt_lint.py"):
 
 def top_level_help():
     parser = argparse.ArgumentParser(
-        prog="prompt_lint.py",
-        description="检查和派生 dy 项目的最终 prompt。",
+        prog=CLI_PROG,
+        description="检查 dy 项目的最终 prompt。",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog=(
             "子命令:\n"
-            "  lint    检查最终 prompt；兼容旧式写法，省略 lint 也会进入 lint\n"
-            "  derive  从 grid-prompt.txt 机械派生阶段 prompt\n"
+            "  lint    检查最终 prompt；也可省略 lint 直接传入 prompt 文件\n"
             "\n"
             "常用:\n"
-            "  python3 TOOLS/prompt_lint.py derive \"TEMP/$RUN_ID/grid-prompt.txt\" --mode fast --out \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
-            "  python3 TOOLS/prompt_lint.py lint \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
-            "  python3 TOOLS/prompt_lint.py \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
+            "  .venv/bin/python TOOLS/prompt_lint.py lint \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
+            "  .venv/bin/python TOOLS/prompt_lint.py \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
             "\n"
             "查看子命令参数:\n"
-            "  python3 TOOLS/prompt_lint.py derive --help\n"
-            "  python3 TOOLS/prompt_lint.py lint --help"
+            "  .venv/bin/python TOOLS/prompt_lint.py lint --help"
         ),
     )
-    parser.add_argument("command", nargs="?", help="子命令：lint 或 derive；省略时按旧式 lint 处理")
+    parser.add_argument("command", nargs="?", help="子命令：lint；也可直接传入 prompt 文件")
     parser.print_help()
     return 0
 
@@ -1045,10 +971,8 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in {"-h", "--help"}:
         return top_level_help()
-    if argv and argv[0] == "derive":
-        return derive_main(argv[1:])
     if argv and argv[0] == "lint":
-        return lint_main(argv[1:], prog="prompt_lint.py lint")
+        return lint_main(argv[1:], prog=f"{CLI_PROG} lint")
     return lint_main(argv)
 
 
