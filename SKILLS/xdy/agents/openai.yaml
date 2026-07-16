@@ -1,0 +1,4 @@
+interface:
+  display_name: "xdy"
+  short_description: "启动 Anna 三图日更，上传 Drive 并同步发布双平台"
+  default_prompt: "使用 $xdy 执行今天的 Anna auto/fast 三图双平台日更。"

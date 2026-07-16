@@ -24,14 +24,16 @@ PERSON_ACTION_PROMPT = "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["0
 
 VIDEO_CONSTRAINT_PROMPT = "视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"]
 
-ENVIRONMENT_PROMPT = "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"]
+ENVIRONMENT_PROMPT = "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["wardrobe-image-01"]
 
 OTHER_PROMPT = "其他：写实摄影风格，真实人物质感，均匀柔和的真实室内光影，真实皮肤纹理，真实面部结构，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实色彩。穿搭轮廓清晰，腰线可见，构图稳定，单一连续完整竖屏画面，人物和环境保持同一时空与稳定透视。"
 
 GOOD_PROMPT = (
     PERSON_PROMPT
     + VIDEO_CONSTRAINT_PROMPT
-    + "穿搭：黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。"
+    + "穿搭："
+    + PROMPT_LINT.WARDROBE_IMAGE_ANCHOR
+    + "同时保持黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。"
     + ENVIRONMENT_PROMPT
     + PERSON_ACTION_PROMPT
     + "背景音乐：轻快电子律动纯音乐，稳定四拍节奏，氛围俏皮自信。"
@@ -57,7 +59,7 @@ class PromptLintFlowTest(unittest.TestCase):
         text,
         route="anna",
         channel="auto",
-        reference_mode=PROMPT_LINT.REFERENCE_MODE_STANDARD,
+        reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
     ):
         return PROMPT_LINT.lint_text(
             text,
@@ -73,7 +75,7 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["route"], "anna")
         self.assertEqual(result["channel"], "auto")
         self.assertEqual(result["mode"], "fast")
-        self.assertEqual(result["reference_mode"], "standard")
+        self.assertEqual(result["reference_mode"], "wardrobe-image")
 
     def test_wardrobe_image_three_reference_prompt_passes(self):
         result = self.lint(
@@ -121,34 +123,6 @@ class PromptLintFlowTest(unittest.TestCase):
             result["findings"],
         )
 
-    def test_standard_reference_mode_rejects_image_three(self):
-        result = self.lint(GOOD_PROMPT + " @图3 是额外参考图。")
-        self.assertEqual(result["decision"], "fail")
-        self.assertTrue(
-            any(f["code"] == "unsupported_reference_image" for f in result["findings"]),
-            result["findings"],
-        )
-
-    def test_standard_reference_mode_reserves_image_two_for_environment(self):
-        text = GOOD_PROMPT.replace(
-            "穿搭：黑色合体上衣",
-            "穿搭：@图2 是衣柜商品图；黑色合体上衣",
-        )
-        result = self.lint(text)
-        self.assertEqual(result["decision"], "fail")
-        self.assertTrue(
-            any(f["code"] == "standard_image_role_conflict" for f in result["findings"]),
-            result["findings"],
-        )
-
-    def test_standard_reference_mode_rejects_image_two_before_sections(self):
-        result = self.lint("@图2 是衣柜商品图。" + GOOD_PROMPT)
-        self.assertEqual(result["decision"], "fail")
-        self.assertTrue(
-            any(f["code"] == "standard_image_role_conflict" for f in result["findings"]),
-            result["findings"],
-        )
-
     def test_wardrobe_image_mode_isolates_image_roles_by_section(self):
         cases = {
             "image_two_in_other": WARDROBE_IMAGE_PROMPT
@@ -180,8 +154,8 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue((PROJECT_ROOT / "MATERIAL/fixed-environment/anna-room-01.png").exists())
         self.assertIn("未指定时，在动作模板 01–04 中随机选择一个", doc)
         environment = re.search(r"### 固定环境引用\n\n```text\n(.*?)\n```", doc, re.S).group(1)
-        self.assertEqual(environment, "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"])
-        self.assertIn("@图2 是本次随机选中的固定墙面环境", environment)
+        self.assertEqual(environment, "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["wardrobe-image-01"])
+        self.assertIn("@图3 是本次随机选中的固定墙面环境", environment)
         self.assertIn("人物贴墙站立", environment)
         self.assertIn("墙上呈现轻微自然投影", environment)
         for template_id, name in (("01", "靠墙完整侧身转回"),):
@@ -357,6 +331,25 @@ class PromptLintFlowTest(unittest.TestCase):
             self.assertEqual(code, 0, stdout.getvalue())
             self.assertEqual(out.read_text(encoding="utf-8"), WARDROBE_IMAGE_PROMPT + "\n")
 
+    def test_standard_two_image_reference_mode_is_not_executable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "grid-prompt.txt"
+            out = Path(tmp) / "vid-prompt-v1.txt"
+            source.write_text(WARDROBE_IMAGE_PROMPT, encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                PROMPT_LINT.main(
+                    [
+                        "derive",
+                        str(source),
+                        "--mode",
+                        "fast",
+                        "--reference-mode",
+                        "standard",
+                        "--out",
+                        str(out),
+                    ]
+                )
+
     def test_top_level_help_mentions_derive_and_legacy_lint(self):
         stdout = io.StringIO()
         with redirect_stdout(stdout):
@@ -438,8 +431,8 @@ class PromptLintFlowTest(unittest.TestCase):
     def test_tns_stacking_terms_fail_in_content_sections(self):
         variants = (
             GOOD_PROMPT.replace(
-                "穿搭：黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。",
-                "穿搭：白色低圆领紧身上衣搭配包臀迷你裙。",
+                "同时保持黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。",
+                "同时保持白色低圆领紧身上衣搭配包臀迷你裙。",
             ),
             GOOD_PROMPT.replace(
                 PERSON_ACTION_PROMPT,
@@ -588,7 +581,10 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertTrue(any(f["code"] == "conditional_or_placeholder_terms" for f in result["findings"]), result["findings"])
 
     def test_placeholder_ellipsis_fails(self):
-        result = self.lint(GOOD_PROMPT.replace("穿搭：黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。", "穿搭：..."))
+        result = self.lint(GOOD_PROMPT.replace(
+            "同时保持黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。",
+            "同时保持...",
+        ))
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "conditional_or_placeholder_terms" for f in result["findings"]), result["findings"])
 

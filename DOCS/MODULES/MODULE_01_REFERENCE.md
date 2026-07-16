@@ -2,7 +2,7 @@
 
 ## 职责
 
-围绕核心卖点选择衣柜款式和固定动作模板，将最终七段式 prompt 写入 `TEMP/RUN_ID/grid-prompt.txt`，再通过 `TOOLS/prompt_lint.py derive` 派生视频 prompt。默认继续使用人物与环境双图；衣柜图实验模式使用人物、衣柜人台商品图和环境三图，未验证前不替换默认日更。
+围绕核心卖点选择衣柜图和固定动作模板，将最终七段式 prompt 写入 `TEMP/RUN_ID/grid-prompt.txt`，再通过 `TOOLS/prompt_lint.py derive` 派生视频 prompt。正式流程固定使用人物、衣柜人台商品图和环境三图。
 
 ## 创作目标与人物资产
 
@@ -17,19 +17,24 @@
 
 ## 自主创作流程
 
-1. 按当天日期优先选择 `MATERIAL/anna-wardrobe.md` 对应编号；当天对应编号不存在时，从现有衣柜条目中随机选择；与核心卖点或动作模板不适配时可改选，并记录原因。
+1. 执行 `TOOLS/select_wardrobe.py`。用户指定 `衣柜图-NNN` 时精确选择；未指定时从全部合法条目随机选择，有多个条目时排除最近一次正式运行使用的编号。工具锁定图片和描述，并将款式提示词原文写入本次运行目录。
 2. 用户明确指定动作模板时使用指定模板；未指定时，在动作模板 01–04 中随机选择一个。
-3. 使用 `TOOLS/select_fixed_environment.py` 从 `MATERIAL/fixed-environment/anna-room-NN.png` 正式环境图中随机选择一张，将绝对路径写入 `TEMP/RUN_ID/environment-path.txt` 并作为本次 `@图2`；同一次运行和 TNS 重试始终使用这张图。
-4. `grid-prompt.txt` 只写最终结果，通过 `prompt_lint.py derive` 派生 `vid-prompt-v1.txt`。
+3. 使用 `TOOLS/select_fixed_environment.py` 随机锁定正式环境图并写入 `TEMP/RUN_ID/environment-path.txt`，作为本次 `@图3`。
+4. 固定人物图为 `@图1`，衣柜图为 `@图2`，环境图为 `@图3`。对三张绝对路径执行 SHA-256 并写入 `TEMP/RUN_ID/reference-inputs.sha256`；同一次运行和全部重试不得更换图片、顺序或哈希。
+5. `grid-prompt.txt` 只写最终结果，通过 `prompt_lint.py derive` 派生 `vid-prompt-v1.txt`。
 
-衣柜图实验模式仅在用户明确要求测试图片衣柜时启用：
+```bash
+.venv/bin/python TOOLS/select_wardrobe.py --run-dir "TEMP/$RUN_ID"
+# 指定款式时追加：--wardrobe-id 衣柜图-001
 
-1. 从 `MATERIAL/anna-wardrobe.md` 的“图片衣柜实验款”选择一个条目，同时锁定其图片路径、款式提示词和视频状态。
-2. 图片必须位于 `MATERIAL/wardrobe-images/`，文件名与条目编号一一对应；将绝对路径写入 `TEMP/RUN_ID/wardrobe-image-path.txt`。
-3. 固定人物图仍是 `@图1`，衣柜人台商品图固定为 `@图2`，本次环境图顺延为 `@图3`。同一次运行和全部重试不得更换任一图片或顺序。
-4. 对三张绝对路径执行 `shasum -a 256`，将结果写入 `TEMP/RUN_ID/reference-inputs.sha256`；模块 02 提交前必须校验通过，不能只依赖可变路径。
-5. 同一次成对验证固定生成两组 prompt：`baseline-grid-prompt-vN.txt` 使用标准双图角色，派生为 `baseline-vid-prompt-vN.txt`；`three-image-grid-prompt-vN.txt` 使用三图角色，派生为 `three-image-vid-prompt-vN.txt`。两组同版本 prompt 使用同一款式文字、视频约束、动作、音乐和其他段，只允许图片角色约束与环境图编号不同；首次为 `v1`，TNS 收敛时两臂同步递增到最多 `v5`。
-6. `experimental` 条目只能用于实验；完成规定的三图验证并记录结论后才能改为 `validated`。默认日更将来只允许消费 `validated` 条目。
+.venv/bin/python TOOLS/select_fixed_environment.py --out "TEMP/$RUN_ID/environment-path.txt"
+
+ROLE_IMAGE="$(pwd)/MATERIAL/fixed-role/anna.png"
+WARDROBE_IMAGE="$(cat "TEMP/$RUN_ID/wardrobe-image-path.txt")"
+ENV_IMAGE="$(cat "TEMP/$RUN_ID/environment-path.txt")"
+shasum -a 256 "$ROLE_IMAGE" "$WARDROBE_IMAGE" "$ENV_IMAGE" \
+  > "TEMP/$RUN_ID/reference-inputs.sha256"
+```
 
 ## grid-prompt 固定结构
 
@@ -56,12 +61,12 @@
 
 ## 段落写作规则
 
-- `穿搭：` 只复制衣柜条目的 `款式提示词：` 正文；人物身份与基础身材比例由固定角色图和 `人物：` 统一锚定，不在穿搭段重复扩写。
+- `穿搭：` 先完整写入下方 `@图2` 服装角色锚点，再紧接 `wardrobe-description.txt` 中的款式提示词原文；不得重新总结、删减或新增服装事实。
 - `背景音乐：` 写具体的纯音乐风格、节拍、速度感和情绪，例如 `轻松时尚的电子纯音乐，稳定柔和节拍，中速，氛围自然自信`。
 - `其他：` 使用正向摄影约束：`写实摄影风格，真实人物质感，均匀柔和的真实室内光影，真实皮肤纹理，真实面部结构，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实色彩。` 同时只补充本次服装颜色、上装与下装轮廓、腰线可读、人物与墙面的贴靠接触、墙上轻微柔边低对比度投影、投影随动作同步变化、构图稳定、单一连续完整竖屏画面和物理真实；服装颜色、面料、领型、袖型、层次、腰线位置与下装版型全程一致，衣料仅随动作自然形变；人物身材体量与胸臀强化描述不在此段重复扩写，排除拼图、分屏、多格和多姿势拼贴。
 - 最终正文只写可见画面语言，不保留占位符、条件分支、内部分析、文件来源、流程说明、合规说明或平台解释。
 
-衣柜图实验模式的 `穿搭：` 先完整写入以下图片角色约束，再紧接所选图片衣柜条目的 `款式提示词：` 正文作为文字核对；图片提供服装视觉事实，文字用于消除组件和层次歧义，两者必须描述同一套服装：
+三图模式的图片提供服装视觉事实，文字用于消除组件和层次歧义，两者必须描述同一套服装：
 
 ```text
 穿搭：@图2 是本次选中的衣柜人台商品图，只用于锁定整套服装的组件、颜色、版型、领口或肩带、层次、开合、腰线、裙裤轮廓、长度、图案、面料和袜类结构；服装自然贴合 @图1 人物，不采用 @图2 的人台、姿势或背景。同时保持<所选图片衣柜条目的款式提示词正文>
@@ -74,18 +79,12 @@
 - 每次运行建档后执行以下命令随机选择并锁定环境图；历史备份、过程图和 `candidates/` 不参与选择。
 
 ```bash
-python3 TOOLS/select_fixed_environment.py --out "TEMP/$RUN_ID/environment-path.txt"
+.venv/bin/python TOOLS/select_fixed_environment.py --out "TEMP/$RUN_ID/environment-path.txt"
 ```
 
 - `环境：` 使用以下通用固定引用，不写某一张环境图独有的墙色或装饰。
 
 ### 固定环境引用
-
-```text
-环境：@图2 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。
-```
-
-衣柜图实验模式改用以下固定环境引用：
 
 ```text
 环境：@图3 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。
@@ -127,23 +126,7 @@ python3 TOOLS/select_fixed_environment.py --out "TEMP/$RUN_ID/environment-path.t
 .venv/bin/python TOOLS/prompt_lint.py derive "TEMP/$RUN_ID/grid-prompt.txt" --mode fast --out "TEMP/$RUN_ID/vid-prompt-v1.txt"
 ```
 
-衣柜图成对实验分别派生两臂，不读写默认正式文件：
-
-```bash
-.venv/bin/python TOOLS/prompt_lint.py derive "TEMP/$RUN_ID/baseline-grid-prompt-v1.txt" \
-  --mode fast \
-  --reference-mode standard \
-  --out "TEMP/$RUN_ID/baseline-vid-prompt-v1.txt"
-
-.venv/bin/python TOOLS/prompt_lint.py derive "TEMP/$RUN_ID/three-image-grid-prompt-v1.txt" \
-  --mode fast \
-  --reference-mode wardrobe-image \
-  --out "TEMP/$RUN_ID/three-image-vid-prompt-v1.txt"
-```
-
-TNS 重试时把上述两臂的 `v1` 同步改为当前 `vN`；两组输入输出始终使用 `baseline-*` 与 `three-image-*` 固定名称，不覆盖默认正式运行的 `grid-prompt.txt` 或 `vid-prompt-v1.txt`。
-
-- 人物锚点、视频约束与构图、当前模式对应的固定环境引用、人物动作和衣柜正文均与本模块一致。
+- 人物锚点、视频约束与构图、固定环境引用、人物动作和衣柜正文均与本模块一致。
 - `人物动作：` 正文按本模块写入，prompt lint 不做逐字校验。
-- 七段标签各一次且顺序正确；默认模式的 `grid-prompt.txt` 以及实验模式两臂各自的 `*-grid-prompt-vN.txt` 都只含最终结果。
-- 默认模式的 `vid-prompt-v1.txt` 与实验模式两臂各自的 `*-vid-prompt-vN.txt` 均由对应 `derive --mode fast` 命令生成并通过校验；派生只标准化文件末尾换行。
+- 七段标签各一次且顺序正确，`grid-prompt.txt` 只含最终结果。
+- `vid-prompt-vN.txt` 均由对应 `derive --mode fast` 命令生成并通过三图校验；派生只标准化文件末尾换行。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "/xdysp 只生成视频"
+  short_description: "生成 Anna 三图参考视频并上传 Drive，由用户检查且不发布"
+  default_prompt: "使用 $xdysp 按 dy 项目三图流程只生成本次视频并上传 Google Drive，由我自行检查，不要发布。"

@@ -1,48 +1,22 @@
 import importlib.util
-import re
-import struct
+import sys
 import unittest
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-WARDROBE_PATH = PROJECT_ROOT / "MATERIAL" / "anna-wardrobe.md"
-MODULE_PATH = PROJECT_ROOT / "DOCS" / "MODULES" / "MODULE_01_REFERENCE.md"
-PROMPT_LINT_PATH = PROJECT_ROOT / "TOOLS" / "prompt_lint.py"
-PROMPT_LINT_SPEC = importlib.util.spec_from_file_location("prompt_lint", PROMPT_LINT_PATH)
+TOOLS_DIR = PROJECT_ROOT / "TOOLS"
+sys.path.insert(0, str(TOOLS_DIR))
+
+PROMPT_LINT_SPEC = importlib.util.spec_from_file_location("prompt_lint", TOOLS_DIR / "prompt_lint.py")
 PROMPT_LINT = importlib.util.module_from_spec(PROMPT_LINT_SPEC)
 PROMPT_LINT_SPEC.loader.exec_module(PROMPT_LINT)
 
-OUTFIT_PATTERN = re.compile(
-    r"^夏-(\d{2})\.\n"
-    r"- 季节标签：([^\n]+)\n"
-    r"- 款式提示词：([^\n]+)$",
-    re.MULTILINE,
-)
-IMAGE_WARDROBE_PATTERN = re.compile(
-    r"^图-(\d{3})\.\n"
-    r"- 图片路径：([^\n]+)\n"
-    r"- 款式提示词：([^\n]+)\n"
-    r"- 视频状态：(experimental|validated)$",
-    re.MULTILINE,
-)
-LOWER_BODY_TERMS = ("短裤", "长裤", "牛仔裤", "短裙", "连衣裙", "衬衫裙", "裙裤")
-LAYERING_TERMS = ("开衫", "西装外套", "外搭", "作为内搭", "外穿", "背带短裤")
-NECKLINE_TERMS = ("方领", "圆领", "U 形领", "小立领", "V 形领", "交叠领", "挂脖", "翻领", "船领", "Polo")
-AMBIGUOUS_OR_DRIFT_TERMS = ("或", "可选", "单侧", "另一侧", "自然敞开", "裙裤", "草帽", "发箍", "独立腰带")
-HIGH_RISK_TERMS = tuple(PROMPT_LINT.TNS_STACKING_TERMS)
-STABILITY_SUFFIX = (
-    "服装颜色、面料、领型、袖型、层次、腰线位置和下装版型全程保持一致，"
-    "衣料仅随动作自然形变，完整服装轮廓持续清晰。"
-)
+SELECTOR_SPEC = importlib.util.spec_from_file_location("select_wardrobe", TOOLS_DIR / "select_wardrobe.py")
+SELECTOR = importlib.util.module_from_spec(SELECTOR_SPEC)
+SELECTOR_SPEC.loader.exec_module(SELECTOR)
 
-
-def png_dimensions(path):
-    header = path.read_bytes()[:24]
-    if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
-        raise ValueError(f"不是有效 PNG：{path}")
-    return struct.unpack(">II", header[16:24])
-
+WARDROBE_DIR = PROJECT_ROOT / "MATERIAL" / "wardrobe-images"
 PERSON_PROMPT = (
     "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
     "脸部严格参考左下角大脸，身材严格参考正面、侧面和背面全身图，"
@@ -64,20 +38,6 @@ def build_prompt(outfit, action_template_id):
         (
             PERSON_PROMPT,
             "视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"],
-            "穿搭：" + outfit,
-            "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"],
-            "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES[action_template_id],
-            "背景音乐：轻松时尚的电子纯音乐，稳定柔和节拍，中速，氛围自然自信。",
-            OTHER_PROMPT,
-        )
-    )
-
-
-def build_image_wardrobe_prompt(outfit, action_template_id):
-    return "\n".join(
-        (
-            PERSON_PROMPT,
-            "视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"],
             "穿搭：" + PROMPT_LINT.WARDROBE_IMAGE_ANCHOR + "同时保持" + outfit,
             "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["wardrobe-image-01"],
             "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES[action_template_id],
@@ -90,106 +50,38 @@ def build_image_wardrobe_prompt(outfit, action_template_id):
 class AnnaWardrobeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.text = WARDROBE_PATH.read_text(encoding="utf-8")
-        cls.module_text = MODULE_PATH.read_text(encoding="utf-8")
-        cls.outfits = OUTFIT_PATTERN.findall(cls.text)
-        cls.image_outfits = IMAGE_WARDROBE_PATTERN.findall(cls.text)
+        cls.entries = SELECTOR.discover(WARDROBE_DIR)
 
-    def test_summer_slots_cover_full_month(self):
-        identifiers = [identifier for identifier, _, _ in self.outfits]
-        self.assertEqual(identifiers, [f"{day:02d}" for day in range(1, 32)])
+    def test_legacy_wardrobe_document_is_removed(self):
+        self.assertFalse((PROJECT_ROOT / "MATERIAL" / "anna-wardrobe.md").exists())
 
-    def test_each_outfit_has_complete_knee_up_description(self):
-        for identifier, season, prompt in self.outfits:
-            with self.subTest(identifier=identifier):
-                self.assertEqual(season, "夏季")
-                self.assertTrue(any(term in prompt for term in LOWER_BODY_TERMS), prompt)
-                self.assertTrue(prompt.endswith(STABILITY_SUFFIX), prompt)
-
-    def test_outfit_prompts_exclude_tns_stacking_terms_and_footwear(self):
-        for identifier, _, prompt in self.outfits:
-            with self.subTest(identifier=identifier):
-                for term in HIGH_RISK_TERMS:
-                    self.assertNotIn(term, prompt)
-                self.assertNotIn("鞋", prompt)
-                self.assertNotIn("脚部", prompt)
-
-    def test_outfit_prompts_exclude_ambiguous_or_drift_prone_terms(self):
-        for identifier, _, prompt in self.outfits:
-            with self.subTest(identifier=identifier):
-                for term in AMBIGUOUS_OR_DRIFT_TERMS:
-                    self.assertNotIn(term, prompt)
-
-    def test_wardrobe_preserves_style_diversity(self):
-        prompts = [prompt for _, _, prompt in self.outfits]
-        self.assertGreaterEqual(sum("连衣裙" in prompt for prompt in prompts), 7)
-        self.assertGreaterEqual(
-            sum("长裤" in prompt or "牛仔裤" in prompt for prompt in prompts),
-            3,
+    def test_all_entries_use_folder_contract(self):
+        self.assertTrue(self.entries)
+        self.assertEqual(
+            [entry.identifier for entry in self.entries],
+            sorted(entry.identifier for entry in self.entries),
         )
-        self.assertGreaterEqual(
-            sum(any(term in prompt for term in LAYERING_TERMS) for prompt in prompts),
-            5,
-        )
-        self.assertGreaterEqual(sum("短裤" in prompt for prompt in prompts), 9)
-        self.assertGreaterEqual(
-            sum(any(term in prompt for term in NECKLINE_TERMS) for prompt in prompts),
-            25,
-        )
+        for entry in self.entries:
+            with self.subTest(identifier=entry.identifier):
+                self.assertEqual(entry.directory.name, f"衣柜图-{entry.identifier}")
+                self.assertEqual(entry.image.name, f"衣柜图-{entry.identifier}.png")
+                self.assertEqual(entry.description_file.name, "服装描述.md")
+                self.assertTrue(entry.prompt)
 
-    def test_every_outfit_and_action_template_passes_fast_prompt_lint(self):
-        for identifier, _, outfit in self.outfits:
+    def test_every_description_and_action_template_passes_three_image_lint(self):
+        for entry in self.entries:
             for action_template_id in sorted(PROMPT_LINT.FIXED_ACTION_TEMPLATES):
-                with self.subTest(identifier=identifier, action_template_id=action_template_id):
+                with self.subTest(identifier=entry.identifier, action_template_id=action_template_id):
                     result = PROMPT_LINT.lint_text(
-                        build_prompt(outfit, action_template_id),
-                        Path(f"summer-{identifier}-action-{action_template_id}.txt"),
-                        route="anna",
-                        channel="auto",
+                        build_prompt(entry.prompt, action_template_id),
+                        Path(f"wardrobe-{entry.identifier}-action-{action_template_id}.txt"),
                     )
                     self.assertEqual(result["decision"], "pass", result["findings"])
 
-    def test_image_wardrobe_entries_have_ordered_pure_image_assets(self):
-        identifiers = [identifier for identifier, _, _, _ in self.image_outfits]
-        numeric_identifiers = [int(identifier) for identifier in identifiers]
-        self.assertEqual(len(numeric_identifiers), len(set(numeric_identifiers)))
-        self.assertEqual(numeric_identifiers, sorted(numeric_identifiers))
-        wardrobe_dir = PROJECT_ROOT / "MATERIAL" / "wardrobe-images"
-        expected_paths = set()
-        for identifier, relative_path, _, status in self.image_outfits:
-            with self.subTest(identifier=identifier):
-                self.assertEqual(relative_path, f"MATERIAL/wardrobe-images/衣柜图-{identifier}.png")
-                self.assertIn(status, {"experimental", "validated"})
-                asset_path = PROJECT_ROOT / relative_path
-                self.assertTrue(asset_path.is_file(), asset_path)
-                width, height = png_dimensions(asset_path)
-                self.assertEqual(width * 16, height * 9, (asset_path, width, height))
-                expected_paths.add(asset_path.resolve())
-        actual_paths = {path.resolve() for path in wardrobe_dir.iterdir()}
-        self.assertEqual(actual_paths, expected_paths)
-        self.assertTrue(all(path.suffix.lower() == ".png" for path in wardrobe_dir.iterdir()))
-
-    def test_every_image_wardrobe_prompt_passes_three_image_lint(self):
-        for identifier, _, outfit, _ in self.image_outfits:
-            for action_template_id in sorted(PROMPT_LINT.FIXED_ACTION_TEMPLATES):
-                with self.subTest(identifier=identifier, action_template_id=action_template_id):
-                    result = PROMPT_LINT.lint_text(
-                        build_image_wardrobe_prompt(outfit, action_template_id),
-                        Path(f"image-{identifier}-action-{action_template_id}.txt"),
-                        route="anna",
-                        channel="auto",
-                        reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
-                    )
-                    self.assertEqual(result["decision"], "pass", result["findings"])
-
-    def test_writing_rules_keep_body_anchors_outside_clothing_sections(self):
-        self.assertIn("每条款式提示词必须完整指定上装与膝上可见下装", self.text)
-        self.assertIn("每套最多使用两层服装和一种图案", self.text)
-        self.assertIn("人物身份与基础身材比例由固定角色图和人物段统一锚定", self.text)
-        self.assertIn("不写鞋履", self.text)
-        self.assertIn("不在穿搭段重复扩写", self.module_text)
-        self.assertIn("服装颜色、面料、领型、袖型、层次、腰线位置与下装版型全程一致", self.module_text)
-        self.assertIn("人物身材体量与胸臀强化描述不在此段重复扩写", self.module_text)
+    def test_description_is_injected_verbatim_after_image_anchor(self):
+        for entry in self.entries:
+            prompt = build_prompt(entry.prompt, "01")
+            self.assertIn(PROMPT_LINT.WARDROBE_IMAGE_ANCHOR + "同时保持" + entry.prompt, prompt)
 
 
 if __name__ == "__main__":

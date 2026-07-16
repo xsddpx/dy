@@ -63,9 +63,8 @@ UNSUPPORTED_TERMS = [
     "结果数",
 ]
 
-REFERENCE_MODE_STANDARD = "standard"
 REFERENCE_MODE_WARDROBE_IMAGE = "wardrobe-image"
-REFERENCE_MODES = (REFERENCE_MODE_STANDARD, REFERENCE_MODE_WARDROBE_IMAGE)
+REFERENCE_MODES = (REFERENCE_MODE_WARDROBE_IMAGE,)
 
 WARDROBE_IMAGE_ANCHOR = (
     "@图2 是本次选中的衣柜人台商品图，只用于锁定整套服装的组件、颜色、版型、"
@@ -119,7 +118,6 @@ ACTION_ADAPTED_PRESENTATION_TERMS = [
 ]
 
 FIXED_ENVIRONMENT_TEMPLATES = {
-    "01": "@图2 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
     "wardrobe-image-01": "@图3 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
 }
 
@@ -616,7 +614,7 @@ def lint_text(
     path,
     route="anna",
     channel="auto",
-    reference_mode=REFERENCE_MODE_STANDARD,
+    reference_mode=REFERENCE_MODE_WARDROBE_IMAGE,
 ):
     findings = []
     if route != "anna":
@@ -632,16 +630,10 @@ def lint_text(
         )
     if "@图1" not in text:
         add(findings, "error", "missing_role_image", "auto/fast 视频 prompt 缺少 @图1 角色图身份引用或说明")
-    if reference_mode == REFERENCE_MODE_STANDARD:
-        if "@图2" not in text:
-            add(findings, "error", "missing_environment_image", "标准双图 prompt 缺少 @图2 固定环境图引用")
-        if "@图3" in text:
-            add(findings, "error", "unsupported_reference_image", "标准双图模式不接收 @图3")
-    elif reference_mode == REFERENCE_MODE_WARDROBE_IMAGE:
-        if "@图2" not in text:
-            add(findings, "error", "missing_wardrobe_image", "衣柜图模式缺少 @图2 衣柜人台商品图引用")
-        if "@图3" not in text:
-            add(findings, "error", "missing_environment_image", "衣柜图模式缺少 @图3 固定环境图引用")
+    if "@图2" not in text:
+        add(findings, "error", "missing_wardrobe_image", "三图模式缺少 @图2 衣柜人台商品图引用")
+    if "@图3" not in text:
+        add(findings, "error", "missing_environment_image", "三图模式缺少 @图3 固定环境图引用")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
@@ -751,11 +743,7 @@ def lint_text(
     if constraint_code:
         add(findings, "error", constraint_code, constraint_message)
     environment_text = section_content(text, "环境")
-    expected_environment_template_id = (
-        "wardrobe-image-01"
-        if reference_mode == REFERENCE_MODE_WARDROBE_IMAGE
-        else "01"
-    )
+    expected_environment_template_id = "wardrobe-image-01"
     if (
         environment_text is not None
         and fixed_template_id(environment_text, FIXED_ENVIRONMENT_TEMPLATES)
@@ -768,21 +756,7 @@ def lint_text(
             f"环境必须完整使用固定模板 {expected_environment_template_id}",
         )
     outfit_text = section_content(text, "穿搭")
-    if reference_mode == REFERENCE_MODE_STANDARD:
-        conflicting_locations = [
-            location
-            for location in reference_section_locations(text, "@图2")
-            if location != "环境"
-        ]
-        if conflicting_locations:
-            add(
-                findings,
-                "error",
-                "standard_image_role_conflict",
-                "标准双图模式的 @图2 只表示环境，不能在其他位置承担衣柜图或其他角色："
-                + ", ".join(dict.fromkeys(conflicting_locations)),
-            )
-    elif reference_mode == REFERENCE_MODE_WARDROBE_IMAGE:
+    if reference_mode == REFERENCE_MODE_WARDROBE_IMAGE:
         image_two_conflicts = [
             location
             for location in reference_section_locations(text, "@图2")
@@ -900,7 +874,7 @@ def derive_prompt(text, mode):
     raise ValueError(f"未知派生模式：{mode}")
 
 
-def lint_derived_prompt(text, path, mode, reference_mode=REFERENCE_MODE_STANDARD):
+def lint_derived_prompt(text, path, mode, reference_mode=REFERENCE_MODE_WARDROBE_IMAGE):
     return lint_text(text, path, reference_mode=reference_mode)
 
 
@@ -914,8 +888,8 @@ def build_derive_parser():
     parser.add_argument(
         "--reference-mode",
         choices=REFERENCE_MODES,
-        default=REFERENCE_MODE_STANDARD,
-        help="standard 使用人物+环境双图；wardrobe-image 使用人物+衣柜图+环境三图",
+        default=REFERENCE_MODE_WARDROBE_IMAGE,
+        help="固定使用 wardrobe-image：人物+衣柜图+环境三图",
     )
     parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
     return parser
@@ -1003,7 +977,7 @@ def build_lint_parser(prog="prompt_lint.py"):
     parser.add_argument(
         "--reference-mode",
         choices=REFERENCE_MODES,
-        default=REFERENCE_MODE_STANDARD,
+        default=REFERENCE_MODE_WARDROBE_IMAGE,
     )
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")
     return parser
