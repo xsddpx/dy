@@ -51,10 +51,19 @@ def read_entry(directory: Path) -> WardrobeEntry:
     identifier = match.group(1)
     image = directory / f"衣柜图-{identifier}.png"
     description_file = directory / "服装描述.md"
-    expected = {image.name, description_file.name}
+    archive_directory = directory / "ori"
+    required = {image.name, description_file.name}
+    allowed = required | {archive_directory.name}
     actual = {path.name for path in directory.iterdir()}
-    if actual != expected:
-        raise WardrobeError(f"衣柜条目必须且只能包含商品图和服装描述：{directory}")
+    if not required.issubset(actual):
+        raise WardrobeError(f"衣柜条目文件不完整：{directory}")
+    unexpected = actual - allowed
+    if unexpected:
+        raise WardrobeError(f"衣柜条目包含不允许的根目录内容：{directory}")
+    if archive_directory.name in actual and (
+        not archive_directory.is_dir() or archive_directory.is_symlink()
+    ):
+        raise WardrobeError(f"衣柜存档 ori 必须是真实目录：{archive_directory}")
     if not image.is_file() or not description_file.is_file():
         raise WardrobeError(f"衣柜条目文件不完整：{directory}")
     width, height = png_dimensions(image)

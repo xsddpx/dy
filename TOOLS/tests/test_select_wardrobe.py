@@ -61,6 +61,39 @@ class SelectWardrobeTest(unittest.TestCase):
             with self.assertRaises(SELECTOR.WardrobeError):
                 SELECTOR.read_entry(wrong_ratio)
 
+    def test_entry_allows_optional_ori_directory_with_arbitrary_contents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = write_entry(root, "001")
+            archive = directory / "ori"
+            nested = archive / "references"
+            nested.mkdir(parents=True)
+            (archive / "source.jpg").write_bytes(b"source")
+            (nested / "notes.txt").write_text("补充说明\n", encoding="utf-8")
+
+            entry = SELECTOR.read_entry(directory)
+
+            self.assertEqual(entry.identifier, "001")
+            self.assertEqual(entry.image.name, "衣柜图-001.png")
+            self.assertEqual(entry.description_file.name, "服装描述.md")
+
+    def test_entry_rejects_ori_file_or_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ori_file = write_entry(root, "001")
+            (ori_file / "ori").touch()
+            with self.assertRaises(SELECTOR.WardrobeError):
+                SELECTOR.read_entry(ori_file)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ori_link = write_entry(root, "001")
+            archive_target = root / "archive-target"
+            archive_target.mkdir()
+            (ori_link / "ori").symlink_to(archive_target, target_is_directory=True)
+            with self.assertRaises(SELECTOR.WardrobeError):
+                SELECTOR.read_entry(ori_link)
+
     def test_entry_rejects_number_mismatch_and_empty_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

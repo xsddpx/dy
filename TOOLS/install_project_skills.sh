@@ -7,7 +7,7 @@ SKILLS_HOME="$CODEX_HOME_DIR/skills"
 
 mkdir -p "$SKILLS_HOME"
 
-for skill in xdy xdysp; do
+for skill in xdy xdysp xyg; do
   source_path="$ROOT_DIR/SKILLS/$skill"
   target_path="$SKILLS_HOME/$skill"
 
