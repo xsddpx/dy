@@ -103,7 +103,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 - 根因：Dreamina CLI 本次对相对路径图片上传没有实际提交文件。
 - 修复动作：当时保持同一个 `vid-prompt-v1.txt` 和单图输入不变，从 Git 根目录解析 `MATERIAL/fixed-role/anna.png` 的绝对路径后重提。
 - 验证：绝对路径重提成功返回 `submit_id`，同一任务后续 `query_result` 返回 `success` 并下载 MP4。
-- 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先把当前流程的全部固定输入图解析为绝对路径，保持双图组合、顺序和 prompt 不变后重试；不要进入 TNS 收敛。
+- 下次判断：若 Dreamina 在上传阶段报 `no file upload`，先把当前模式的全部固定输入图解析为绝对路径，保持图片数量、顺序和 prompt 不变后重试；不要进入 TNS 收敛。
 
 ### 2026-07-09 发布前 CDP 端口未启动且存在普通 Chrome
 - 症状：`publish_adapter.py both` 在抖音和快手预检阶段均失败，`127.0.0.1:9222` connection refused，进程检查发现只有普通 Chrome，没有带 `--remote-debugging-port=9222` 的 CDP Chrome。

@@ -1,5 +1,6 @@
 import importlib.util
 import re
+import struct
 import unittest
 from pathlib import Path
 
@@ -18,6 +19,13 @@ OUTFIT_PATTERN = re.compile(
     r"- 款式提示词：([^\n]+)$",
     re.MULTILINE,
 )
+IMAGE_WARDROBE_PATTERN = re.compile(
+    r"^图-(\d{3})\.\n"
+    r"- 图片路径：([^\n]+)\n"
+    r"- 款式提示词：([^\n]+)\n"
+    r"- 视频状态：(experimental|validated)$",
+    re.MULTILINE,
+)
 LOWER_BODY_TERMS = ("短裤", "长裤", "牛仔裤", "短裙", "连衣裙", "衬衫裙", "裙裤")
 LAYERING_TERMS = ("开衫", "西装外套", "外搭", "作为内搭", "外穿", "背带短裤")
 NECKLINE_TERMS = ("方领", "圆领", "U 形领", "小立领", "V 形领", "交叠领", "挂脖", "翻领", "船领", "Polo")
@@ -27,6 +35,13 @@ STABILITY_SUFFIX = (
     "服装颜色、面料、领型、袖型、层次、腰线位置和下装版型全程保持一致，"
     "衣料仅随动作自然形变，完整服装轮廓持续清晰。"
 )
+
+
+def png_dimensions(path):
+    header = path.read_bytes()[:24]
+    if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+        raise ValueError(f"不是有效 PNG：{path}")
+    return struct.unpack(">II", header[16:24])
 
 PERSON_PROMPT = (
     "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
@@ -58,12 +73,27 @@ def build_prompt(outfit, action_template_id):
     )
 
 
+def build_image_wardrobe_prompt(outfit, action_template_id):
+    return "\n".join(
+        (
+            PERSON_PROMPT,
+            "视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"],
+            "穿搭：" + PROMPT_LINT.WARDROBE_IMAGE_ANCHOR + "同时保持" + outfit,
+            "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["wardrobe-image-01"],
+            "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES[action_template_id],
+            "背景音乐：轻松时尚的电子纯音乐，稳定柔和节拍，中速，氛围自然自信。",
+            OTHER_PROMPT,
+        )
+    )
+
+
 class AnnaWardrobeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = WARDROBE_PATH.read_text(encoding="utf-8")
         cls.module_text = MODULE_PATH.read_text(encoding="utf-8")
         cls.outfits = OUTFIT_PATTERN.findall(cls.text)
+        cls.image_outfits = IMAGE_WARDROBE_PATTERN.findall(cls.text)
 
     def test_summer_slots_cover_full_month(self):
         identifiers = [identifier for identifier, _, _ in self.outfits]
@@ -116,6 +146,39 @@ class AnnaWardrobeTest(unittest.TestCase):
                         Path(f"summer-{identifier}-action-{action_template_id}.txt"),
                         route="anna",
                         channel="auto",
+                    )
+                    self.assertEqual(result["decision"], "pass", result["findings"])
+
+    def test_image_wardrobe_entries_have_ordered_pure_image_assets(self):
+        identifiers = [identifier for identifier, _, _, _ in self.image_outfits]
+        numeric_identifiers = [int(identifier) for identifier in identifiers]
+        self.assertEqual(len(numeric_identifiers), len(set(numeric_identifiers)))
+        self.assertEqual(numeric_identifiers, sorted(numeric_identifiers))
+        wardrobe_dir = PROJECT_ROOT / "MATERIAL" / "wardrobe-images"
+        expected_paths = set()
+        for identifier, relative_path, _, status in self.image_outfits:
+            with self.subTest(identifier=identifier):
+                self.assertEqual(relative_path, f"MATERIAL/wardrobe-images/衣柜图-{identifier}.png")
+                self.assertIn(status, {"experimental", "validated"})
+                asset_path = PROJECT_ROOT / relative_path
+                self.assertTrue(asset_path.is_file(), asset_path)
+                width, height = png_dimensions(asset_path)
+                self.assertEqual(width * 16, height * 9, (asset_path, width, height))
+                expected_paths.add(asset_path.resolve())
+        actual_paths = {path.resolve() for path in wardrobe_dir.iterdir()}
+        self.assertEqual(actual_paths, expected_paths)
+        self.assertTrue(all(path.suffix.lower() == ".png" for path in wardrobe_dir.iterdir()))
+
+    def test_every_image_wardrobe_prompt_passes_three_image_lint(self):
+        for identifier, _, outfit, _ in self.image_outfits:
+            for action_template_id in sorted(PROMPT_LINT.FIXED_ACTION_TEMPLATES):
+                with self.subTest(identifier=identifier, action_template_id=action_template_id):
+                    result = PROMPT_LINT.lint_text(
+                        build_image_wardrobe_prompt(outfit, action_template_id),
+                        Path(f"image-{identifier}-action-{action_template_id}.txt"),
+                        route="anna",
+                        channel="auto",
+                        reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
                     )
                     self.assertEqual(result["decision"], "pass", result["findings"])
 

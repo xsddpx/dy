@@ -38,9 +38,34 @@ GOOD_PROMPT = (
     + OTHER_PROMPT
 )
 
+WARDROBE_IMAGE_PROMPT = (
+    PERSON_PROMPT
+    + VIDEO_CONSTRAINT_PROMPT
+    + "穿搭："
+    + PROMPT_LINT.WARDROBE_IMAGE_ANCHOR
+    + "同时保持象牙白结构感短上衣、深蓝斜纹领带、黑色亮面短裤和黑色长筒袜的可见款式一致。"
+    + "环境："
+    + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["wardrobe-image-01"]
+    + PERSON_ACTION_PROMPT
+    + "背景音乐：轻快电子律动纯音乐，稳定四拍节奏，氛围俏皮自信。"
+    + OTHER_PROMPT
+)
+
 class PromptLintFlowTest(unittest.TestCase):
-    def lint(self, text, route="anna", channel="auto"):
-        return PROMPT_LINT.lint_text(text, Path("prompt.txt"), route, channel)
+    def lint(
+        self,
+        text,
+        route="anna",
+        channel="auto",
+        reference_mode=PROMPT_LINT.REFERENCE_MODE_STANDARD,
+    ):
+        return PROMPT_LINT.lint_text(
+            text,
+            Path("prompt.txt"),
+            route,
+            channel,
+            reference_mode,
+        )
 
     def test_auto_anna_with_seven_section_prompt_passes(self):
         result = self.lint(GOOD_PROMPT)
@@ -48,6 +73,107 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["route"], "anna")
         self.assertEqual(result["channel"], "auto")
         self.assertEqual(result["mode"], "fast")
+        self.assertEqual(result["reference_mode"], "standard")
+
+    def test_wardrobe_image_three_reference_prompt_passes(self):
+        result = self.lint(
+            WARDROBE_IMAGE_PROMPT,
+            reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
+        )
+        self.assertEqual(result["decision"], "pass", result["findings"])
+        self.assertEqual(result["reference_mode"], "wardrobe-image")
+
+    def test_wardrobe_image_mode_requires_image_two_and_image_three(self):
+        without_wardrobe = WARDROBE_IMAGE_PROMPT.replace("@图2", "衣柜图")
+        result = self.lint(
+            without_wardrobe,
+            reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
+        )
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(
+            any(f["code"] == "missing_wardrobe_image" for f in result["findings"]),
+            result["findings"],
+        )
+
+        without_environment = WARDROBE_IMAGE_PROMPT.replace("@图3", "环境图")
+        result = self.lint(
+            without_environment,
+            reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
+        )
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(
+            any(f["code"] == "missing_environment_image" for f in result["findings"]),
+            result["findings"],
+        )
+
+    def test_wardrobe_image_mode_requires_role_isolation_anchor(self):
+        text = WARDROBE_IMAGE_PROMPT.replace(
+            PROMPT_LINT.WARDROBE_IMAGE_ANCHOR,
+            "参考 @图2 的服装。",
+        )
+        result = self.lint(
+            text,
+            reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
+        )
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(
+            any(f["code"] == "missing_wardrobe_image_anchor" for f in result["findings"]),
+            result["findings"],
+        )
+
+    def test_standard_reference_mode_rejects_image_three(self):
+        result = self.lint(GOOD_PROMPT + " @图3 是额外参考图。")
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(
+            any(f["code"] == "unsupported_reference_image" for f in result["findings"]),
+            result["findings"],
+        )
+
+    def test_standard_reference_mode_reserves_image_two_for_environment(self):
+        text = GOOD_PROMPT.replace(
+            "穿搭：黑色合体上衣",
+            "穿搭：@图2 是衣柜商品图；黑色合体上衣",
+        )
+        result = self.lint(text)
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(
+            any(f["code"] == "standard_image_role_conflict" for f in result["findings"]),
+            result["findings"],
+        )
+
+    def test_standard_reference_mode_rejects_image_two_before_sections(self):
+        result = self.lint("@图2 是衣柜商品图。" + GOOD_PROMPT)
+        self.assertEqual(result["decision"], "fail")
+        self.assertTrue(
+            any(f["code"] == "standard_image_role_conflict" for f in result["findings"]),
+            result["findings"],
+        )
+
+    def test_wardrobe_image_mode_isolates_image_roles_by_section(self):
+        cases = {
+            "image_two_in_other": WARDROBE_IMAGE_PROMPT
+            + " 同时继承 @图2 的人台姿势与背景。",
+            "image_three_in_outfit": WARDROBE_IMAGE_PROMPT.replace(
+                "同时保持象牙白结构感短上衣",
+                "同时参考 @图3 的服装颜色并保持象牙白结构感短上衣",
+            ),
+            "image_three_in_other": WARDROBE_IMAGE_PROMPT
+            + " 服装颜色同时由 @图3 决定。",
+        }
+        for name, text in cases.items():
+            with self.subTest(name=name):
+                result = self.lint(
+                    text,
+                    reference_mode=PROMPT_LINT.REFERENCE_MODE_WARDROBE_IMAGE,
+                )
+                self.assertEqual(result["decision"], "fail")
+                self.assertTrue(
+                    any(
+                        f["code"] == "wardrobe_image_role_conflict"
+                        for f in result["findings"]
+                    ),
+                    result["findings"],
+                )
 
     def test_documented_fixed_templates_match_linter_contract(self):
         doc = (PROJECT_ROOT / "DOCS/MODULES/MODULE_01_REFERENCE.md").read_text(encoding="utf-8")
@@ -209,6 +335,28 @@ class PromptLintFlowTest(unittest.TestCase):
             self.assertEqual(code, 0, stdout.getvalue())
             self.assertEqual(out.read_text(encoding="utf-8"), GOOD_PROMPT + "\n")
 
+    def test_derive_main_supports_wardrobe_image_reference_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "grid-prompt.txt"
+            out = Path(tmp) / "vid-prompt-v1.txt"
+            source.write_text(WARDROBE_IMAGE_PROMPT, encoding="utf-8")
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = PROMPT_LINT.main(
+                    [
+                        "derive",
+                        str(source),
+                        "--mode",
+                        "fast",
+                        "--reference-mode",
+                        "wardrobe-image",
+                        "--out",
+                        str(out),
+                    ]
+                )
+            self.assertEqual(code, 0, stdout.getvalue())
+            self.assertEqual(out.read_text(encoding="utf-8"), WARDROBE_IMAGE_PROMPT + "\n")
+
     def test_top_level_help_mentions_derive_and_legacy_lint(self):
         stdout = io.StringIO()
         with redirect_stdout(stdout):
@@ -230,6 +378,27 @@ class PromptLintFlowTest(unittest.TestCase):
                 code = PROMPT_LINT.main(["lint", str(source), "--out-dir", str(out_dir)])
             self.assertEqual(code, 0, stdout.getvalue())
             self.assertTrue((out_dir / "report.json").exists())
+
+    def test_lint_subcommand_supports_wardrobe_image_reference_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "vid-prompt-v1.txt"
+            out_dir = Path(tmp) / "lint-report"
+            source.write_text(WARDROBE_IMAGE_PROMPT, encoding="utf-8")
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = PROMPT_LINT.main(
+                    [
+                        "lint",
+                        str(source),
+                        "--reference-mode",
+                        "wardrobe-image",
+                        "--out-dir",
+                        str(out_dir),
+                    ]
+                )
+            self.assertEqual(code, 0, stdout.getvalue())
+            report = (out_dir / "report.json").read_text(encoding="utf-8")
+            self.assertIn('"reference_mode": "wardrobe-image"', report)
 
     def test_legacy_lint_invocation_still_writes_report(self):
         with tempfile.TemporaryDirectory() as tmp:

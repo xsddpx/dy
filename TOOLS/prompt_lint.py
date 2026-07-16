@@ -57,12 +57,21 @@ APPEARANCE_CHANGE_RE = re.compile(
 )
 
 UNSUPPORTED_TERMS = [
-    "@图3",
     "附件",
     "节点",
     "模型参数",
     "结果数",
 ]
+
+REFERENCE_MODE_STANDARD = "standard"
+REFERENCE_MODE_WARDROBE_IMAGE = "wardrobe-image"
+REFERENCE_MODES = (REFERENCE_MODE_STANDARD, REFERENCE_MODE_WARDROBE_IMAGE)
+
+WARDROBE_IMAGE_ANCHOR = (
+    "@图2 是本次选中的衣柜人台商品图，只用于锁定整套服装的组件、颜色、版型、"
+    "领口或肩带、层次、开合、腰线、裙裤轮廓、长度、图案、面料和袜类结构；"
+    "服装自然贴合 @图1 人物，不采用 @图2 的人台、姿势或背景。"
+)
 
 REQUIRED_SECTION_LABELS = [
     "人物",
@@ -111,6 +120,7 @@ ACTION_ADAPTED_PRESENTATION_TERMS = [
 
 FIXED_ENVIRONMENT_TEMPLATES = {
     "01": "@图2 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
+    "wardrobe-image-01": "@图3 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
 }
 
 FIXED_ACTION_TEMPLATES = {
@@ -476,6 +486,19 @@ def section_content(text, label):
     return None
 
 
+def reference_section_locations(text, reference):
+    _, _, spans = section_spans(text, REQUIRED_SECTION_LABELS)
+    locations = []
+    for match in re.finditer(re.escape(reference), text):
+        location = "段外文本"
+        for section_label, _, content_start, content_end in spans:
+            if content_start <= match.start() < content_end:
+                location = section_label
+                break
+        locations.append(location)
+    return locations
+
+
 def image_one_clothing_conflict(text):
     compact = re.sub(r"\s+", "", text)
     patterns = [
@@ -588,16 +611,37 @@ def add_prompt_style_findings(findings, text):
         )
 
 
-def lint_text(text, path, route="anna", channel="auto"):
+def lint_text(
+    text,
+    path,
+    route="anna",
+    channel="auto",
+    reference_mode=REFERENCE_MODE_STANDARD,
+):
     findings = []
     if route != "anna":
         add(findings, "error", "unsupported_route", "dy 项目只支持 anna 路线")
     if channel != "auto":
         add(findings, "error", "unsupported_channel", "dy 项目只支持 auto 通道")
+    if reference_mode not in REFERENCE_MODES:
+        add(
+            findings,
+            "error",
+            "unsupported_reference_mode",
+            f"不支持的图片参考模式：{reference_mode}",
+        )
     if "@图1" not in text:
         add(findings, "error", "missing_role_image", "auto/fast 视频 prompt 缺少 @图1 角色图身份引用或说明")
-    if "@图2" not in text:
-        add(findings, "error", "missing_environment_image", "auto/fast 视频 prompt 缺少 @图2 固定环境图引用")
+    if reference_mode == REFERENCE_MODE_STANDARD:
+        if "@图2" not in text:
+            add(findings, "error", "missing_environment_image", "标准双图 prompt 缺少 @图2 固定环境图引用")
+        if "@图3" in text:
+            add(findings, "error", "unsupported_reference_image", "标准双图模式不接收 @图3")
+    elif reference_mode == REFERENCE_MODE_WARDROBE_IMAGE:
+        if "@图2" not in text:
+            add(findings, "error", "missing_wardrobe_image", "衣柜图模式缺少 @图2 衣柜人台商品图引用")
+        if "@图3" not in text:
+            add(findings, "error", "missing_environment_image", "衣柜图模式缺少 @图3 固定环境图引用")
     unsupported_hits = [term for term in UNSUPPORTED_TERMS if term in text]
     if unsupported_hits:
         add(findings, "error", "unsupported_terms", f"prompt 含本项目不接收的内部流程词：{', '.join(unsupported_hits)}")
@@ -707,13 +751,73 @@ def lint_text(text, path, route="anna", channel="auto"):
     if constraint_code:
         add(findings, "error", constraint_code, constraint_message)
     environment_text = section_content(text, "环境")
-    if environment_text is not None and fixed_template_id(environment_text, FIXED_ENVIRONMENT_TEMPLATES) is None:
+    expected_environment_template_id = (
+        "wardrobe-image-01"
+        if reference_mode == REFERENCE_MODE_WARDROBE_IMAGE
+        else "01"
+    )
+    if (
+        environment_text is not None
+        and fixed_template_id(environment_text, FIXED_ENVIRONMENT_TEMPLATES)
+        != expected_environment_template_id
+    ):
         add(
             findings,
             "error",
             "invalid_environment_template",
-            "环境必须完整使用固定模板 01",
+            f"环境必须完整使用固定模板 {expected_environment_template_id}",
         )
+    outfit_text = section_content(text, "穿搭")
+    if reference_mode == REFERENCE_MODE_STANDARD:
+        conflicting_locations = [
+            location
+            for location in reference_section_locations(text, "@图2")
+            if location != "环境"
+        ]
+        if conflicting_locations:
+            add(
+                findings,
+                "error",
+                "standard_image_role_conflict",
+                "标准双图模式的 @图2 只表示环境，不能在其他位置承担衣柜图或其他角色："
+                + ", ".join(dict.fromkeys(conflicting_locations)),
+            )
+    elif reference_mode == REFERENCE_MODE_WARDROBE_IMAGE:
+        image_two_conflicts = [
+            location
+            for location in reference_section_locations(text, "@图2")
+            if location != "穿搭"
+        ]
+        image_three_conflicts = [
+            location
+            for location in reference_section_locations(text, "@图3")
+            if location != "环境"
+        ]
+        if image_two_conflicts or image_three_conflicts:
+            details = []
+            if image_two_conflicts:
+                details.append(
+                    "@图2 仅用于穿搭段，冲突位置："
+                    + ", ".join(dict.fromkeys(image_two_conflicts))
+                )
+            if image_three_conflicts:
+                details.append(
+                    "@图3 仅用于环境段，冲突位置："
+                    + ", ".join(dict.fromkeys(image_three_conflicts))
+                )
+            add(
+                findings,
+                "error",
+                "wardrobe_image_role_conflict",
+                "衣柜图三图模式必须隔离人物、服装和环境角色；" + "；".join(details),
+            )
+        if outfit_text is None or WARDROBE_IMAGE_ANCHOR not in outfit_text:
+            add(
+                findings,
+                "error",
+                "missing_wardrobe_image_anchor",
+                "衣柜图模式的穿搭段必须完整写明 @图2 的服装专用角色和人台隔离规则",
+            )
     person_action_text = section_content(text, "人物动作")
     clothing_conflicts = image_one_clothing_conflict(text)
     if clothing_conflicts:
@@ -780,6 +884,7 @@ def lint_text(text, path, route="anna", channel="auto"):
         "route": "anna",
         "channel": "auto",
         "mode": "fast",
+        "reference_mode": reference_mode,
         "bytes": len(text.encode("utf-8")),
         "errors": errors,
         "warnings": warnings,
@@ -795,8 +900,8 @@ def derive_prompt(text, mode):
     raise ValueError(f"未知派生模式：{mode}")
 
 
-def lint_derived_prompt(text, path, mode):
-    return lint_text(text, path)
+def lint_derived_prompt(text, path, mode, reference_mode=REFERENCE_MODE_STANDARD):
+    return lint_text(text, path, reference_mode=reference_mode)
 
 
 def build_derive_parser():
@@ -806,6 +911,12 @@ def build_derive_parser():
     )
     parser.add_argument("grid_prompt", help="模块 01 写出的 TEMP/RUN_ID/grid-prompt.txt")
     parser.add_argument("--mode", choices=["fast"], required=True)
+    parser.add_argument(
+        "--reference-mode",
+        choices=REFERENCE_MODES,
+        default=REFERENCE_MODE_STANDARD,
+        help="standard 使用人物+环境双图；wardrobe-image 使用人物+衣柜图+环境三图",
+    )
     parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
     return parser
 
@@ -821,7 +932,7 @@ def derive_main(argv):
         return 2
 
     source_text = source.read_text(encoding="utf-8", errors="replace")
-    source_lint = lint_text(source_text, source)
+    source_lint = lint_text(source_text, source, reference_mode=args.reference_mode)
     if source_lint["decision"] != "pass":
         print(json.dumps({"decision": "fail", "source_lint": source_lint}, ensure_ascii=False, indent=2))
         return 1
@@ -832,7 +943,12 @@ def derive_main(argv):
         print(json.dumps({"decision": "fail", "error": str(exc)}, ensure_ascii=False, indent=2))
         return 1
 
-    derived_lint = lint_derived_prompt(derived, out_path, args.mode)
+    derived_lint = lint_derived_prompt(
+        derived,
+        out_path,
+        args.mode,
+        reference_mode=args.reference_mode,
+    )
     if derived_lint["decision"] != "pass":
         print(json.dumps({"decision": "fail", "source_lint": source_lint, "derived_lint": derived_lint}, ensure_ascii=False, indent=2))
         return 1
@@ -842,6 +958,7 @@ def derive_main(argv):
     print(json.dumps({
         "decision": "pass",
         "mode": args.mode,
+        "reference_mode": args.reference_mode,
         "source": str(source),
         "out": str(out_path),
         "source_lint": source_lint["decision"],
@@ -862,12 +979,15 @@ def write_reports(results, out_dir):
         f"- 通过：{sum(1 for r in results if r['decision'] == 'pass')}",
         f"- 失败：{sum(1 for r in results if r['decision'] == 'fail')}",
         "",
-        "| 结论 | 路线 | 通道 | 视频模式 | 错误数 | 文件 | 主要发现 |",
-        "|---|---|---|---|---:|---|---|",
+        "| 结论 | 路线 | 通道 | 视频模式 | 图片参考模式 | 错误数 | 文件 | 主要发现 |",
+        "|---|---|---|---|---|---:|---|---|",
     ]
     for item in results:
         top = "; ".join(f["message"] for f in item["findings"][:4]) or "无"
-        lines.append(f"| {item['decision']} | anna | auto | fast | {item['errors']} | {Path(item['path']).name} | {top} |")
+        lines.append(
+            f"| {item['decision']} | anna | auto | fast | {item['reference_mode']} | "
+            f"{item['errors']} | {Path(item['path']).name} | {top} |"
+        )
     report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report_json, report_md
 
@@ -880,6 +1000,11 @@ def build_lint_parser(prog="prompt_lint.py"):
     parser.add_argument("prompts", nargs="+", help="最终 prompt 文本文件")
     parser.add_argument("--route", choices=["anna"], default="anna")
     parser.add_argument("--channel", choices=["auto"], default="auto")
+    parser.add_argument(
+        "--reference-mode",
+        choices=REFERENCE_MODES,
+        default=REFERENCE_MODE_STANDARD,
+    )
     parser.add_argument("--out-dir", default=None, help="输出目录，默认 TEMP/prompt-lint-runs/YYYYMMDD-HHMMSS")
     return parser
 
@@ -894,7 +1019,16 @@ def lint_main(argv=None, prog="prompt_lint.py"):
         print(json.dumps({"error": "prompt 文件不存在", "missing": missing}, ensure_ascii=False), file=sys.stderr)
         return 2
 
-    results = [lint_text(file.read_text(encoding="utf-8", errors="replace"), file, args.route, args.channel) for file in files]
+    results = [
+        lint_text(
+            file.read_text(encoding="utf-8", errors="replace"),
+            file,
+            args.route,
+            args.channel,
+            args.reference_mode,
+        )
+        for file in files
+    ]
     out_dir = Path(args.out_dir) if args.out_dir else Path.cwd() / "TEMP/prompt-lint-runs" / datetime.now().strftime("%Y%m%d-%H%M%S")
     report_json, report_md = write_reports(results, out_dir)
     print(json.dumps({
