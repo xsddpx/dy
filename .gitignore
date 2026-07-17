@@ -1,0 +1,19 @@
+# Local process and output files may contain browser state, credentials, dependencies, and large media.
+/TEMP/
+/OUTPUT/
+/logs/
+.env
+.env.*
+!.env.example
+
+# macOS metadata.
+.DS_Store
+
+# Python runtime caches.
+.venv/
+__pycache__/
+*.pyc
+
+# 本地过程目录与正式产出目录默认不纳入 Git。
+TEMP/
+OUTPUT/
