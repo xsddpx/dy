@@ -1,0 +1,4 @@
+interface:
+  display_name: "/xdy｜生成并发布"
+  short_description: "启动 Anna 双图日更，质检后上传 Drive 并发布双平台"
+  default_prompt: "使用 $xdy 执行今天的 Anna 双图双平台日更。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "/xdysp｜裸生成不质检"
+  short_description: "生成 Anna 双图参考视频并上传 Drive，由用户检查且不发布"
+  default_prompt: "使用 $xdysp 按 dy 项目双图流程裸生成视频并上传 Google Drive，由我自行检查，不要质检或发布。"
