@@ -35,6 +35,6 @@
 .venv/bin/python TOOLS/xdy_flow.py complete "$RUN_ID"
 ```
 
-`complete` 先执行生成、成片、质检、Drive 和发布的一致性合同，再原子追加唯一 `run/completed`，刷新 Markdown/JSON 摘要并执行命名审计。重复调用不产生第二条 completed。等待发布确认时不能收尾。
+`complete` 原子追加唯一 `run/completed` 并刷新 Markdown/JSON 摘要。重复调用不产生第二条 completed。等待发布确认时不能收尾。
 
 双平台均为 `published` 才能以 `success` 收尾；任一平台失败时以 `failed`、`outcome=publish_failed` 收尾。状态与聚合报告不一致时拒绝追加 `run/completed`。

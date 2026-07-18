@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -26,6 +27,8 @@ SOFT_ASSISTANT_WORDS = ("建议", "可优化", "推荐", "提示", "风险提醒
 AI_DECLARATION_WORDS = ("内容由AI生成", "AI生成", "人工智能生成", "AIGC")
 DEFAULT_CDP_URL = "http://127.0.0.1:9222"
 DOM_CDP_URL: str | None = None
+MAX_APPLIED_TAGS = 4
+MAX_TAG_CANDIDATES = 8
 
 
 def is_video_publish_page(url: str) -> bool:
@@ -265,13 +268,24 @@ return result;
 def fill_tags(tags: list[str]) -> dict[str, Any]:
     clean_tags = [tag.strip().lstrip("#") for tag in tags if tag.strip()]
     if not clean_tags:
-        return {"ok": True, "filled": 0, "requested_tags": [], "applied_tags": []}
+        return {"ok": True, "safe": True, "filled": 0, "requested_tags": [], "applied_tags": []}
     if not DOM_CDP_URL:
-        return {"ok": False, "filled": 0, "requested_tags": clean_tags, "applied_tags": [], "reason": "抖音标签只允许通过 CDP 完整匹配写入"}
+        return {
+            "ok": False,
+            "safe": False,
+            "filled": 0,
+            "requested_tags": clean_tags,
+            "applied_tags": [],
+            "reason": "抖音标签只允许通过 CDP 完整匹配写入",
+        }
     return fill_tags_via_playwright(DOM_CDP_URL, clean_tags)
 
 
-def apply_tag_candidates(tags: list[str], attempt: Any, target_count: int = 4) -> dict[str, Any]:
+def apply_tag_candidates(
+    tags: list[str],
+    attempt: Any,
+    target_count: int = MAX_APPLIED_TAGS,
+) -> dict[str, Any]:
     applied: list[str] = []
     actions: list[dict[str, Any]] = []
     for tag in tags:
@@ -291,6 +305,62 @@ def apply_tag_candidates(tags: list[str], attempt: Any, target_count: int = 4) -
         "requested_tags": tags,
         "applied_tags": applied,
         "actions": actions,
+    }
+
+
+def normalize_tag_values(tags: list[str]) -> list[str]:
+    clean: list[str] = []
+    seen: set[str] = set()
+    for tag in tags:
+        value = str(tag).strip().lstrip("#")
+        if not value or value in seen:
+            continue
+        clean.append(value)
+        seen.add(value)
+    return clean
+
+
+def validate_topic_state(
+    *,
+    base_text: str,
+    final_text: str,
+    requested_tags: list[str],
+    applied_tags: list[str],
+    highlighted_topics: list[str],
+) -> dict[str, Any]:
+    requested = normalize_tag_values(requested_tags)
+    applied = normalize_tag_values(applied_tags)
+    highlighted = normalize_tag_values(highlighted_topics)
+    base_compact = re.sub(r"\s+", "", base_text)
+    final_compact = re.sub(r"\s+", "", final_text)
+    errors: list[str] = []
+
+    if len(applied) > MAX_APPLIED_TAGS:
+        errors.append(f"已应用标签超过 {MAX_APPLIED_TAGS} 个")
+    if len(highlighted) > MAX_APPLIED_TAGS:
+        errors.append(f"页面话题 token 超过 {MAX_APPLIED_TAGS} 个")
+
+    missing = [tag for tag in applied if tag not in highlighted]
+    unexpected = [tag for tag in highlighted if tag not in applied]
+    residues = [
+        tag
+        for tag in requested
+        if tag not in applied and tag not in base_compact and tag in final_compact
+    ]
+    if missing:
+        errors.append("已应用标签缺少页面 token：" + "、".join(missing))
+    if unexpected:
+        errors.append("页面存在未记录话题 token：" + "、".join(unexpected))
+    if residues:
+        errors.append("失败候选标签残留在正文：" + "、".join(residues))
+
+    return {
+        "safe": not errors,
+        "highlighted_topics": highlighted,
+        "missing_topics": missing,
+        "unexpected_topics": unexpected,
+        "residual_candidates": residues,
+        "errors": errors,
     }
 
 
@@ -325,6 +395,43 @@ def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 1
             tag,
         ))
 
+    def capture_topic_state(page: Any) -> dict[str, Any]:
+        return page.evaluate(
+            """() => {
+              function visible(el) {
+                const s = getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 1 && r.height > 1;
+              }
+              const editor = Array.from(document.querySelectorAll(
+                '[contenteditable=true], .editor-kit-root-container, .editor-comp-publish-container-d4oeQI, .zone-container'
+              )).find(visible);
+              if (!editor) return {text: '', highlighted_topics: []};
+              const topics = Array.from(editor.querySelectorAll('*')).flatMap((el) => {
+                const text = (el.innerText || el.textContent || '').replace(/\\s+/g, '').trim();
+                const bg = getComputedStyle(el).backgroundColor;
+                return /^#[^#]+$/.test(text) && /rgba?\\(1,\\s*118,\\s*247/.test(bg) ? [text] : [];
+              });
+              return {
+                text: editor.innerText || editor.textContent || '',
+                highlighted_topics: Array.from(new Set(topics)),
+              };
+            }"""
+        )
+
+    def restore_topic_state(page: Any, before: dict[str, Any]) -> bool:
+        expected = re.sub(r"\s+", "", str(before.get("text") or ""))
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(200)
+        for _ in range(4):
+            current = capture_topic_state(page)
+            if re.sub(r"\s+", "", str(current.get("text") or "")) == expected:
+                return True
+            page.keyboard.press("Meta+z")
+            page.wait_for_timeout(250)
+        current = capture_topic_state(page)
+        return re.sub(r"\s+", "", str(current.get("text") or "")) == expected
+
     with sync_playwright() as playwright:
         browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_sec * 1000)
         pages = [page for context in browser.contexts for page in context.pages]
@@ -332,10 +439,20 @@ def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 1
         if page is None:
             page = next((item for item in pages if "creator.douyin.com" in item.url), None)
         if page is None:
-            return {"ok": False, "filled": 0, "tags": tags, "reason": "没有找到抖音发布页"}
+            return {
+                "ok": False,
+                "safe": False,
+                "filled": 0,
+                "requested_tags": tags,
+                "applied_tags": [],
+                "reason": "没有找到抖音发布页",
+            }
 
         page.bring_to_front()
+        base_state = capture_topic_state(page)
+
         def attempt(tag: str) -> dict[str, Any]:
+            before = capture_topic_state(page)
             try:
                 add_topic = page.get_by_text("#添加话题", exact=True).first
                 add_topic.click(timeout=timeout_sec * 1000)
@@ -346,19 +463,38 @@ def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 1
 
                 suggestion = page.get_by_text(f"#{tag}", exact=True).first
                 if suggestion.count() == 0 or not suggestion.is_visible(timeout=2000):
-                    page.keyboard.press("Escape")
-                    page.wait_for_timeout(300)
-                    return {"ok": False, "reason": "没有找到完整匹配的话题建议"}
+                    cleanup_ok = restore_topic_state(page, before)
+                    return {
+                        "ok": False,
+                        "cleanup_ok": cleanup_ok,
+                        "reason": "没有找到完整匹配的话题建议",
+                    }
 
                 suggestion.click(timeout=3000)
 
                 page.wait_for_timeout(700)
                 ok = has_highlighted_topic(page, tag)
-                return {"ok": ok, "method": "topic-suggestion"}
+                cleanup_ok = True if ok else restore_topic_state(page, before)
+                return {"ok": ok, "cleanup_ok": cleanup_ok, "method": "topic-suggestion"}
             except Exception as exc:
-                return {"ok": False, "reason": str(exc)}
+                cleanup_ok = restore_topic_state(page, before)
+                return {"ok": False, "cleanup_ok": cleanup_ok, "reason": str(exc)}
 
-        return {**apply_tag_candidates(tags, attempt), "method": "playwright-topic-token"}
+        result = apply_tag_candidates(tags, attempt)
+        final_state = capture_topic_state(page)
+        validation = validate_topic_state(
+            base_text=str(base_state.get("text") or ""),
+            final_text=str(final_state.get("text") or ""),
+            requested_tags=tags,
+            applied_tags=result["applied_tags"],
+            highlighted_topics=list(final_state.get("highlighted_topics") or []),
+        )
+        return {
+            **result,
+            "safe": validation["safe"],
+            "validation": validation,
+            "method": "playwright-topic-token",
+        }
 
 
 def click_locator_center(page: Any, locator: Any, timeout_ms: int) -> dict[str, Any]:
@@ -799,19 +935,15 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
 
 def normalize_tags(tags: list[str]) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
-    clean = []
-    seen = set()
-    for tag in tags:
-        value = tag.strip().lstrip("#")
-        if not value or value in seen:
-            continue
-        clean.append(value)
-        seen.add(value)
-    if len(clean) < 4:
-        warnings.append(f"候选标签数量 {len(clean)} 个，少于目标 4 个")
-    if len(clean) > 8:
-        warnings.append(f"标签数量 {len(clean)} 个，多于候选池上限 8 个；本次只尝试前 8 个")
-        clean = clean[:8]
+    clean = normalize_tag_values(tags)
+    if len(clean) < MAX_APPLIED_TAGS:
+        warnings.append(f"候选标签数量 {len(clean)} 个，少于目标 {MAX_APPLIED_TAGS} 个")
+    if len(clean) > MAX_TAG_CANDIDATES:
+        warnings.append(
+            f"标签数量 {len(clean)} 个，多于候选池上限 {MAX_TAG_CANDIDATES} 个；"
+            f"本次只尝试前 {MAX_TAG_CANDIDATES} 个"
+        )
+        clean = clean[:MAX_TAG_CANDIDATES]
     return clean, warnings
 
 
@@ -951,8 +1083,11 @@ def main() -> int:
     report["steps"]["copywriting"].update({"status": "filled", "fields": copywriting, "tags": tag_result})
     if not copywriting.get("title"):
         return fail(report, out_dir, "没有成功填写标题", 5)
+    if tag_result.get("safe") is False:
+        validation_errors = (tag_result.get("validation") or {}).get("errors") or [tag_result.get("reason")]
+        return fail(report, out_dir, "标签写入校验失败：" + "；".join(filter(None, validation_errors)), 5)
     if tags and not tag_result.get("ok"):
-        report["warnings"].append("候选标签已耗尽，未获得四个完整匹配；不会写入粘连标签")
+        report["warnings"].append("候选标签已耗尽，未获得四个完整匹配；仅保留已回读确认的完整话题 token")
 
     declaration = try_set_ai_declaration(args.declaration_timeout)
     report["steps"]["declaration"].update(declaration)

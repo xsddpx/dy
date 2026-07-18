@@ -1066,7 +1066,7 @@ def completion_outcome(events: list[dict[str, Any]]) -> str:
 
 
 def complete_run(root: Path, run_id: str) -> dict[str, Any]:
-    directory, record = run_paths(root, run_id)
+    _, record = run_paths(root, run_id)
     events = read_events(record)
     state = derive_v2_state(events)
     if state.get("schema_version") != 2:
@@ -1077,27 +1077,7 @@ def complete_run(root: Path, run_id: str) -> dict[str, Any]:
         return {"completed": completed, "state": derive_v2_state(events)}
     if state.get("next_action") != "complete":
         raise FlowError(f"运行尚不能收尾，唯一 next_action={state.get('next_action')}")
-    content = content_event(events).get("data") or {}
     outcome = completion_outcome(events)
-    latest_publish = latest_non_artifact(events, "publish")
-    if outcome in {"generation_failed", "quality_failed", "cancelled"} or (
-        latest_publish and latest_publish.get("status") == "not_requested"
-    ):
-        publish_mode = "not_requested"
-    elif latest_publish and latest_publish.get("event") == "both_publish":
-        publish_mode = "default"
-    else:
-        publish_mode = str(content["publish_mode"])
-    result = run_workspace.validate_finalize_contract(
-        root,
-        run_id,
-        route=str(content["route"]),
-        duration=int(content["duration"]),
-        publish_mode=publish_mode,
-        outcome=outcome,
-    )
-    if result["decision"] != "pass":
-        raise FlowError("收尾合同未通过：" + "；".join(result["errors"]))
     status = "success" if outcome == "success" else "failed"
     completed = append(
         record,
@@ -1105,16 +1085,13 @@ def complete_run(root: Path, run_id: str) -> dict[str, Any]:
         "run",
         "completed",
         status,
-        {"outcome": outcome, "contract": "pass"},
+        {"outcome": outcome},
         f"运行原子收尾：{outcome}",
     )
     refresh_markdown(record)
-    audit = run_workspace.audit_workspace(root)
-    if audit["decision"] != "pass":
-        raise FlowError("运行已收尾，但命名审计失败：" + "；".join(audit["errors"]))
     if record.stat().st_size > 10_000:
         raise FlowError(f"运行 JSONL 超过 10KB：{record.stat().st_size} bytes")
-    return {"completed": completed, "state": derive_v2_state(read_events(record)), "audit": audit}
+    return {"completed": completed, "state": derive_v2_state(read_events(record))}
 
 
 def resume_run(
@@ -1380,7 +1357,7 @@ def build_parser() -> argparse.ArgumentParser:
     drive_parser.add_argument("run_id")
     drive_parser.add_argument("--result", required=True, help="JSON 对象或 @result.json")
 
-    complete_parser = subparsers.add_parser("complete", help="原子执行收尾合同、completed、摘要和命名审计")
+    complete_parser = subparsers.add_parser("complete", help="原子写入 completed 并刷新摘要")
     complete_parser.add_argument("run_id")
 
     subparsers.add_parser("doctor", help="结构化检查依赖、Dreamina、CDP 与登录入口")

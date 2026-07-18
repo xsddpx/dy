@@ -133,6 +133,39 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertEqual([item["tag"] for item in result["actions"]], requested[:6])
         self.assertTrue(result["ok"])
 
+    def test_topic_state_accepts_fewer_than_four_exact_tokens(self):
+        result = MODULE.validate_topic_state(
+            base_text="简单记录今天的状态。",
+            final_text="简单记录今天的状态。 #轻熟穿搭 #穿搭分享 #身材比例",
+            requested_tags=["轻熟穿搭", "修身穿搭", "穿搭分享", "身材比例"],
+            applied_tags=["轻熟穿搭", "穿搭分享", "身材比例"],
+            highlighted_topics=["#轻熟穿搭", "#穿搭分享", "#身材比例"],
+        )
+        self.assertTrue(result["safe"], result["errors"])
+
+    def test_topic_state_rejects_failed_candidate_residue(self):
+        result = MODULE.validate_topic_state(
+            base_text="简单记录今天的状态。",
+            final_text="简单记录今天的状态。 #轻熟穿搭 修身穿搭日常穿搭",
+            requested_tags=["轻熟穿搭", "修身穿搭", "日常穿搭"],
+            applied_tags=["轻熟穿搭"],
+            highlighted_topics=["#轻熟穿搭"],
+        )
+        self.assertFalse(result["safe"])
+        self.assertEqual(result["residual_candidates"], ["修身穿搭", "日常穿搭"])
+
+    def test_topic_state_rejects_more_than_four_tokens(self):
+        tags = ["一", "二", "三", "四", "五"]
+        result = MODULE.validate_topic_state(
+            base_text="正文",
+            final_text="正文 " + " ".join(f"#{tag}" for tag in tags),
+            requested_tags=tags,
+            applied_tags=tags,
+            highlighted_topics=tags,
+        )
+        self.assertFalse(result["safe"])
+        self.assertTrue(any("超过 4 个" in error for error in result["errors"]))
+
 
 if __name__ == "__main__":
     unittest.main()
