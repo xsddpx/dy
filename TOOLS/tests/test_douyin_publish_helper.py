@@ -2,9 +2,7 @@
 import importlib.util
 import io
 import os
-import tempfile
 import unittest
-from argparse import Namespace
 from pathlib import Path
 from unittest import mock
 
@@ -62,105 +60,6 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertTrue(MODULE.description_contains_tags("今天很好看 #纯欲 #穿搭", ["纯欲", "穿搭"]))
         self.assertFalse(MODULE.description_contains_tags("今天很好看 #纯欲", ["纯欲", "穿搭"]))
 
-    def test_compact_location_query_dedupes_blank_parts(self):
-        self.assertEqual(MODULE.compact_location_query("上海", " 武康路  与  安福路街区 ", "上海"), "上海 武康路 与 安福路街区")
-
-    def test_location_query_attempts_split_compound_street_area(self):
-        attempts = MODULE.location_query_attempts("上海 武康路与安福路街区")
-        self.assertEqual(attempts[0], "上海 武康路与安福路街区")
-        self.assertIn("上海 武康路", attempts)
-        self.assertIn("上海 安福路", attempts)
-        self.assertIn("武康路", attempts)
-        self.assertIn("安福路街区", attempts)
-        self.assertIn("安福路", attempts)
-        self.assertEqual(attempts[-1], "上海")
-
-    def test_location_query_attempts_include_known_poi_substrings(self):
-        attempts = MODULE.location_query_attempts("苏州 金鸡湖月光码头与湖边步道")
-        self.assertIn("苏州 月光码头", attempts)
-        self.assertIn("月光码头", attempts)
-
-    def test_location_match_tokens_prefer_specific_poi_terms(self):
-        tokens = MODULE.location_match_tokens("上海 武康路与安福路街区", "上海 武康路")
-        self.assertEqual(tokens[0], "安福路街区")
-        self.assertIn("武康路", tokens)
-        self.assertIn("安福路", tokens)
-        self.assertNotIn("上海", tokens)
-
-    def test_location_city_hint_reads_leading_city(self):
-        self.assertEqual(MODULE.location_city_hint("苏州 金鸡湖月光码头"), "苏州")
-        self.assertIsNone(MODULE.location_city_hint("月光码头"))
-
-    def test_location_candidate_accepts_local_suzhou_poi(self):
-        self.assertTrue(
-            MODULE.location_candidate_is_plausible(
-                "月光码头步行街 江苏省苏州市吴中区观枫街1号",
-                "苏州 金鸡湖月光码头",
-                "月光码头",
-            )
-        )
-
-    def test_location_candidate_rejects_foreign_context_false_positive(self):
-        self.assertFalse(
-            MODULE.location_candidate_is_plausible(
-                "Afun-game767 首尔西大门区苏州工业园区星湖街328号创意产业园4-B601单元附近企业, 西大门区, 首尔, 韩国",
-                "苏州 苏州中心",
-                "苏州中心",
-            )
-        )
-
-    def test_infer_location_query_prefers_cli_value(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            result = MODULE.infer_location_query("上海 外滩")
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["query"], "上海 外滩")
-        self.assertEqual(result["source"], "cli")
-
-    def test_infer_location_query_requires_cli_value(self):
-        result = MODULE.infer_location_query()
-        self.assertFalse(result["ok"])
-        self.assertEqual(result["query"], "")
-        self.assertEqual(result["source"], "cli")
-        self.assertIn("--location", result["reason"])
-
-    def test_normalize_cover_frame_aliases(self):
-        self.assertEqual(MODULE.normalize_cover_frame(None), "middle")
-        self.assertEqual(MODULE.normalize_cover_frame("recommend"), "recommended")
-        self.assertEqual(MODULE.normalize_cover_frame("mid"), "middle")
-        self.assertEqual(MODULE.normalize_cover_frame("skip"), "none")
-        self.assertEqual(MODULE.normalize_cover_frame("ai"), "ai-recommended")
-        self.assertEqual(MODULE.normalize_cover_frame("ai_recommended"), "ai-recommended")
-
-    def test_location_defaults_to_skipped_without_explicit_location(self):
-        args = Namespace(location=None, no_location=False)
-        self.assertFalse(MODULE.should_attempt_location(args))
-        self.assertIn("默认不填写发布地址", MODULE.location_skip_reason(args))
-
-    def test_explicit_location_enables_location_attempt(self):
-        args = Namespace(location="上海 武康路", no_location=False)
-        self.assertTrue(MODULE.should_attempt_location(args))
-
-    def test_no_location_overrides_explicit_location(self):
-        args = Namespace(location="上海 武康路", no_location=True)
-        self.assertFalse(MODULE.should_attempt_location(args))
-        self.assertIn("--no-location", MODULE.location_skip_reason(args))
-
-    def test_classify_ai_cover_recommendation_snapshot(self):
-        self.assertEqual(MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": False}), "absent")
-        self.assertEqual(
-            MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True, "generating": True}),
-            "generating",
-        )
-        self.assertEqual(
-            MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True, "empty": True}),
-            "empty",
-        )
-        self.assertEqual(
-            MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True, "hasRecommendation": True}),
-            "ready",
-        )
-        self.assertEqual(MODULE.classify_ai_cover_recommendation_snapshot({"hasSection": True}), "done")
-
     def test_main_help_includes_no_publish(self):
         stdout = io.StringIO()
         with self.assertRaises(SystemExit) as cm:
@@ -168,9 +67,10 @@ class DouyinPublishHelperTest(unittest.TestCase):
                 MODULE.main()
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("--no-publish", stdout.getvalue())
-        self.assertIn("--location", stdout.getvalue())
-        self.assertIn("--cover-frame", stdout.getvalue())
-        self.assertIn("默认 middle", stdout.getvalue())
+        self.assertNotIn("--location", stdout.getvalue())
+        self.assertNotIn("--cover-frame", stdout.getvalue())
+        self.assertNotIn("--current-tab", stdout.getvalue())
+        self.assertNotIn("--upload-mode", stdout.getvalue())
         self.assertNotIn("--ai-cover-recommendation-timeout", stdout.getvalue())
 
     def test_resolve_cdp_url_prefers_cli_value(self):
@@ -210,13 +110,6 @@ class DouyinPublishHelperTest(unittest.TestCase):
         self.assertTrue(result["skipped"])
         self.assertIn("missing playwright", result["reason"])
 
-    def test_activate_video_publish_page_reports_missing_dependency(self):
-        with mock.patch.object(MODULE, "playwright_import_error", return_value="missing playwright"):
-            result = MODULE.activate_video_publish_page_via_playwright("http://127.0.0.1:9222")
-        self.assertFalse(result["ok"])
-        self.assertTrue(result["skipped"])
-        self.assertIn("missing playwright", result["reason"])
-
     def test_publish_snapshot_does_not_treat_uploading_manage_page_as_success(self):
         status = MODULE.classify_publish_snapshot({
             "url": "https://creator.douyin.com/creator-micro/content/manage?enter_from=publish",
@@ -230,6 +123,15 @@ class DouyinPublishHelperTest(unittest.TestCase):
             "textSample": "作品管理 合集管理 共创中心",
         })
         self.assertEqual(status, "success")
+
+    def test_tag_candidates_fall_back_until_four_exact_matches(self):
+        requested = ["一", "二", "三", "四", "五", "六", "七"]
+        accepted = {"二", "三", "五", "六"}
+        result = MODULE.apply_tag_candidates(requested, lambda tag: {"ok": tag in accepted})
+        self.assertEqual(result["requested_tags"], requested)
+        self.assertEqual(result["applied_tags"], ["二", "三", "五", "六"])
+        self.assertEqual([item["tag"] for item in result["actions"]], requested[:6])
+        self.assertTrue(result["ok"])
 
 
 if __name__ == "__main__":

@@ -14,7 +14,6 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from douyin_publish_preflight import DEFAULT_USER_DATA_DIR, check_cdp, check_playwright
-from run_record import append_artifact, append_event, refresh_markdown
 
 
 DEFAULT_UPLOAD_URL = "https://cp.kuaishou.com/article/publish/video?tabType=1"
@@ -24,6 +23,7 @@ LOGIN_WORDS = ("立即登录", "扫码登录", "验证码登录", "手机号登�
 HARD_ERROR_WORDS = ("发布失败", "上传失败", "禁止发布", "无法发布", "安全验证", "账号异常")
 VR360_MODE_WORDS = ("正在使用VR360°全景视频上传模式", "VR360°全景视频上传模式")
 UPLOAD_IN_PROGRESS_WORDS = ("上传中", "预览转码中", "转码过程也可以发布")
+MAX_APPLIED_TAGS = 4
 
 
 def is_kuaishou_page(url: str) -> bool:
@@ -34,19 +34,19 @@ def is_publish_page(url: str) -> bool:
     return "cp.kuaishou.com/article/publish/video" in url
 
 
-def normalize_tags(tags: list[str]) -> list[str]:
+def normalize_tags(tags: list[str], limit: int | None = None) -> list[str]:
     result: list[str] = []
     for raw in tags:
         value = raw.strip().lstrip("#")
         if value and value not in result:
             result.append(value)
-    return result[:5]
+    return result if limit is None else result[:limit]
 
 
 def build_caption(title: str, description: str, tags: list[str]) -> str:
     parts = [title.strip(), description.strip()]
     caption = "\n".join(part for part in parts if part)
-    missing = [tag for tag in normalize_tags(tags) if f"#{tag}" not in caption]
+    missing = [tag for tag in normalize_tags(tags, MAX_APPLIED_TAGS) if f"#{tag}" not in caption]
     suffix = " ".join(f"#{tag}" for tag in missing)
     return "\n".join(part for part in (caption, suffix) if part)
 
@@ -373,7 +373,6 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
                 f"- 上传：{report.get('steps', {}).get('upload', {}).get('status')}",
                 f"- 文案：{report.get('steps', {}).get('copywriting', {}).get('status')}",
                 f"- AI 声明：{report.get('steps', {}).get('declaration', {}).get('status')}",
-                f"- 位置：{report.get('steps', {}).get('location', {}).get('status')}",
                 f"- 发布：{report.get('steps', {}).get('publish', {}).get('status')}",
                 "",
                 "## Errors",
@@ -386,31 +385,20 @@ def write_report(out_dir: Path, report: dict[str, Any]) -> tuple[Path, Path]:
         + "\n",
         encoding="utf-8",
     )
-    if report.get("record_jsonl"):
-        append_event(
-            report["record_jsonl"],
-            stage="publish",
-            event="kuaishou_publish",
-            status=report.get("decision"),
-            summary=f"快手发布 {report.get('decision')}",
-            data={"video": report.get("video"), "report_json": str(json_path), "steps": report.get("steps", {})},
-        )
-        append_artifact(
-            report["record_jsonl"],
-            stage="publish",
-            path=str(json_path),
-            kind="kuaishou-publish-report",
-            status=report.get("decision"),
-            keep=True,
-            summary="快手发布 JSON 报告",
-        )
-        refresh_markdown(report["record_jsonl"])
     return json_path, md_path
 
 
 def fail(report: dict[str, Any], out_dir: Path, message: str, code: int) -> int:
     report["decision"] = "blocked"
     report["errors"].append(message)
+    if "登录" in message or "验证" in message or "账号" in message:
+        report["error_category"] = "authentication"
+    elif "声明" in message:
+        report["error_category"] = "declaration"
+    elif "超时" in message and any(token in message for token in ("页面", "导航", "CDP", "表单")):
+        report["error_category"] = "navigation_timeout"
+    else:
+        report["error_category"] = "unknown"
     write_report(out_dir, report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return code
@@ -425,32 +413,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cdp-url", default=os.environ.get("KUAISHOU_CHROME_CDP_URL") or DEFAULT_CDP_URL)
     parser.add_argument("--upload-url", default=DEFAULT_UPLOAD_URL)
     parser.add_argument("--out-dir", default=None)
-    parser.add_argument("--record-jsonl", default=None)
     parser.add_argument("--upload-timeout", type=int, default=300)
     parser.add_argument("--publish-timeout", type=int, default=90)
     parser.add_argument("--declaration-timeout", type=int, default=20)
-    parser.add_argument("--location", default=None, help="兼容双平台入口；快手不设置发布地址，会忽略该参数")
-    parser.add_argument("--no-location", action="store_true", help="兼容双平台入口；快手固定不设置发布地址")
-    parser.add_argument("--location-timeout", type=int, default=15, help="兼容双平台入口；快手固定不设置发布地址")
     parser.add_argument("--no-publish", action="store_true", help="停在发布按钮前")
     parser.add_argument("--dry-run", action="store_true", help="只校验参数并生成报告")
     args = parser.parse_args(argv)
 
     video = Path(args.video).expanduser().resolve()
     out_dir = Path(args.out_dir) if args.out_dir else Path("TEMP/publish-runs") / datetime.now().strftime("%Y%m%d-%H%M%S")
+    requested_tags = normalize_tags(args.tag)
+    applied_tags = requested_tags[:MAX_APPLIED_TAGS]
     report = {
         "platform": "kuaishou",
         "decision": "pending",
         "video": str(video),
         "title": args.title,
         "description": args.description,
-        "tags": normalize_tags(args.tag),
-        "location": {"status": "skipped", "reason": "快手不设置发布地址"},
-        "record_jsonl": args.record_jsonl,
-        "steps": {"preflight": {}, "upload": {}, "copywriting": {}, "declaration": {}, "location": {}, "publish": {}},
+        "requested_tags": requested_tags,
+        "applied_tags": applied_tags,
+        "steps": {"preflight": {}, "upload": {}, "copywriting": {}, "declaration": {}, "publish": {}},
         "errors": [],
         "warnings": [],
     }
+    if len(requested_tags) > MAX_APPLIED_TAGS:
+        report["warnings"].append(
+            f"发布标签最多 {MAX_APPLIED_TAGS} 个，已仅应用前 {MAX_APPLIED_TAGS} 个"
+        )
     if not video.is_file():
         return fail(report, out_dir, f"视频文件不存在：{video}", 2)
     if not args.title.strip():
@@ -485,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:
                 return fail(report, out_dir, "快手上传后未进入可发布表单", 4)
             report["steps"]["upload"]["status"] = "uploaded-or-form-ready"
 
-            copywriting = fill_caption(page, build_caption(args.title, args.description, args.tag))
+            copywriting = fill_caption(page, build_caption(args.title, args.description, applied_tags))
             report["steps"]["copywriting"].update(copywriting)
             if copywriting["status"] != "filled":
                 return fail(report, out_dir, copywriting["reason"], 5)
@@ -494,8 +483,6 @@ def main(argv: list[str] | None = None) -> int:
             report["steps"]["declaration"].update(declaration)
             if declaration["status"] != "set":
                 return fail(report, out_dir, declaration["reason"], 6)
-
-            report["steps"]["location"].update({"status": "skipped", "reason": "快手不设置发布地址"})
 
             upload_complete = wait_for_upload_complete(page, args.upload_timeout)
             report["steps"]["upload"]["complete"] = upload_complete

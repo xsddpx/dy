@@ -20,7 +20,7 @@
 以下问题不属于环境修复：
 
 - TNS/安全拦截；按对应生成模块的 `v1-v5` 收敛规则处理。
-- `grid-prompt.txt` 或派生 prompt 不合格。
+- `vid-prompt-vN.txt` 或统一 workflow 配置不合格。
 - 视频审美失败、角色不像、动作不好、画面质量不达标。
 - 平台正常审核中、发布后数据表现不佳。
 
@@ -38,7 +38,7 @@
 
 - 固定 CDP 地址为 `http://127.0.0.1:9222`。
 - 启动脚本从普通 Chrome 当前使用的 Profile 初始化独立 CDP 数据目录；普通 Chrome 与 CDP Chrome 可并存，需要重新同步登录态时使用 `--refresh-from-browser`。
-- 自动化默认使用 Playwright `connect_over_cdp` 接管该浏览器；AppleScript 和系统文件选择器仅作为兼容兜底。静态端口预检不能替代真实 CDP 接管验证。
+- 自动化只使用 Playwright `connect_over_cdp` 接管该浏览器；不再保留 AppleScript 或系统文件选择器路径。静态端口预检不能替代真实 CDP 接管验证。
 - 需要启动或刷新 CDP Chrome 时使用：
 
 ```bash
@@ -94,7 +94,7 @@ zsh TOOLS/open_cdp_chrome.sh 9222
 ### 2026-07-01 抖音上传页 CDP 导航超时
 - 症状：`douyin_publish_helper.py` 预检通过，但打开 `https://creator.douyin.com/creator-micro/content/upload` 时 `Page.goto` 在 20 秒 `domcontentloaded` 等待内超时；快手可正常发布。
 - 根因：抖音创作者中心上传页偶发加载慢，默认 `--cdp-timeout 20` 不足以完成首轮 Playwright-CDP 导航和文件输入接管。
-- 修复动作：只重试抖音单平台，保留原视频、标题、标签和 `--no-location`，将 `--cdp-timeout` 放宽到 `60`。
+- 修复动作：只重试抖音单平台，保留原视频、标题和候选标签；无位置合同由发布入口固定执行。
 - 验证：同一条 `RUN_ID` 用抖音单平台重试完成上传、中间帧封面、`内容由AI生成` 自主声明和发布，报告返回 `published`。
 - 下次判断：若 CDP/登录态预检均通过且失败点只是上传页 `Page.goto` 超时，优先单平台重试并加 `--cdp-timeout 60`；只跳过同一 `RUN_ID`、同一成片、同一平台已 `published` 的完全相同发布动作，不按日期或条数限制后续发布。
 

@@ -102,14 +102,10 @@ class PublishAdapterTest(unittest.TestCase):
                 "好心情",
                 "--tag",
                 "穿搭",
-                "--location",
-                "杭州 湖滨",
                 "--cdp-url",
                 "http://127.0.0.1:9222",
                 "--out-dir",
                 str(out_dir),
-                "--record-jsonl",
-                str(out_dir / "run.jsonl"),
             ]
             with mock.patch.object(MODULE.subprocess, "call", side_effect=fake_call):
                 MODULE.main(["both", *passthrough])
@@ -118,7 +114,7 @@ class PublishAdapterTest(unittest.TestCase):
         for command in calls:
             self.assertEqual(command[2:], passthrough)
 
-    def test_both_adapter_defaults_to_no_location(self):
+    def test_both_adapter_has_no_location_interface(self):
         with tempfile.TemporaryDirectory() as tmp:
             out_dir = Path(tmp)
             calls = []
@@ -144,12 +140,48 @@ class PublishAdapterTest(unittest.TestCase):
 
         self.assertEqual(len(calls), 2)
         for command in calls:
-            self.assertIn("--no-location", command)
+            self.assertNotIn("--no-location", command)
             self.assertNotIn("--location", command)
 
     def test_unknown_adapter_has_actionable_error(self):
         with self.assertRaisesRegex(ValueError, "未知发布平台"):
             MODULE.get_adapter("unknown")
+
+    def test_navigation_timeout_retries_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            calls = []
+
+            def fake_call(command):
+                calls.append(command)
+                platform = Path(command[1]).name.split("_", 1)[0]
+                path = out_dir / f"{platform}-publish-report.json"
+                if len(calls) == 1:
+                    path.write_text('{"decision":"failed","error_category":"navigation_timeout"}', encoding="utf-8")
+                    return 8
+                path.write_text('{"decision":"published"}', encoding="utf-8")
+                return 0
+
+            with mock.patch.object(MODULE.subprocess, "call", side_effect=fake_call):
+                result = MODULE.run_platform("douyin", ["demo.mp4", "--out-dir", str(out_dir)], out_dir)
+            self.assertEqual(result["decision"], "published")
+            self.assertEqual(len(calls), 2)
+
+    def test_authentication_failure_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            calls = []
+
+            def fake_call(command):
+                calls.append(command)
+                (out_dir / "douyin-publish-report.json").write_text(
+                    '{"decision":"failed","error_category":"authentication"}', encoding="utf-8"
+                )
+                return 3
+
+            with mock.patch.object(MODULE.subprocess, "call", side_effect=fake_call):
+                MODULE.run_platform("douyin", ["demo.mp4", "--out-dir", str(out_dir)], out_dir)
+            self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

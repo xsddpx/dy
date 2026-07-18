@@ -1,45 +1,41 @@
 #!/usr/bin/env python3
-"""Allocate, validate, audit, migrate, and roll back canonical dy workspaces."""
+"""Allocate, validate, and audit canonical dy workspaces."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
 import re
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
-import uuid
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import prompt_lint
 from run_record import append_event, refresh_markdown
+from workflow_config import config_sha256, load_workflow_config, project_path
 
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 RUN_ID_RE = re.compile(r"^\d{8}-\d{6}(?:-\d{2})?$")
-LEGACY_TIME_RE = re.compile(r"^(?:dy-)?(?P<date>\d{8})-(?P<time>\d{4}|\d{6})(?:-|$)")
-TEXT_SUFFIXES = {".json", ".jsonl", ".md", ".txt", ".log"}
-LOCK_NAME = ".run-id-migration.lock"
-MIGRATIONS_DIR = "_run-id-migrations"
-VALID_DURATIONS = {5, 6, 7}
+WORKFLOW_CONFIG = load_workflow_config()
+GENERATION_CONFIG = WORKFLOW_CONFIG["generation"]
+ASSET_CONFIG = WORKFLOW_CONFIG["assets"]
+VALID_DURATIONS = set(GENERATION_CONFIG["valid_durations"])
 VALID_ROUTES = {"xdy", "xdysp"}
 VALID_PUBLISH_MODES = {"default", "not_requested", "awaiting_confirmation"}
-VALID_OUTCOMES = {"success", "generation_failed", "quality_failed", "cancelled"}
+VALID_OUTCOMES = {"success", "generation_failed", "quality_failed", "publish_failed", "cancelled"}
 FORMAL_ENVIRONMENT_RE = re.compile(r"^anna-room-\d{2,}\.png$")
 CONTRACTS_DIR = Path("logs/contracts")
-VIDEO_RATIO = "9:16"
-VIDEO_RESOLUTION = "720p"
-VIDEO_WIDTH = 720
-VIDEO_HEIGHT = 1280
+VIDEO_RATIO = GENERATION_CONFIG["ratio"]
+VIDEO_RESOLUTION = GENERATION_CONFIG["video_resolution"]
+VIDEO_WIDTH = int(GENERATION_CONFIG["width"])
+VIDEO_HEIGHT = int(GENERATION_CONFIG["height"])
 VIDEO_DURATION_TOLERANCE = 0.75
 
 
@@ -62,33 +58,6 @@ def output_root(root: Path) -> Path:
     return root / "OUTPUT"
 
 
-def lock_path(root: Path) -> Path:
-    return temp_root(root) / LOCK_NAME
-
-
-@contextmanager
-def migration_lock(root: Path) -> Iterator[None]:
-    temp_root(root).mkdir(parents=True, exist_ok=True)
-    path = lock_path(root)
-    try:
-        path.mkdir()
-        (path / "owner.json").write_text(
-            json.dumps(
-                {"pid": os.getpid(), "created_at": datetime.now(SHANGHAI).isoformat()},
-                ensure_ascii=False,
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-    except FileExistsError as exc:
-        raise WorkspaceError(f"迁移锁已存在：{path}") from exc
-    try:
-        yield
-    finally:
-        shutil.rmtree(path, ignore_errors=True)
-
-
 def parse_time(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -102,50 +71,6 @@ def parse_time(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=SHANGHAI)
     return parsed.astimezone(SHANGHAI)
-
-
-def read_jsonl_events(path: Path) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        return events
-    for line in lines:
-        if not line.strip():
-            continue
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(item, dict):
-            events.append(item)
-    return events
-
-
-def timestamp_for_run(run_dir: Path, record: Path) -> tuple[datetime, str]:
-    events = read_jsonl_events(record)
-    for event in events:
-        if event.get("stage") == "run" and event.get("event") == "started":
-            for key in ("created_at", "ts"):
-                parsed = parse_time(event.get(key))
-                if parsed:
-                    return parsed, f"run/started.{key}"
-    for event in events:
-        for key in ("created_at", "ts"):
-            parsed = parse_time(event.get(key))
-            if parsed:
-                return parsed, f"first_event.{key}"
-    match = LEGACY_TIME_RE.match(run_dir.name)
-    if match:
-        time_text = match.group("time")
-        if len(time_text) == 4:
-            time_text += "00"
-        parsed = datetime.strptime(match.group("date") + time_text, "%Y%m%d%H%M%S")
-        return parsed.replace(tzinfo=SHANGHAI), "legacy_name"
-    mtimes = [path.stat().st_mtime for path in run_dir.rglob("*") if path.is_file()]
-    if mtimes:
-        return datetime.fromtimestamp(min(mtimes), SHANGHAI), "earliest_file_mtime"
-    raise WorkspaceError(f"无法确定历史运行时间：{run_dir}")
 
 
 def canonical_base(value: datetime) -> str:
@@ -165,8 +90,6 @@ def formal_runs(root: Path) -> list[tuple[str, Path, Path]]:
 
 
 def allocate_run_dir(root: Path, when: datetime) -> tuple[str, Path]:
-    if lock_path(root).exists():
-        raise WorkspaceError("历史迁移正在进行，暂不创建新运行")
     base = canonical_base(when)
     candidates = [base, *(f"{base}-{index:02d}" for index in range(1, 100))]
     temp_root(root).mkdir(parents=True, exist_ok=True)
@@ -223,164 +146,6 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def output_for_old_id(root: Path, old_id: str) -> Path | None:
-    candidates = [output_root(root) / f"{old_id}.mp4"]
-    if old_id.startswith("dy-"):
-        candidates.append(output_root(root) / f"{old_id.removeprefix('dy-')}.mp4")
-    existing = [path for path in candidates if path.is_file()]
-    if len(existing) > 1:
-        raise WorkspaceError(f"历史成片匹配不唯一：{old_id} -> {existing}")
-    return existing[0] if existing else None
-
-
-def build_migration_plan(root: Path) -> dict[str, Any]:
-    runs = formal_runs(root)
-    source_names = {old_id for old_id, _, _ in runs}
-    reserved_names = {
-        path.name
-        for path in temp_root(root).iterdir()
-        if path.is_dir() and path.name not in source_names
-    }
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for old_id, directory, record in runs:
-        stamp, source = timestamp_for_run(directory, record)
-        grouped.setdefault(canonical_base(stamp), []).append(
-            {
-                "old_id": old_id,
-                "timestamp": stamp.isoformat(),
-                "timestamp_source": source,
-            }
-        )
-
-    entries: list[dict[str, Any]] = []
-    assigned: set[str] = set()
-    for base in sorted(grouped):
-        index = 0
-        for item in sorted(grouped[base], key=lambda value: value["old_id"]):
-            while True:
-                if index > 99:
-                    raise WorkspaceError(f"同一秒的历史 RUN_ID 超过 100 个：{base}")
-                candidate = base if index == 0 else f"{base}-{index:02d}"
-                index += 1
-                if candidate not in reserved_names and candidate not in assigned:
-                    break
-            assigned.add(candidate)
-            old_id = item["old_id"]
-            output = output_for_old_id(root, old_id)
-            entry = {**item, "new_id": candidate}
-            if output:
-                entry["output_old"] = str(output.relative_to(root))
-                entry["output_new"] = f"OUTPUT/{candidate}.mp4"
-                entry["output_size"] = output.stat().st_size
-                entry["output_sha256"] = sha256_file(output)
-            entries.append(entry)
-
-    output_sources = [entry["output_old"] for entry in entries if entry.get("output_old")]
-    if len(output_sources) != len(set(output_sources)):
-        raise WorkspaceError("同一个历史成片被多个运行匹配")
-    output_targets = [entry["output_new"] for entry in entries if entry.get("output_new")]
-    if len(output_targets) != len(set(output_targets)):
-        raise WorkspaceError("多个历史成片映射到了同一目标")
-    source_set = set(output_sources)
-    for target in output_targets:
-        if (root / target).exists() and target not in source_set:
-            raise WorkspaceError(f"迁移目标成片已被占用：{target}")
-    return {
-        "schema_version": 1,
-        "created_at": datetime.now(SHANGHAI).isoformat(),
-        "root": str(root),
-        "status": "planned",
-        "run_count": len(entries),
-        "output_count": len(output_sources),
-        "entries": sorted(entries, key=lambda value: value["old_id"]),
-    }
-
-
-def replacement_pairs(entry: dict[str, Any]) -> list[tuple[str, str]]:
-    old_id = entry["old_id"]
-    new_id = entry["new_id"]
-    pairs = [
-        (f"TEMP/{old_id}", f"TEMP/{new_id}"),
-        (f"{old_id}-run-record.jsonl", f"{new_id}-run-record.jsonl"),
-        (f"{old_id}-run-record.md", f"{new_id}-run-record.md"),
-        (f"{old_id}-run-summary.md", f"{new_id}-run-summary.md"),
-        (f"{old_id}-summary.json", f"{new_id}-summary.json"),
-    ]
-    output_old = entry.get("output_old")
-    if output_old:
-        pairs.append((output_old, entry["output_new"]))
-    pairs.append((f"OUTPUT/{old_id}.mp4", f"OUTPUT/{new_id}.mp4"))
-    return pairs
-
-
-def rewrite_text(text: str, entry: dict[str, Any]) -> str:
-    updated = text
-    for old, new in replacement_pairs(entry):
-        updated = updated.replace(old, new)
-    old_id = re.escape(entry["old_id"])
-    new_id = entry["new_id"]
-    updated = re.sub(
-        rf'("run_id"\s*:\s*"){old_id}(")',
-        lambda match: match.group(1) + new_id + match.group(2),
-        updated,
-    )
-    updated = updated.replace(f"# {entry['old_id']} 运行记录", f"# {new_id} 运行记录")
-    return updated
-
-
-def known_identity_filename(name: str, old_id: str, new_id: str) -> str:
-    suffixes = (
-        "-run-record.jsonl",
-        "-run-record.md",
-        "-run-summary.md",
-        "-summary.json",
-    )
-    if name.startswith(old_id) and name[len(old_id) :] in suffixes:
-        return new_id + name[len(old_id) :]
-    return name
-
-
-def collect_changes(root: Path, plan: dict[str, Any]) -> tuple[list[str], list[dict[str, str]]]:
-    changed_text: list[str] = []
-    file_renames: list[dict[str, str]] = []
-    for entry in plan["entries"]:
-        old_id = entry["old_id"]
-        new_id = entry["new_id"]
-        run_dir = temp_root(root) / old_id
-        for path in run_dir.rglob("*"):
-            if not path.is_file():
-                continue
-            relative_inside = path.relative_to(run_dir)
-            new_name = known_identity_filename(path.name, old_id, new_id)
-            if new_name != path.name:
-                new_relative_inside = relative_inside.with_name(new_name)
-                file_renames.append(
-                    {
-                        "old": str(path.relative_to(root)),
-                        "new": str((temp_root(root) / new_id / new_relative_inside).relative_to(root)),
-                    }
-                )
-                if path.suffix.lower() in TEXT_SUFFIXES:
-                    changed_text.append(str(path.relative_to(root)))
-            if path.suffix.lower() not in TEXT_SUFFIXES:
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            if rewrite_text(text, entry) != text:
-                changed_text.append(str(path.relative_to(root)))
-    return sorted(set(changed_text)), file_renames
-
-
-def write_backup(root: Path, migration_dir: Path, changed_text: list[str]) -> Path:
-    backup = migration_dir / "text-backup.tar.gz"
-    with tarfile.open(backup, "w:gz") as archive:
-        for relative in changed_text:
-            archive.add(root / relative, arcname=relative, recursive=False)
-    return backup
-
-
 def safe_write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
@@ -388,211 +153,6 @@ def safe_write_json(path: Path, value: dict[str, Any]) -> None:
         handle.write("\n")
         temporary = Path(handle.name)
     temporary.replace(path)
-
-
-def stage_and_move(root: Path, plan: dict[str, Any], *, reverse: bool = False) -> None:
-    token = uuid.uuid4().hex[:10]
-    temp_stage = temp_root(root) / f".run-id-stage-{token}"
-    output_stage = output_root(root) / f".run-id-stage-{token}"
-    temp_stage.mkdir()
-    output_stage.mkdir()
-    moved_temp: list[tuple[Path, Path, Path]] = []
-    moved_output: list[tuple[Path, Path, Path]] = []
-    try:
-        for index, entry in enumerate(plan["entries"]):
-            source_id = entry["new_id"] if reverse else entry["old_id"]
-            target_id = entry["old_id"] if reverse else entry["new_id"]
-            source = temp_root(root) / source_id
-            target = temp_root(root) / target_id
-            staged = temp_stage / f"{index:04d}"
-            if not source.is_dir():
-                raise WorkspaceError(f"待迁移运行目录不存在：{source}")
-            source.rename(staged)
-            moved_temp.append((source, staged, target))
-        for index, entry in enumerate(item for item in plan["entries"] if item.get("output_old")):
-            source_rel = entry["output_new"] if reverse else entry["output_old"]
-            target_rel = entry["output_old"] if reverse else entry["output_new"]
-            source = root / source_rel
-            target = root / target_rel
-            staged = output_stage / f"{index:04d}.mp4"
-            if not source.is_file():
-                raise WorkspaceError(f"待迁移成片不存在：{source}")
-            source.rename(staged)
-            moved_output.append((source, staged, target))
-        for _, staged, target in moved_temp:
-            if target.exists():
-                raise WorkspaceError(f"目标运行目录已存在：{target}")
-            staged.rename(target)
-        for _, staged, target in moved_output:
-            if target.exists():
-                raise WorkspaceError(f"目标成片已存在：{target}")
-            staged.rename(target)
-    except Exception:
-        # Put anything still staged or already finalized back at its source.
-        for source, staged, target in reversed(moved_output):
-            current = staged if staged.exists() else target
-            if current.exists() and not source.exists():
-                current.rename(source)
-        for source, staged, target in reversed(moved_temp):
-            current = staged if staged.exists() else target
-            if current.exists() and not source.exists():
-                current.rename(source)
-        raise
-    finally:
-        shutil.rmtree(temp_stage, ignore_errors=True)
-        shutil.rmtree(output_stage, ignore_errors=True)
-
-
-def apply_internal_changes(root: Path, plan: dict[str, Any]) -> None:
-    renames_by_old = {item["old"]: item["new"] for item in plan["file_renames"]}
-    changed_set = set(plan["changed_text"])
-    for entry in plan["entries"]:
-        old_id = entry["old_id"]
-        new_id = entry["new_id"]
-        run_dir = temp_root(root) / new_id
-        relevant_renames = [
-            (old, new)
-            for old, new in renames_by_old.items()
-            if old.startswith(f"TEMP/{old_id}/")
-        ]
-        for old_rel, new_rel in sorted(relevant_renames, key=lambda item: item[0].count("/"), reverse=True):
-            inside = Path(old_rel).relative_to("TEMP", old_id)
-            source = run_dir / inside
-            target = root / new_rel
-            target.parent.mkdir(parents=True, exist_ok=True)
-            source.rename(target)
-        for old_rel in sorted(path for path in changed_set if path.startswith(f"TEMP/{old_id}/")):
-            new_rel = renames_by_old.get(old_rel)
-            if new_rel:
-                path = root / new_rel
-            else:
-                inside = Path(old_rel).relative_to("TEMP", old_id)
-                path = run_dir / inside
-            text = path.read_text(encoding="utf-8")
-            updated = rewrite_text(text, entry)
-            if updated != text:
-                path.write_text(updated, encoding="utf-8")
-
-
-def restore_internal_changes(root: Path, plan: dict[str, Any], migration_dir: Path) -> None:
-    for item in sorted(plan.get("file_renames", []), key=lambda value: value["new"].count("/"), reverse=True):
-        old_path = root / item["old"]
-        new_path = root / item["new"]
-        # Directories have already been restored, so translate the new run prefix to old.
-        parts = Path(item["new"]).parts
-        new_id = parts[1]
-        entry = next(value for value in plan["entries"] if value["new_id"] == new_id)
-        translated = temp_root(root) / entry["old_id"] / Path(*parts[2:])
-        if translated.exists() and translated != old_path:
-            translated.unlink()
-    backup = migration_dir / "text-backup.tar.gz"
-    if backup.is_file():
-        with tarfile.open(backup, "r:gz") as archive:
-            # Archive members are generated from repository-relative paths by this tool.
-            archive.extractall(root)
-
-
-def verify_plan(root: Path, plan: dict[str, Any], *, applied: bool) -> list[str]:
-    errors: list[str] = []
-    for entry in plan["entries"]:
-        expected_id = entry["new_id"] if applied else entry["old_id"]
-        unexpected_id = entry["old_id"] if applied else entry["new_id"]
-        directory = temp_root(root) / expected_id
-        if not directory.is_dir():
-            errors.append(f"运行目录缺失：TEMP/{expected_id}")
-            continue
-        record = directory / f"{expected_id}-run-record.jsonl"
-        if not record.is_file():
-            errors.append(f"运行记录缺失：{record.relative_to(root)}")
-        if applied and unexpected_id != expected_id and (temp_root(root) / unexpected_id).exists():
-            errors.append(f"旧运行目录仍存在：TEMP/{unexpected_id}")
-        if entry.get("output_old"):
-            output_rel = entry["output_new"] if applied else entry["output_old"]
-            output = root / output_rel
-            if not output.is_file():
-                errors.append(f"成片缺失：{output_rel}")
-            else:
-                if output.stat().st_size != entry["output_size"]:
-                    errors.append(f"成片大小变化：{output_rel}")
-                elif sha256_file(output) != entry["output_sha256"]:
-                    errors.append(f"成片哈希变化：{output_rel}")
-        if applied and entry["old_id"] != entry["new_id"]:
-            old_temp_token = f"TEMP/{entry['old_id']}"
-            old_output_tokens = {f"OUTPUT/{entry['old_id']}.mp4"}
-            if entry.get("output_old"):
-                old_output_tokens.add(entry["output_old"])
-            for path in directory.rglob("*"):
-                if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
-                    continue
-                try:
-                    text = path.read_text(encoding="utf-8")
-                except (OSError, UnicodeDecodeError):
-                    continue
-                if old_temp_token in text:
-                    errors.append(f"旧 TEMP 路径残留：{path.relative_to(root)}")
-                    break
-                if any(token in text for token in old_output_tokens):
-                    errors.append(f"旧 OUTPUT 路径残留：{path.relative_to(root)}")
-                    break
-    return errors
-
-
-def apply_migration(root: Path, plan: dict[str, Any]) -> Path:
-    migration_id = datetime.now(SHANGHAI).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
-    migration_dir = temp_root(root) / MIGRATIONS_DIR / migration_id
-    migration_dir.mkdir(parents=True)
-    changed_text, file_renames = collect_changes(root, plan)
-    plan["migration_id"] = migration_id
-    plan["changed_text"] = changed_text
-    plan["file_renames"] = file_renames
-    plan["status"] = "prepared"
-    manifest = migration_dir / "manifest.json"
-    safe_write_json(manifest, plan)
-    write_backup(root, migration_dir, changed_text)
-    moved = False
-    try:
-        stage_and_move(root, plan)
-        moved = True
-        apply_internal_changes(root, plan)
-        errors = verify_plan(root, plan, applied=True)
-        if errors:
-            raise WorkspaceError("迁移后验证失败：\n- " + "\n- ".join(errors))
-    except Exception:
-        try:
-            if moved:
-                stage_and_move(root, plan, reverse=True)
-                restore_internal_changes(root, plan, migration_dir)
-            plan["status"] = "rolled_back_after_failure"
-        finally:
-            safe_write_json(manifest, plan)
-        raise
-    plan["status"] = "applied"
-    plan["applied_at"] = datetime.now(SHANGHAI).isoformat()
-    safe_write_json(manifest, plan)
-    return manifest
-
-
-def rollback_migration(root: Path, manifest: Path) -> dict[str, Any]:
-    plan = json.loads(manifest.read_text(encoding="utf-8"))
-    if plan.get("status") != "applied":
-        raise WorkspaceError(f"迁移状态不可回滚：{plan.get('status')}")
-    for entry in plan["entries"]:
-        old_path = temp_root(root) / entry["old_id"]
-        if old_path.exists() and old_path != temp_root(root) / entry["new_id"]:
-            raise WorkspaceError(f"回滚目标已被占用：{old_path}")
-        if entry.get("output_old"):
-            old_output = root / entry["output_old"]
-            if old_output.exists() and old_output != root / entry["output_new"]:
-                raise WorkspaceError(f"回滚成片目标已被占用：{old_output}")
-    stage_and_move(root, plan, reverse=True)
-    restore_internal_changes(root, plan, manifest.parent)
-    errors = verify_plan(root, plan, applied=False)
-    if errors:
-        raise WorkspaceError("回滚后验证失败：\n- " + "\n- ".join(errors))
-    plan["status"] = "rolled_back"
-    plan["rolled_back_at"] = datetime.now(SHANGHAI).isoformat()
-    safe_write_json(manifest, plan)
-    return plan
 
 
 def read_contract_events(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
@@ -753,28 +313,20 @@ def validate_pre_generation_contract(
     if prompt_version not in range(1, 6):
         errors.append(f"prompt 版本必须是 v1-v5，实际为 v{prompt_version}")
 
-    grid_prompt = directory / "grid-prompt.txt"
     video_prompt = directory / f"vid-prompt-v{prompt_version}.txt"
     environment_lock = directory / "environment-path.txt"
-    role_image = (root / "MATERIAL" / "fixed-role" / "anna.png").resolve()
+    role_image = project_path(root, ASSET_CONFIG["role_image"])
     environment_image, environment_errors = locked_environment_image(root, directory)
     errors.extend(environment_errors)
 
-    if not grid_prompt.is_file():
-        errors.append("本次运行缺少 grid-prompt.txt")
     if not video_prompt.is_file():
         errors.append(f"本次运行缺少 {video_prompt.name}")
     if not role_image.is_file():
-        errors.append("固定角色图不存在：MATERIAL/fixed-role/anna.png")
+        errors.append(f"固定角色图不存在：{ASSET_CONFIG['role_image']}")
 
     if video_prompt.is_file():
         video_text = video_prompt.read_text(encoding="utf-8")
-        if grid_prompt.is_file():
-            grid_text = grid_prompt.read_text(encoding="utf-8")
-            expected = prompt_lint.derive_prompt(grid_text, "fast")
-            if video_text != expected:
-                errors.append(f"{video_prompt.name} 不是由当前 grid-prompt.txt 机械派生")
-        lint = prompt_lint.lint_derived_prompt(video_text, video_prompt, "fast")
+        lint = prompt_lint.lint_text(video_text, video_prompt)
         facts["prompt_lint"] = lint["decision"]
         if lint["decision"] != "pass":
             codes = sorted({item["code"] for item in lint["findings"] if item["severity"] == "error"})
@@ -794,7 +346,7 @@ def validate_pre_generation_contract(
     if not errors and write_manifest:
         manifest_path = generation_manifest_path(directory, prompt_version)
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "decision": "pass",
             "phase": "pre-generation",
             "run_id": run_id,
@@ -806,6 +358,8 @@ def validate_pre_generation_contract(
             "reference_images": reference_images,
             "prompt": str(video_prompt.relative_to(root)),
             "environment_lock": str(environment_lock.relative_to(root)),
+            "workflow_config": "MATERIAL/xdy-workflow.json",
+            "workflow_config_sha256": config_sha256(),
             "sha256": {
                 "role_image": sha256_file(role_image),
                 "environment_image": sha256_file(environment_image),
@@ -823,6 +377,8 @@ def validate_pre_generation_contract(
                     errors.append(f"已有合同清单与当前输入不同，拒绝覆盖：{manifest_path.relative_to(root)}")
         else:
             safe_write_json(manifest_path, manifest)
+        if manifest_path.is_file():
+            facts["manifest_sha256"] = sha256_file(manifest_path)
     return contract_result(
         phase="pre-generation",
         run_id=run_id,
@@ -937,8 +493,10 @@ def validate_generation_evidence(
         errors.append("生成前合同清单必须是 JSON 对象")
         return errors, facts
 
+    manifest_schema = manifest.get("schema_version")
+    if manifest_schema not in {1, 2}:
+        errors.append(f"生成前合同清单 schema_version 不受支持：{manifest_schema!r}")
     expected_fields = {
-        "schema_version": 1,
         "decision": "pass",
         "phase": "pre-generation",
         "run_id": run_id,
@@ -953,6 +511,11 @@ def validate_generation_evidence(
     for key, expected in expected_fields.items():
         if manifest.get(key) != expected:
             errors.append(f"生成前合同清单字段 {key} 不匹配：应为 {expected!r}")
+    if manifest_schema == 2:
+        if manifest.get("workflow_config") != "MATERIAL/xdy-workflow.json":
+            errors.append("生成前合同清单未引用统一 workflow 配置")
+        if manifest.get("workflow_config_sha256") != config_sha256():
+            errors.append("统一 workflow 配置在提交后发生变化")
 
     raw_references = manifest.get("reference_images")
     if not reference_images_are_absolute(raw_references):
@@ -976,6 +539,16 @@ def validate_generation_evidence(
             errors.append(f"生成后合同输入缺失：{key}")
         elif sha256_file(target) != hashes.get(key):
             errors.append(f"生成后合同输入发生变化：{key}")
+
+    submit_event = latest_versioned_event(events, "dreamina", "submitted", version_text)
+    if submit_event is not None:
+        submit_data = event_data(submit_event)
+        manifest_relative = str(manifest_path.relative_to(root))
+        if submit_data.get("manifest") != manifest_relative:
+            errors.append("Dreamina submitted 记录的 manifest 路径不一致")
+        if submit_data.get("manifest_sha256") != sha256_file(manifest_path):
+            errors.append("Dreamina submitted 记录的 manifest_sha256 不一致")
+        return errors, facts
 
     submit_event = latest_versioned_event(events, "dreamina", "submit", version_text)
     if submit_event is None:
@@ -1046,7 +619,7 @@ def validate_finalize_contract(
         errors.append(f"未知运行结果：{outcome}")
     if route == "xdysp" and publish_mode != "not_requested":
         errors.append("xdysp 的发布模式必须是 not_requested")
-    if outcome != "success" and publish_mode != "not_requested":
+    if outcome not in {"success", "publish_failed"} and publish_mode != "not_requested":
         errors.append("失败或取消路线的发布模式必须是 not_requested")
     if publish_mode == "awaiting_confirmation":
         errors.append("awaiting_confirmation 是等待态，不能通过收尾合同门禁")
@@ -1070,17 +643,21 @@ def validate_finalize_contract(
         terminal_data = event_data(terminal)
         if terminal is None or str(terminal.get("status") or "").lower() not in {"failed", "blocked"}:
             errors.append("生成失败路线缺少 Dreamina failed/blocked 终态")
-        if terminal_data.get("version") != "v5":
+        terminal_version = str(terminal_data.get("version") or "")
+        terminal_match = re.fullmatch(r"v([1-5])", terminal_version)
+        if terminal_match is None:
+            errors.append("生成失败路线必须明确记录 v1-v5")
+        if terminal_data.get("reason_category") == "tns" and terminal_version != "v5":
             errors.append("TNS 生成失败路线必须收敛并记录至 v5")
-        if terminal_data.get("reason_category") != "tns":
-            errors.append("生成失败路线必须明确记录 reason_category: tns")
+        if not terminal_data.get("reason_category"):
+            errors.append("生成失败路线必须明确记录 reason_category")
         evidence_errors, evidence_facts = validate_generation_evidence(
             root,
             directory,
             run_id,
             route=route,
             duration=duration,
-            prompt_version=5,
+            prompt_version=int(terminal_match.group(1)) if terminal_match else 1,
             events=events,
         )
         errors.extend(evidence_errors)
@@ -1246,6 +823,10 @@ def validate_finalize_contract(
                 value == "published" for value in platform_decisions
             ):
                 errors.append("publish/both_publish=blocked 与单平台结果不一致")
+            if outcome == "success" and both_status != "published":
+                errors.append("运行结果 success 要求双平台发布均为 published")
+            if outcome == "publish_failed" and both_status != "blocked":
+                errors.append("运行结果 publish_failed 要求双平台聚合状态为 blocked")
             if publish_event is not both_event:
                 errors.append("publish/both_publish 必须是最新发布终态")
 
@@ -1325,12 +906,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("audit", help="审计正式运行目录与成片命名")
 
-    migrate_parser = subparsers.add_parser("migrate", help="预演或执行历史 RUN_ID 迁移")
-    migrate_parser.add_argument("--apply", action="store_true", help="实际执行；默认只预演")
-
-    rollback_parser = subparsers.add_parser("rollback", help="按 manifest 回滚已执行迁移")
-    rollback_parser.add_argument("manifest")
-
     contract_parser = subparsers.add_parser("contract", help="执行生成前或收尾合同门禁")
     contract_parser.add_argument("run_id")
     contract_parser.add_argument(
@@ -1400,22 +975,6 @@ def main() -> int:
                 )
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result["decision"] == "pass" else 1
-        if args.command == "migrate":
-            if not args.apply:
-                plan = build_migration_plan(root)
-                print(json.dumps(plan, ensure_ascii=False, indent=2))
-                return 0
-            with migration_lock(root):
-                plan = build_migration_plan(root)
-                manifest = apply_migration(root, plan)
-            print(json.dumps({"status": "applied", "manifest": str(manifest)}, ensure_ascii=False, indent=2))
-            return 0
-        if args.command == "rollback":
-            manifest = Path(args.manifest).resolve()
-            with migration_lock(root):
-                result = rollback_migration(root, manifest)
-            print(json.dumps({"status": result["status"], "manifest": str(manifest)}, ensure_ascii=False, indent=2))
-            return 0
     except (WorkspaceError, OSError, json.JSONDecodeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
         return 2

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "generation": {
+    "model_version": "seedance2.0_vip",
+    "ratio": "9:16",
+    "video_resolution": "720p",
+    "width": 720,
+    "height": 1280,
+    "valid_durations": [5, 6, 7],
+    "max_prompt_version": 5
+  },
+  "assets": {
+    "role_image": "MATERIAL/fixed-role/anna.png",
+    "environment_directory": "MATERIAL/fixed-environment",
+    "environment_pattern": "anna-room-\\d{2,}\\.png",
+    "wardrobe": "MATERIAL/anna-wardrobe.md"
+  },
+  "prompt": {
+    "sections": ["人物", "视频约束", "穿搭", "环境", "人物动作", "背景音乐", "其他"],
+    "person": "@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；脸部严格参考左下角大脸，身材严格参考正面、侧面和背面全身图，保持同一人物的脸部身份与身材一致。画面中只出现这一位成年女性。",
+    "video_constraint": "固定拍摄，单一连续膝盖以上中景；机位高度大致与人物胸部齐平；人物位于画面中央并贴近墙面，动作范围保持在墙前半步内；头顶保留适度空间，双肩、上身、腰线、腰胯与膝上区域完整清晰，画面下缘稳定落在膝盖附近，脚部始终位于画外；机位、视角、景别和构图全程保持不变；全程保持正常速度，不使用慢动作。",
+    "environment": "@图2 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
+    "music": "轻松时尚的电子纯音乐，稳定柔和节拍，中速，氛围自然自信。",
+    "other_base": "写实摄影风格，真实人物质感，均匀柔和的真实室内光影，真实皮肤纹理，真实面部结构，真实头发丝细节，真实服装材质，符合物理规律的光照和阴影，自然景深，真实镜头质感，真实环境透视，真实色彩。",
+    "other_suffix": "人物肩背与墙面保持自然贴靠接触，墙上呈现轻微柔边低对比度投影，投影随动作同步变化；服装颜色、面料、领型、袖型、层次、腰线位置与下装版型全程一致，衣料仅随动作自然形变；构图稳定，呈现单一连续完整竖屏画面，人物、衣料、墙面接触和投影均保持物理真实。",
+    "actions": {
+      "01": {
+        "name": "靠墙完整侧身转回",
+        "preferred_duration": 7,
+        "text": "人物贴近墙面从正面站姿开始，肩背自然靠墙；全身沿墙面原地同步向左转至清晰的侧身姿态，一侧肩背始终轻靠墙面，侧身短暂停留后再沿墙面转回正面。转身过程中在适当时机自然融入撩头发、整理衣服、看向镜头、表情变化、叉腰、手放胸前等动作，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。转身幅度明确，动作舒展流畅、衔接自然，整体呈现甜美亲切、自然有韵律的状态。"
+      },
+      "02": {
+        "name": "靠墙自然摆姿回正",
+        "preferred_duration": 6,
+        "text": "人物贴近墙面从正面自然站姿开始，肩背自然靠墙；在原地摆出一个常见的女性拍照姿态，短暂停留后恢复正面自然站姿，随后面向镜头比心或比出 V 手势。动作过程中可自然融入撩头发、视线移动和表情变化，人物位置保持稳定，墙上轻微投影随动作同步变化。整体动作清晰流畅、衔接自然。"
+      },
+      "03": {
+        "name": "肩颈微转",
+        "preferred_duration": 5,
+        "text": "人物贴近墙面从半侧身站姿开始，一侧肩背轻靠墙面；保持半侧身状态，转动肩颈面向镜头，短暂停留后自然偏头。人物位置保持稳定，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。整体动作清晰流畅、衔接自然。"
+      },
+      "04": {
+        "name": "交叉手摆姿",
+        "preferred_duration": 6,
+        "text": "人物贴近墙面从正面自然站姿开始，双手自然交叠在腰前；随后一只手抬起整理发丝并微微侧身，另一只手留在腰侧，最后自然看向镜头。人物位置保持稳定，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。整体动作清晰流畅、衔接自然。"
+      }
+    }
+  },
+  "selection": {
+    "history_window": 12
+  },
+  "runtime": {
+    "timezone": "Asia/Shanghai",
+    "poll_intervals_seconds": [2, 3, 5, 8, 13, 20, 30],
+    "environment_error_categories": ["network", "login", "credits", "upload", "download", "timeout", "dependency", "parameter"]
+  },
+  "quality": {
+    "frame_times": [0.5, "middle", "end_minus_0.5"],
+    "proxy_max_bytes": 100000
+  },
+  "publish": {
+    "platform_order": ["douyin", "kuaishou"],
+    "cover_frame": "middle",
+    "location": null,
+    "tag_count": 4,
+    "candidate_tag_count": 8,
+    "navigation_retry_count": 1
+  }
+}

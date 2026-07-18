@@ -15,8 +15,6 @@ from typing import Any
 
 TOOLS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS_DIR))
-from run_record import append_artifact, append_event, refresh_markdown
-
 DUAL_PLATFORM_ORDER = ("douyin", "kuaishou")
 
 
@@ -104,7 +102,10 @@ def summarize_platform(
         "report_md": str(report_json.with_suffix(".md")),
         "errors": report.get("errors", []),
         "warnings": report.get("warnings", []),
-        "command": command,
+        "error_category": report.get("error_category"),
+        "requested_tags": report.get("requested_tags", report.get("tags", [])),
+        "applied_tags": report.get("applied_tags", []),
+        "attempts": report.get("attempts", 1),
     }
 
 
@@ -119,7 +120,6 @@ def overall_decision(platforms: list[dict[str, Any]]) -> str:
 
 def write_both_report(
     out_dir: Path,
-    record_jsonl: str | None,
     report: dict[str, Any],
 ) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -148,53 +148,40 @@ def write_both_report(
             lines.append(f"  - Warning：{warning}")
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    if record_jsonl:
-        append_event(
-            record_jsonl,
-            stage="publish",
-            event="both_publish",
-            status=report.get("decision"),
-            summary=(
-                "双平台发布 "
-                + ", ".join(
-                    f"{item.get('platform')}={item.get('decision')}"
-                    for item in report.get("platforms", [])
-                )
-                + f", overall={report.get('decision')}"
-            ),
-            data={
-                "overall": report.get("decision"),
-                "platforms": report.get("platforms", []),
-                "report_json": str(json_path),
-            },
-        )
-        append_artifact(
-            record_jsonl,
-            stage="publish",
-            path=str(json_path),
-            kind="publish-both-report",
-            status=report.get("decision"),
-            keep=True,
-            summary="双平台发布聚合 JSON 报告",
-        )
-        refresh_markdown(record_jsonl)
     return json_path, md_path
+
+
+def should_retry_navigation(report: dict[str, Any]) -> bool:
+    return report.get("decision") != "published" and report.get("error_category") == "navigation_timeout"
+
+
+def run_platform(platform: str, passthrough: list[str], out_dir: Path) -> dict[str, Any]:
+    adapter = get_adapter(platform)
+    existing_path = platform_report_path(out_dir, platform)
+    if existing_path.is_file():
+        existing = load_platform_report(existing_path)
+        if existing.get("decision") == "published":
+            return summarize_platform(platform, adapter.command(passthrough), 0, out_dir)
+    command = adapter.command(passthrough)
+    returncode = subprocess.call(command)
+    result = summarize_platform(platform, command, returncode, out_dir)
+    if should_retry_navigation(load_platform_report(existing_path)):
+        returncode = subprocess.call(command)
+        report = load_platform_report(existing_path)
+        report["attempts"] = 2
+        existing_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        result = summarize_platform(platform, command, returncode, out_dir)
+    return result
 
 
 def run_both(passthrough: list[str]) -> int:
     out_dir = Path(option_value(passthrough, "--out-dir") or default_publish_out_dir())
     passthrough = ensure_option(passthrough, "--out-dir", str(out_dir))
-    if option_value(passthrough, "--location") is None and not option_present(passthrough, "--no-location"):
-        passthrough = [*passthrough, "--no-location"]
-    record_jsonl = option_value(passthrough, "--record-jsonl")
 
     started_at = datetime.now().isoformat(timespec="seconds")
     platform_results: list[dict[str, Any]] = []
     for platform in DUAL_PLATFORM_ORDER:
-        adapter = get_adapter(platform)
-        command = adapter.command(passthrough)
-        returncode = subprocess.call(command)
-        platform_results.append(summarize_platform(platform, command, returncode, out_dir))
+        platform_results.append(run_platform(platform, passthrough, out_dir))
 
     decision = overall_decision(platform_results)
     report = {
@@ -207,7 +194,7 @@ def run_both(passthrough: list[str]) -> int:
     }
     report["report_json"] = str(out_dir / "publish-both-report.json")
     report["report_md"] = str(out_dir / "publish-both-report.md")
-    report_json, report_md = write_both_report(out_dir, record_jsonl, report)
+    report_json, report_md = write_both_report(out_dir, report)
     report["report_json"] = str(report_json)
     report["report_md"] = str(report_md)
     print(json.dumps(report, ensure_ascii=False, indent=2))

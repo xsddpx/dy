@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="${ROOT_DIR}/.venv"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-USER_BIN="${HOME}/.local/bin"
 RECREATE=0
 
 for arg in "$@"; do
@@ -33,7 +32,7 @@ if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
 fi
 
 "${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${ROOT_DIR}/TOOLS/requirements.txt"
+"${VENV_DIR}/bin/python" -m pip install -r "${ROOT_DIR}/TOOLS/requirements.lock"
 
 media_info="$("${VENV_DIR}/bin/python" - <<'PY'
 from static_ffmpeg import run
@@ -51,13 +50,12 @@ if [[ -z "${ffmpeg_path}" || -z "${ffprobe_path}" ]]; then
   exit 1
 fi
 
-mkdir -p "${USER_BIN}"
-ln -sfn "${ffmpeg_path}" "${USER_BIN}/ffmpeg"
-ln -sfn "${ffprobe_path}" "${USER_BIN}/ffprobe"
+ln -sfn "${ffmpeg_path}" "${VENV_DIR}/bin/ffmpeg"
+ln -sfn "${ffprobe_path}" "${VENV_DIR}/bin/ffprobe"
 
 "${VENV_DIR}/bin/python" -c 'import cv2, numpy, playwright, pytest'
-"${USER_BIN}/ffmpeg" -version >/dev/null
-"${USER_BIN}/ffprobe" -version >/dev/null
+"${VENV_DIR}/bin/ffmpeg" -version >/dev/null
+"${VENV_DIR}/bin/ffprobe" -version >/dev/null
 
 echo "项目环境已就绪：${VENV_DIR}"
-echo "媒体命令已链接：${USER_BIN}/ffmpeg、${USER_BIN}/ffprobe"
+echo "媒体命令已链接：${VENV_DIR}/bin/ffmpeg、${VENV_DIR}/bin/ffprobe"

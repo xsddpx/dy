@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint and derive final prompts for the anna auto workflow."""
+"""Lint final vid prompts for the Anna auto workflow."""
 
 import argparse
 import json
@@ -7,6 +7,17 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from workflow_config import load_workflow_config
+
+
+WORKFLOW_CONFIG = load_workflow_config()
+PROMPT_CONFIG = WORKFLOW_CONFIG["prompt"]
 
 
 def add(findings, severity, code, message):
@@ -64,15 +75,7 @@ UNSUPPORTED_TERMS = [
     "结果数",
 ]
 
-REQUIRED_SECTION_LABELS = [
-    "人物",
-    "视频约束",
-    "穿搭",
-    "环境",
-    "人物动作",
-    "背景音乐",
-    "其他",
-]
+REQUIRED_SECTION_LABELS = list(PROMPT_CONFIG["sections"])
 
 PERSON_REQUIRED_TERMS = [
     "同一位成年女性",
@@ -109,20 +112,11 @@ ACTION_ADAPTED_PRESENTATION_TERMS = [
     "发丝",
 ]
 
-FIXED_ENVIRONMENT_TEMPLATES = {
-    "01": "@图2 是本次随机选中的固定墙面环境；人物贴墙站立，墙上呈现轻微自然投影。",
-}
-
+FIXED_ENVIRONMENT_TEMPLATES = {"01": PROMPT_CONFIG["environment"]}
 FIXED_ACTION_TEMPLATES = {
-    "01": "人物贴近墙面从正面站姿开始，肩背自然靠墙；全身沿墙面原地同步向左转至清晰的侧身姿态，一侧肩背始终轻靠墙面，侧身短暂停留后再沿墙面转回正面。转身过程中在适当时机自然融入撩头发、整理衣服、看向镜头、表情变化、叉腰、手放胸前等动作，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。转身幅度明确，动作舒展流畅、衔接自然，整体呈现甜美亲切、自然有韵律的状态。",
-    "02": "人物贴近墙面从正面自然站姿开始，肩背自然靠墙；在原地摆出一个常见的女性拍照姿态，短暂停留后恢复正面自然站姿，随后面向镜头比心或比出 V 手势。动作过程中可自然融入撩头发、视线移动和表情变化，人物位置保持稳定，墙上轻微投影随动作同步变化。整体动作清晰流畅、衔接自然。",
-    "03": "人物贴近墙面从半侧身站姿开始，一侧肩背轻靠墙面；保持半侧身状态，缓慢打开肩颈转向镜头，短暂停留后轻轻偏头。人物位置保持稳定，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。整体动作轻柔流畅、衔接自然。",
-    "04": "人物贴近墙面从正面自然站姿开始，双手自然交叠在腰前；随后一只手抬起整理发丝并微微侧身，另一只手留在腰侧，最后自然看向镜头。人物位置保持稳定，动作范围集中在墙面前方半步内，墙上轻微投影随动作同步变化。整体动作清晰流畅、衔接自然。",
+    action_id: action["text"] for action_id, action in PROMPT_CONFIG["actions"].items()
 }
-
-FIXED_VIDEO_CONSTRAINT_TEMPLATES = {
-    "01": "固定拍摄，单一连续膝盖以上中景；机位高度大致与人物胸部齐平；人物位于画面中央并贴近墙面，动作范围保持在墙前半步内；头顶保留适度空间，双肩、上身、腰线、腰胯与膝上区域完整清晰，画面下缘稳定落在膝盖附近，脚部始终位于画外；机位、视角、景别和构图全程保持不变。",
-}
+FIXED_VIDEO_CONSTRAINT_TEMPLATES = {"01": PROMPT_CONFIG["video_constraint"]}
 
 INTERNAL_SOURCE_TERMS = [
     "grid-prompt.txt",
@@ -789,67 +783,6 @@ def lint_text(text, path, route="anna", channel="auto"):
     }
 
 
-def derive_prompt(text, mode):
-    if mode == "fast":
-        return text.rstrip() + "\n"
-    raise ValueError(f"未知派生模式：{mode}")
-
-
-def lint_derived_prompt(text, path, mode):
-    return lint_text(text, path)
-
-
-def build_derive_parser():
-    parser = argparse.ArgumentParser(
-        prog="prompt_lint.py derive",
-        description="从 grid-prompt.txt 机械派生阶段 prompt。",
-    )
-    parser.add_argument("grid_prompt", help="主链 02 写出的 TEMP/RUN_ID/grid-prompt.txt")
-    parser.add_argument("--mode", choices=["fast"], required=True)
-    parser.add_argument("--out", required=True, help="派生 prompt 输出路径")
-    return parser
-
-
-def derive_main(argv):
-    parser = build_derive_parser()
-    args = parser.parse_args(argv)
-
-    source = Path(args.grid_prompt).expanduser().resolve()
-    out_path = Path(args.out).expanduser().resolve()
-    if not source.exists():
-        print(json.dumps({"error": "grid-prompt 文件不存在", "missing": str(source)}, ensure_ascii=False), file=sys.stderr)
-        return 2
-
-    source_text = source.read_text(encoding="utf-8", errors="replace")
-    source_lint = lint_text(source_text, source)
-    if source_lint["decision"] != "pass":
-        print(json.dumps({"decision": "fail", "source_lint": source_lint}, ensure_ascii=False, indent=2))
-        return 1
-
-    try:
-        derived = derive_prompt(source_text, args.mode)
-    except ValueError as exc:
-        print(json.dumps({"decision": "fail", "error": str(exc)}, ensure_ascii=False, indent=2))
-        return 1
-
-    derived_lint = lint_derived_prompt(derived, out_path, args.mode)
-    if derived_lint["decision"] != "pass":
-        print(json.dumps({"decision": "fail", "source_lint": source_lint, "derived_lint": derived_lint}, ensure_ascii=False, indent=2))
-        return 1
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(derived, encoding="utf-8")
-    print(json.dumps({
-        "decision": "pass",
-        "mode": args.mode,
-        "source": str(source),
-        "out": str(out_path),
-        "source_lint": source_lint["decision"],
-        "derived_lint": derived_lint["decision"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
-
 def write_reports(results, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     report_json = out_dir / "report.json"
@@ -911,24 +844,18 @@ def lint_main(argv=None, prog="prompt_lint.py"):
 def top_level_help():
     parser = argparse.ArgumentParser(
         prog="prompt_lint.py",
-        description="检查和派生 dy 项目的最终 prompt。",
+        description="检查 dy 项目的最终 vid prompt。",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog=(
             "子命令:\n"
-            "  lint    检查最终 prompt；兼容旧式写法，省略 lint 也会进入 lint\n"
-            "  derive  从 grid-prompt.txt 机械派生阶段 prompt\n"
+            "  lint    检查最终 vid prompt；省略 lint 也会进入 lint\n"
             "\n"
             "常用:\n"
-            "  .venv/bin/python TOOLS/prompt_lint.py derive \"TEMP/$RUN_ID/grid-prompt.txt\" --mode fast --out \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
             "  .venv/bin/python TOOLS/prompt_lint.py lint \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
-            "  .venv/bin/python TOOLS/prompt_lint.py \"TEMP/$RUN_ID/vid-prompt-v1.txt\"\n"
-            "\n"
-            "查看子命令参数:\n"
-            "  .venv/bin/python TOOLS/prompt_lint.py derive --help\n"
-            "  .venv/bin/python TOOLS/prompt_lint.py lint --help"
+            "  .venv/bin/python TOOLS/prompt_lint.py \"TEMP/$RUN_ID/vid-prompt-v1.txt\""
         ),
     )
-    parser.add_argument("command", nargs="?", help="子命令：lint 或 derive；省略时按旧式 lint 处理")
+    parser.add_argument("command", nargs="?", help="子命令：lint；省略时直接检查")
     parser.print_help()
     return 0
 
@@ -937,8 +864,6 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in {"-h", "--help"}:
         return top_level_help()
-    if argv and argv[0] == "derive":
-        return derive_main(argv[1:])
     if argv and argv[0] == "lint":
         return lint_main(argv[1:], prog="prompt_lint.py lint")
     return lint_main(argv)

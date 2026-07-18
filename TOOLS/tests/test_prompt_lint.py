@@ -51,62 +51,20 @@ class PromptLintFlowTest(unittest.TestCase):
 
     def test_documented_fixed_templates_match_linter_contract(self):
         doc = (PROJECT_ROOT / "DOCS/MODULES/MAIN_02_CONTENT_PROMPT.md").read_text(encoding="utf-8")
+        config = (PROJECT_ROOT / "MATERIAL/xdy-workflow.json").read_text(encoding="utf-8")
         self.assertTrue((PROJECT_ROOT / "MATERIAL/fixed-environment/anna-room-01.png").exists())
-        self.assertIn("未指定时，在动作模板 01–04 中随机选择一个", doc)
-        environment = re.search(r"### 固定环境引用\n\n```text\n(.*?)\n```", doc, re.S).group(1)
-        self.assertEqual(environment, "环境：" + PROMPT_LINT.FIXED_ENVIRONMENT_TEMPLATES["01"])
-        self.assertIn("@图2 是本次随机选中的固定墙面环境", environment)
-        self.assertIn("人物贴墙站立", environment)
-        self.assertIn("墙上呈现轻微自然投影", environment)
-        for template_id, name in (("01", "靠墙完整侧身转回"),):
-            action = re.search(rf"### 动作模板 {template_id}：{name}\n\n```text\n(.*?)\n```", doc, re.S).group(1)
-            self.assertEqual(action, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES[template_id])
-            self.assertIn("视频约束：" + PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES[template_id], doc)
-            self.assertIn("全身沿墙面原地同步向左转至清晰的侧身姿态", action)
-            self.assertIn("侧身短暂停留", action)
-            self.assertIn("再沿墙面转回正面", action)
-            self.assertIn("撩头发、整理衣服、看向镜头、表情变化、叉腰、手放胸前", action)
-            self.assertIn("动作舒展流畅、衔接自然", action)
-            self.assertIn("甜美亲切、自然有韵律", action)
-            self.assertIn("肩背自然靠墙", action)
-            self.assertIn("动作范围集中在墙面前方半步内", action)
-            self.assertIn("墙上轻微投影随动作同步变化", action)
-            self.assertNotIn("轻微重心", action)
-            self.assertNotIn("机械僵硬", action)
-            self.assertNotIn("人物神态轻松自信", action)
-            self.assertNotIn("服装轮廓、上身比例、清晰腰线和整体身形在动作过程中持续可读", action)
-            for micro_direction in ("一只手", "另一只手", "耳侧", "自然回落", "视线在镜头附近"):
-                self.assertNotIn(micro_direction, action)
-            self.assertNotIn("镜子", action)
-            for high_risk_term in ("舞蹈", "跳舞", "肩胯", "妩媚", "S 型曲线", "面料张力"):
-                self.assertNotIn(high_risk_term, action)
-        action_02 = re.search(r"### 动作模板 02：靠墙自然摆姿回正\n\n```text\n(.*?)\n```", doc, re.S).group(1)
-        self.assertEqual(action_02, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["02"])
-        self.assertIn("从正面自然站姿开始", action_02)
-        self.assertIn("一个常见的女性拍照姿态", action_02)
-        self.assertIn("恢复正面自然站姿", action_02)
-        self.assertIn("面向镜头比心或比出 V 手势", action_02)
-        self.assertIn("撩头发、视线移动和表情变化", action_02)
-        self.assertIn("人物位置保持稳定", action_02)
-        self.assertIn("墙上轻微投影随动作同步变化", action_02)
-        self.assertIn("整体动作清晰流畅、衔接自然", action_02)
-        action_03 = re.search(r"### 动作模板 03：肩颈微转\n\n```text\n(.*?)\n```", doc, re.S).group(1)
-        self.assertEqual(action_03, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["03"])
-        self.assertIn("从半侧身站姿开始", action_03)
-        self.assertIn("一侧肩背轻靠墙面", action_03)
-        self.assertIn("缓慢打开肩颈转向镜头", action_03)
-        self.assertIn("短暂停留后轻轻偏头", action_03)
-        action_04 = re.search(r"### 动作模板 04：交叉手摆姿\n\n```text\n(.*?)\n```", doc, re.S).group(1)
-        self.assertEqual(action_04, "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["04"])
-        self.assertIn("双手自然交叠在腰前", action_04)
-        self.assertIn("一只手抬起整理发丝并微微侧身", action_04)
-        self.assertIn("另一只手留在腰侧", action_04)
-        self.assertIn("最后自然看向镜头", action_04)
+        self.assertIn("MATERIAL/xdy-workflow.json", doc)
+        self.assertIn("不复制固定模板", doc)
+        self.assertIn("全程保持正常速度，不使用慢动作", config)
+        self.assertEqual(PROMPT_LINT.PROMPT_CONFIG["video_constraint"], PROMPT_LINT.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"])
+
         self.assertIn("单一连续膝盖以上中景", VIDEO_CONSTRAINT_PROMPT)
         self.assertIn("机位高度大致与人物胸部齐平", VIDEO_CONSTRAINT_PROMPT)
         self.assertIn("人物位于画面中央并贴近墙面", VIDEO_CONSTRAINT_PROMPT)
         self.assertIn("动作范围保持在墙前半步内", VIDEO_CONSTRAINT_PROMPT)
         self.assertIn("脚部始终位于画外", VIDEO_CONSTRAINT_PROMPT)
+        self.assertIn("全程保持正常速度", VIDEO_CONSTRAINT_PROMPT)
+        self.assertIn("不使用慢动作", VIDEO_CONSTRAINT_PROMPT)
         self.assertNotIn("人物展示；", VIDEO_CONSTRAINT_PROMPT)
         self.assertNotIn("舞蹈律动", VIDEO_CONSTRAINT_PROMPT)
 
@@ -195,29 +153,26 @@ class PromptLintFlowTest(unittest.TestCase):
         self.assertEqual(result["decision"], "fail")
         self.assertTrue(any(f["code"] == "standalone_sellpoint_section" for f in result["findings"]), result["findings"])
 
-    def test_derive_fast_copies_grid_prompt(self):
-        self.assertEqual(PROMPT_LINT.derive_prompt(GOOD_PROMPT, "fast"), GOOD_PROMPT + "\n")
-
-    def test_derive_main_writes_output(self):
+    def test_direct_vid_prompt_lint_writes_output(self):
         with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "grid-prompt.txt"
-            out = Path(tmp) / "vid-prompt-v1.txt"
+            source = Path(tmp) / "vid-prompt-v1.txt"
+            out = Path(tmp) / "lint"
             source.write_text(GOOD_PROMPT, encoding="utf-8")
             stdout = io.StringIO()
             with redirect_stdout(stdout):
-                code = PROMPT_LINT.main(["derive", str(source), "--mode", "fast", "--out", str(out)])
+                code = PROMPT_LINT.main(["lint", str(source), "--out-dir", str(out)])
             self.assertEqual(code, 0, stdout.getvalue())
-            self.assertEqual(out.read_text(encoding="utf-8"), GOOD_PROMPT + "\n")
+            self.assertTrue((out / "report.json").is_file())
 
-    def test_top_level_help_mentions_derive_and_legacy_lint(self):
+    def test_top_level_help_only_mentions_direct_vid_lint(self):
         stdout = io.StringIO()
         with redirect_stdout(stdout):
             code = PROMPT_LINT.main(["--help"])
         help_text = stdout.getvalue()
         self.assertEqual(code, 0)
-        self.assertIn("derive", help_text)
         self.assertIn("lint", help_text)
-        self.assertIn(".venv/bin/python TOOLS/prompt_lint.py derive", help_text)
+        self.assertNotIn("derive", help_text)
+        self.assertIn("vid-prompt-v1.txt", help_text)
         self.assertIn("省略 lint", help_text)
 
     def test_lint_subcommand_writes_report(self):

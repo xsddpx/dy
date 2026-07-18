@@ -60,13 +60,11 @@ class TestDocRoutes(unittest.TestCase):
     def test_contract_gates_are_executable_and_waiting_is_not_final(self):
         lifecycle = (MODULES_DIR / "MAIN_01_RUN_LIFECYCLE.md").read_text(encoding="utf-8")
         delivery = (MODULES_DIR / "MAIN_03_VIDEO_DELIVERY.md").read_text(encoding="utf-8")
-        self.assertIn('run_workspace.py contract "$RUN_ID"', lifecycle)
-        self.assertIn("--phase finalize", lifecycle)
-        self.assertIn('run_workspace.py contract "$RUN_ID"', delivery)
-        self.assertIn("--phase pre-generation", delivery)
-        self.assertIn("`awaiting_confirmation` 是等待态", lifecycle)
-        self.assertIn("generation_failed", lifecycle)
-        self.assertIn("quality_failed", lifecycle)
+        self.assertIn('xdy_flow.py complete "$RUN_ID"', lifecycle)
+        self.assertIn('xdy_flow.py resume "$RUN_ID"', lifecycle)
+        self.assertIn("不可变 `logs/contracts/generation-vN.json`", delivery)
+        self.assertIn("等待发布确认时不能收尾", lifecycle)
+        self.assertIn("原子追加唯一 `run/completed`", lifecycle)
 
     def test_routing_docs_use_project_virtualenv_python(self):
         offenders = []

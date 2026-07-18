@@ -81,12 +81,7 @@ def make_contract_run(root: Path, run_id: str = "20260717-120000", prompt_versio
     role.write_bytes(b"role")
     environment.write_bytes(b"environment")
     directory = make_run(root, run_id, "2026-07-17T12:00:00+08:00")
-    grid = valid_prompt()
-    (directory / "grid-prompt.txt").write_text(grid, encoding="utf-8")
-    (directory / f"vid-prompt-v{prompt_version}.txt").write_text(
-        RUN_WORKSPACE.prompt_lint.derive_prompt(grid, "fast"),
-        encoding="utf-8",
-    )
+    (directory / f"vid-prompt-v{prompt_version}.txt").write_text(valid_prompt() + "\n", encoding="utf-8")
     (directory / "environment-path.txt").write_text(str(environment.resolve()) + "\n", encoding="utf-8")
     return directory
 
@@ -127,24 +122,6 @@ class RunWorkspaceTest(unittest.TestCase):
         self.assertEqual(naive, utc)
         self.assertEqual(RUN_WORKSPACE.canonical_base(utc), "20260712-080910")
 
-    def test_timestamp_fallbacks_to_first_event_then_legacy_name(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = make_root(Path(tmp))
-            directory = root / "TEMP" / "20260625-0955-topic"
-            directory.mkdir()
-            record = directory / "20260625-0955-topic-run-record.jsonl"
-            record.write_text(
-                json.dumps({"ts": "2026-06-25T01:59:21Z", "stage": "reference", "event": "start"}) + "\n",
-                encoding="utf-8",
-            )
-            stamp, source = RUN_WORKSPACE.timestamp_for_run(directory, record)
-            self.assertEqual(RUN_WORKSPACE.canonical_base(stamp), "20260625-095921")
-            self.assertEqual(source, "first_event.ts")
-
-            record.write_text("not json\n", encoding="utf-8")
-            stamp, source = RUN_WORKSPACE.timestamp_for_run(directory, record)
-            self.assertEqual(RUN_WORKSPACE.canonical_base(stamp), "20260625-095500")
-            self.assertEqual(source, "legacy_name")
 
     def test_allocator_uses_suffixes_and_stops_after_99(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -187,96 +164,6 @@ class RunWorkspaceTest(unittest.TestCase):
             self.assertTrue((root / "TEMP" / result["run_id"] / "logs").is_dir())
             self.assertEqual(result["output_mp4"], "OUTPUT/20260712-080910.mp4")
 
-    def test_plan_excludes_auxiliary_dirs_and_maps_dy_output_alias(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = make_root(Path(tmp))
-            make_run(root, "old-b", "2026-07-12T08:09:10")
-            make_run(root, "old-a", "2026-07-12T08:09:10")
-            make_run(root, "dy-20260712-090000-topic", "2026-07-12T09:00:00")
-            (root / "TEMP" / "candidate-1").mkdir()
-            (root / "TEMP" / "candidate-1" / "candidate-run-record.jsonl").touch()
-            (root / "TEMP" / "del").mkdir()
-            output = root / "OUTPUT" / "20260712-090000-topic.mp4"
-            output.write_bytes(b"video")
-
-            plan = RUN_WORKSPACE.build_migration_plan(root)
-            self.assertEqual(plan["run_count"], 3)
-            self.assertEqual(plan["output_count"], 1)
-            by_old = {item["old_id"]: item for item in plan["entries"]}
-            self.assertEqual(by_old["old-a"]["new_id"], "20260712-080910")
-            self.assertEqual(by_old["old-b"]["new_id"], "20260712-080910-01")
-            self.assertEqual(
-                by_old["dy-20260712-090000-topic"]["output_old"],
-                "OUTPUT/20260712-090000-topic.mp4",
-            )
-
-    def test_apply_audit_and_rollback_preserve_external_facts(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = make_root(Path(tmp))
-            old_id = "20260712-0809-topic"
-            external = {
-                "created_at": "2026-07-12T08:09:10",
-                "stage": "google_drive",
-                "event": "uploaded",
-                "data": {
-                    "run_id": old_id,
-                    "local_temp": f"TEMP/{old_id}/grid-prompt.txt",
-                    "local_output": f"OUTPUT/{old_id}.mp4",
-                    "file_name": f"{old_id}.mp4",
-                    "url": "https://drive.google.com/file/d/unchanged",
-                },
-            }
-            directory = make_run(root, old_id, "2026-07-12T08:09:10", external)
-            (directory / "grid-prompt.txt").write_text("prompt\n", encoding="utf-8")
-            output = root / "OUTPUT" / f"{old_id}.mp4"
-            output.write_bytes(b"unchanged-video")
-            original_hash = RUN_WORKSPACE.sha256_file(output)
-
-            plan = RUN_WORKSPACE.build_migration_plan(root)
-            manifest = RUN_WORKSPACE.apply_migration(root, plan)
-            new_id = plan["entries"][0]["new_id"]
-            new_record = root / "TEMP" / new_id / f"{new_id}-run-record.jsonl"
-            text = new_record.read_text(encoding="utf-8")
-            self.assertIn(f'"run_id": "{new_id}"', text)
-            self.assertIn(f"TEMP/{new_id}/grid-prompt.txt", text)
-            self.assertIn(f"OUTPUT/{new_id}.mp4", text)
-            self.assertIn(f'"file_name": "{old_id}.mp4"', text)
-            self.assertIn("https://drive.google.com/file/d/unchanged", text)
-            self.assertEqual(RUN_WORKSPACE.sha256_file(root / "OUTPUT" / f"{new_id}.mp4"), original_hash)
-            self.assertEqual(RUN_WORKSPACE.audit_workspace(root)["decision"], "pass")
-
-            RUN_WORKSPACE.rollback_migration(root, manifest)
-            restored_record = root / "TEMP" / old_id / f"{old_id}-run-record.jsonl"
-            self.assertTrue(restored_record.is_file())
-            self.assertIn(f"TEMP/{old_id}/grid-prompt.txt", restored_record.read_text(encoding="utf-8"))
-            self.assertEqual(RUN_WORKSPACE.sha256_file(root / "OUTPUT" / f"{old_id}.mp4"), original_hash)
-
-    def test_migration_accepts_an_already_canonical_run(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = make_root(Path(tmp))
-            run_id = "20260712-080910"
-            make_run(root, run_id, "2026-07-12T08:09:10")
-            plan = RUN_WORKSPACE.build_migration_plan(root)
-            self.assertEqual(plan["entries"][0]["new_id"], run_id)
-            manifest = RUN_WORKSPACE.apply_migration(root, plan)
-            self.assertEqual(json.loads(manifest.read_text(encoding="utf-8"))["status"], "applied")
-            self.assertEqual(RUN_WORKSPACE.audit_workspace(root)["decision"], "pass")
-            RUN_WORKSPACE.rollback_migration(root, manifest)
-            self.assertTrue((root / "TEMP" / run_id / f"{run_id}-run-record.jsonl").is_file())
-
-    def test_apply_failure_automatically_restores_original_paths(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = make_root(Path(tmp))
-            old_id = "20260712-0809-topic"
-            make_run(root, old_id, "2026-07-12T08:09:10")
-            output = root / "OUTPUT" / f"{old_id}.mp4"
-            output.write_bytes(b"video")
-            plan = RUN_WORKSPACE.build_migration_plan(root)
-            with mock.patch.object(RUN_WORKSPACE, "apply_internal_changes", side_effect=RuntimeError("boom")):
-                with self.assertRaises(RuntimeError):
-                    RUN_WORKSPACE.apply_migration(root, plan)
-            self.assertTrue((root / "TEMP" / old_id / f"{old_id}-run-record.jsonl").is_file())
-            self.assertEqual(output.read_bytes(), b"video")
 
     def test_audit_rejects_orphan_and_invalid_output(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -320,10 +207,7 @@ class RunWorkspaceTest(unittest.TestCase):
             self.assertEqual(manifest_path.read_bytes(), original_manifest)
 
             changed = valid_prompt().replace("氛围俏皮自信", "氛围轻松自信")
-            (directory / "grid-prompt.txt").write_text(changed, encoding="utf-8")
-            (directory / "vid-prompt-v1.txt").write_text(
-                RUN_WORKSPACE.prompt_lint.derive_prompt(changed, "fast"), encoding="utf-8"
-            )
+            (directory / "vid-prompt-v1.txt").write_text(changed + "\n", encoding="utf-8")
             conflict = RUN_WORKSPACE.validate_pre_generation_contract(
                 root, run_id, route="xdysp", duration=5, prompt_version=1
             )
@@ -337,7 +221,6 @@ class RunWorkspaceTest(unittest.TestCase):
             run_id = "20260717-120001"
             directory = make_contract_run(root, run_id)
             prompt = (directory / "vid-prompt-v1.txt").read_text(encoding="utf-8").replace("@图2", "@图3")
-            (directory / "grid-prompt.txt").write_text(prompt, encoding="utf-8")
             (directory / "vid-prompt-v1.txt").write_text(prompt, encoding="utf-8")
             with (directory / f"{run_id}-run-record.jsonl").open("a", encoding="utf-8") as handle:
                 handle.write("not-json\n")
@@ -446,7 +329,7 @@ class RunWorkspaceTest(unittest.TestCase):
             self.assertTrue(any("My Drive 根目录" in error for error in rejected["errors"]))
             self.assertTrue(any("偏差超过" in error for error in rejected["errors"]))
 
-    def test_finalize_accepts_publish_adapter_blocked_terminal(self):
+    def test_finalize_accepts_publish_adapter_blocked_terminal_as_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = make_root(Path(tmp))
             run_id = "20260717-120003"
@@ -498,7 +381,12 @@ class RunWorkspaceTest(unittest.TestCase):
                 RUN_WORKSPACE, "probe_video", return_value={"width": 720, "height": 1280, "duration": 5.06}
             ):
                 result = RUN_WORKSPACE.validate_finalize_contract(
-                    root, run_id, route="xdy", duration=5, publish_mode="default"
+                    root,
+                    run_id,
+                    route="xdy",
+                    duration=5,
+                    publish_mode="default",
+                    outcome="publish_failed",
                 )
             self.assertEqual(result["decision"], "pass", result["errors"])
 

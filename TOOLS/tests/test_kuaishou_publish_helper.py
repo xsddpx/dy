@@ -31,6 +31,13 @@ class KuaishouPublishHelperTest(unittest.TestCase):
         caption = MODULE.build_caption("轻熟针织穿搭", "今天心情很轻松", ["穿搭"])
         self.assertEqual(caption.splitlines()[0], "轻熟针织穿搭")
 
+    def test_build_caption_applies_at_most_four_tags(self):
+        tags = ["一", "二", "三", "四", "五", "六"]
+        caption = MODULE.build_caption("标题", "描述", tags)
+        self.assertEqual([token for token in caption.split() if token.startswith("#")], ["#一", "#二", "#三", "#四"])
+        self.assertEqual(MODULE.normalize_tags(tags), tags)
+        self.assertEqual(MODULE.normalize_tags(tags, MODULE.MAX_APPLIED_TAGS), tags[:4])
+
     def test_ai_declaration_detection(self):
         self.assertTrue(MODULE.ai_declaration_is_set("作品声明 内容由AI生成"))
         self.assertTrue(MODULE.ai_declaration_is_set("作者声明 内容为AI生成"))
@@ -69,15 +76,14 @@ class KuaishouPublishHelperTest(unittest.TestCase):
         self.assertTrue(MODULE.snapshot_has_vr360_mode({"textSample": "正在使用VR360°全景视频上传模式"}))
         self.assertFalse(MODULE.snapshot_has_vr360_mode({"textSample": "上传视频 作品描述"}))
 
-    def test_main_help_includes_location_controls(self):
+    def test_main_help_excludes_location_controls(self):
         stdout = io.StringIO()
         with self.assertRaises(SystemExit) as cm:
             with mock.patch("sys.stdout", stdout):
                 MODULE.main(["--help"])
         self.assertEqual(cm.exception.code, 0)
-        self.assertIn("--location", stdout.getvalue())
-        self.assertIn("--no-location", stdout.getvalue())
-        self.assertIn("快手不设置发布地址", stdout.getvalue())
+        self.assertNotIn("--location", stdout.getvalue())
+        self.assertNotIn("--no-location", stdout.getvalue())
 
 
 if __name__ == "__main__":
