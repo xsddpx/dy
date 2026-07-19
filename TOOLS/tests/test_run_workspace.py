@@ -55,10 +55,9 @@ def make_run(root: Path, run_id: str, created_at: str, extra_event=None) -> Path
 def valid_prompt() -> str:
     lint = RUN_WORKSPACE.prompt_lint
     return (
-        "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
-        "脸部严格参考左下角大脸，身材严格参考正面、侧面和背面全身图，保持同一人物的脸部身份与身材一致。"
-        "画面中只出现这一位成年女性。"
-        "视频约束："
+        "人物："
+        + lint.PROMPT_CONFIG["person"]
+        + "视频约束："
         + lint.FIXED_VIDEO_CONSTRAINT_TEMPLATES["01"]
         + "穿搭：黑色合体上衣搭配高腰直筒短裙，上衣采用哑光面料并呈现清晰腰线，短裙版型全程一致。"
         + "环境："

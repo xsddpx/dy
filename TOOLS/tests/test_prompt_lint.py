@@ -14,11 +14,7 @@ PROMPT_LINT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PROMPT_LINT)
 
 
-PERSON_PROMPT = (
-    "人物：@图1 是同一位成年女性的多视角、多表情角色参考图，不是多人合照；"
-    "脸部严格参考左下角大脸，身材严格参考正面、侧面和背面全身图，保持同一人物的脸部身份与身材一致。"
-    "画面中只出现这一位成年女性。"
-)
+PERSON_PROMPT = "人物：" + PROMPT_LINT.PROMPT_CONFIG["person"]
 
 PERSON_ACTION_PROMPT = "人物动作：" + PROMPT_LINT.FIXED_ACTION_TEMPLATES["01"]
 
@@ -123,6 +119,17 @@ class PromptLintFlowTest(unittest.TestCase):
         result = self.lint(text)
         self.assertEqual(result["decision"], "fail", result["findings"])
         self.assertTrue(any(f["code"] == "missing_person_anchors" for f in result["findings"]), result["findings"])
+
+    def test_fixed_person_template_explicitly_locks_chest_volume(self):
+        person = PROMPT_LINT.PROMPT_CONFIG["person"]
+        for phrase in (
+            "胸部体量严格以正面、斜侧面和侧面全身图为准",
+            "与角色图相同的体量",
+            "胸廓前后比例",
+            "侧向投影",
+            "各角度全程稳定一致",
+        ):
+            self.assertIn(phrase, person)
 
     def test_extra_expression_section_fails(self):
         text = GOOD_PROMPT.replace("人物动作：", "表情节奏：自然微笑。人物动作：")

@@ -264,6 +264,17 @@ class XdyFlowTest(unittest.TestCase):
             )
             waiting_quality = xdy_flow.resume_run(root, run_id, dreamina_bin=str(dreamina), poll_timeout=10)
             self.assertEqual(waiting_quality["next_action"], "review_quality")
+            directory = root / "TEMP" / run_id
+            checklist = json.loads((directory / "quality/quality-checklist.json").read_text(encoding="utf-8"))
+            self.assertEqual(checklist["role_proxy_top_ratio"], 0.52)
+            self.assertEqual(checklist["role_proxy_max_width"], 960)
+            self.assertIn("相近朝向", checklist["role_reference_scope"])
+            self.assertIn("三帧均无法判断", checklist["decision_rule"])
+            role_proxy = root / checklist["role_proxy"]
+            self.assertLess(role_proxy.stat().st_size, 100000)
+            role_proxy_meta = xdy_flow.video_probe(root, role_proxy)
+            self.assertGreaterEqual(role_proxy_meta["width"], 720)
+            self.assertLess(role_proxy_meta["height"] / role_proxy_meta["width"], 0.6)
             xdy_flow.record_quality(root, run_id, "pass")
             xdy_flow.record_drive(root, run_id, {"status": "failed", "reason": "fake", "needs_retry": True})
             completed = xdy_flow.resume_run(root, run_id, publish_adapter=str(publisher))

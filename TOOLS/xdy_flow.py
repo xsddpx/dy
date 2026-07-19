@@ -727,21 +727,38 @@ def video_probe(root: Path, path: Path) -> dict[str, Any]:
     }
 
 
-def _render_proxy(root: Path, source: Path, target: Path, seek: float | None = None) -> None:
+def _render_proxy(
+    root: Path,
+    source: Path,
+    target: Path,
+    seek: float | None = None,
+    *,
+    top_crop_ratio: float | None = None,
+    max_width: int = 480,
+) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     max_bytes = int(QUALITY["proxy_max_bytes"])
     ffmpeg = executable("ffmpeg", root)
-    for short_edge in (480, 400, 320, 260):
+    width_candidates = []
+    for ratio in (1.0, 0.875, 0.75, 0.625, 0.5):
+        width = max(260, int(max_width * ratio) // 2 * 2)
+        if width not in width_candidates:
+            width_candidates.append(width)
+    for width in width_candidates:
         for quality in (5, 8, 12, 18, 24, 31):
             command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
             if seek is not None:
                 command.extend(["-ss", f"{seek:.3f}"])
+            filters = []
+            if top_crop_ratio is not None:
+                filters.append(f"crop=iw:trunc(ih*{top_crop_ratio:.6f}/2)*2:0:0")
+            filters.append(f"scale={width}:-2")
             command.extend(
                 [
                     "-i",
                     str(source),
                     "-vf",
-                    f"scale={short_edge}:-2",
+                    ",".join(filters),
                     "-frames:v",
                     "1",
                     "-q:v",
@@ -780,13 +797,26 @@ def prepare_quality(root: Path, directory: Path, record: Path, run_id: str, even
         quality_dir / "frame-middle.jpg",
         quality_dir / "frame-end-minus-0.5.jpg",
     ]
-    _render_proxy(root, project_path(root, ASSETS["role_image"]), role_proxy)
+    role_proxy_top_ratio = float(QUALITY["role_proxy_top_ratio"])
+    role_proxy_max_width = int(QUALITY["role_proxy_max_width"])
+    _render_proxy(
+        root,
+        project_path(root, ASSETS["role_image"]),
+        role_proxy,
+        top_crop_ratio=role_proxy_top_ratio,
+        max_width=role_proxy_max_width,
+    )
     for target, seek in zip(frame_paths, times):
         _render_proxy(root, video, target, seek)
     report = {
         "decision": "pending_visual_comparison",
         "criterion": "仅判断成片胸部体量是否相对固定角色图明显偏小",
         "role_proxy": relative(root, role_proxy),
+        "role_reference_scope": "角色图顶部正面、斜侧面、侧面和背面身体参考带；按成片相近朝向对照",
+        "comparison_basis": "以肩宽和胸廓为相对尺度，对照胸廓前后比例与侧向投影，不按画面绝对像素面积判断",
+        "decision_rule": "至少一帧胸部清晰可判断；任一清晰可判断帧明显偏小，或三帧均无法判断时，记录 blocked；其余记录 pass",
+        "role_proxy_top_ratio": role_proxy_top_ratio,
+        "role_proxy_max_width": role_proxy_max_width,
         "frames": [
             {"path": relative(root, path), "time": round(seek, 3), "size": path.stat().st_size}
             for path, seek in zip(frame_paths, times)
@@ -802,7 +832,7 @@ def prepare_quality(root: Path, directory: Path, record: Path, run_id: str, even
         "prepared",
         "pending",
         {"checklist": relative(root, report_path)},
-        "角色代理图与首中尾三帧已准备，等待逐张视觉比对",
+        "胸部体量角色参考带与首中尾三帧已准备，等待按相近朝向逐张视觉比对",
     )
 
 

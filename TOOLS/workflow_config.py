@@ -13,6 +13,13 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "MATERIAL" / "xdy-workflow.json"
 EXPECTED_SECTIONS = ("人物", "视频约束", "穿搭", "环境", "人物动作", "背景音乐", "其他")
+REQUIRED_PERSON_BODY_PHRASES = (
+    "胸部体量严格以正面、斜侧面和侧面全身图为准",
+    "与角色图相同的体量",
+    "胸廓前后比例",
+    "侧向投影",
+    "各角度全程稳定一致",
+)
 SLOW_ACTION_PHRASES = ("缓慢", "慢慢", "慢速", "轻缓", "徐徐", "渐渐", "slowly", "slow motion", "slow-motion")
 
 
@@ -47,6 +54,10 @@ def validate_workflow_config(config: dict[str, Any], root: Path = PROJECT_ROOT) 
     prompt = config.get("prompt") or {}
     if tuple(prompt.get("sections") or ()) != EXPECTED_SECTIONS:
         raise WorkflowConfigError("prompt 七段顺序与项目合同不一致")
+    person = str(prompt.get("person") or "").strip()
+    missing_person_body_phrases = [phrase for phrase in REQUIRED_PERSON_BODY_PHRASES if phrase not in person]
+    if missing_person_body_phrases:
+        raise WorkflowConfigError("prompt 人物固定段缺少胸部体量一致性锚点：" + "、".join(missing_person_body_phrases))
     if "全程保持正常速度，不使用慢动作" not in str(prompt.get("video_constraint") or ""):
         raise WorkflowConfigError("视频约束缺少正常速度与非慢动作要求")
     actions = prompt.get("actions") or {}
@@ -74,6 +85,17 @@ def validate_workflow_config(config: dict[str, Any], root: Path = PROJECT_ROOT) 
     expected_categories = {"network", "login", "credits", "upload", "download", "timeout", "dependency", "parameter"}
     if set(runtime.get("environment_error_categories") or []) != expected_categories:
         raise WorkflowConfigError("环境错误分类与项目合同不一致")
+    quality = config.get("quality") or {}
+    if quality.get("frame_times") != [0.5, "middle", "end_minus_0.5"]:
+        raise WorkflowConfigError("质检抽帧必须固定为 0.5 秒、中点和结束前 0.5 秒")
+    if not isinstance(quality.get("proxy_max_bytes"), int) or quality["proxy_max_bytes"] <= 0:
+        raise WorkflowConfigError("质检代理图字节上限必须是正整数")
+    role_proxy_top_ratio = quality.get("role_proxy_top_ratio")
+    if not isinstance(role_proxy_top_ratio, (int, float)) or not 0 < role_proxy_top_ratio <= 1:
+        raise WorkflowConfigError("角色质检代理图顶部裁切比例必须在 0 到 1 之间")
+    role_proxy_max_width = quality.get("role_proxy_max_width")
+    if not isinstance(role_proxy_max_width, int) or role_proxy_max_width < 480:
+        raise WorkflowConfigError("角色质检代理图最大宽度不得小于 480 像素")
     publish = config.get("publish") or {}
     if publish.get("tag_count") != 4:
         raise WorkflowConfigError("发布环节实际应用标签数必须严格限制为 4")
