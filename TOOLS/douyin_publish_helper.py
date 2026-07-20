@@ -265,49 +265,6 @@ return result;
     )
 
 
-def fill_tags(tags: list[str]) -> dict[str, Any]:
-    clean_tags = [tag.strip().lstrip("#") for tag in tags if tag.strip()]
-    if not clean_tags:
-        return {"ok": True, "safe": True, "filled": 0, "requested_tags": [], "applied_tags": []}
-    if not DOM_CDP_URL:
-        return {
-            "ok": False,
-            "safe": False,
-            "filled": 0,
-            "requested_tags": clean_tags,
-            "applied_tags": [],
-            "reason": "抖音标签只允许通过 CDP 完整匹配写入",
-        }
-    return fill_tags_via_playwright(DOM_CDP_URL, clean_tags)
-
-
-def apply_tag_candidates(
-    tags: list[str],
-    attempt: Any,
-    target_count: int = MAX_APPLIED_TAGS,
-) -> dict[str, Any]:
-    applied: list[str] = []
-    actions: list[dict[str, Any]] = []
-    for tag in tags:
-        if len(applied) >= target_count:
-            break
-        try:
-            result = attempt(tag)
-        except Exception as exc:
-            result = {"tag": tag, "ok": False, "reason": str(exc)}
-        action = {"tag": tag, **(result if isinstance(result, dict) else {"ok": bool(result)})}
-        actions.append(action)
-        if action.get("ok"):
-            applied.append(tag)
-    return {
-        "ok": len(applied) >= min(target_count, len(tags)),
-        "filled": len(applied),
-        "requested_tags": tags,
-        "applied_tags": applied,
-        "actions": actions,
-    }
-
-
 def normalize_tag_values(tags: list[str]) -> list[str]:
     clean: list[str] = []
     seen: set[str] = set()
@@ -320,122 +277,55 @@ def normalize_tag_values(tags: list[str]) -> list[str]:
     return clean
 
 
+def extract_hashtags(text: str) -> list[str]:
+    normalized = str(text or "").replace("\u200b", " ")
+    return [value.strip() for value in re.findall(r"#([^\s#]+)", normalized) if value.strip()]
+
+
+def build_description_with_tags(description: str, tags: list[str]) -> tuple[str, list[str]]:
+    selected = normalize_tag_values(tags)[:MAX_APPLIED_TAGS]
+    if len(selected) != MAX_APPLIED_TAGS:
+        raise ValueError(f"抖音发布必须恰好提供 {MAX_APPLIED_TAGS} 个去重话题")
+    base = re.sub(r"#([^\s#]+)", "", str(description or "").replace("\u200b", " "))
+    base = "\n".join(line.strip() for line in base.splitlines() if line.strip())
+    hashtag_line = " ".join(f"#{tag}" for tag in selected)
+    return "\n".join(part for part in (base, hashtag_line) if part), selected
+
+
 def validate_topic_state(
     *,
-    base_text: str,
     final_text: str,
-    requested_tags: list[str],
     applied_tags: list[str],
-    highlighted_topics: list[str],
 ) -> dict[str, Any]:
-    requested = normalize_tag_values(requested_tags)
-    applied = normalize_tag_values(applied_tags)
-    highlighted = normalize_tag_values(highlighted_topics)
-    base_compact = re.sub(r"\s+", "", base_text)
-    final_compact = re.sub(r"\s+", "", final_text)
+    expected = normalize_tag_values(applied_tags)
+    actual = extract_hashtags(final_text)
     errors: list[str] = []
 
-    if len(applied) > MAX_APPLIED_TAGS:
-        errors.append(f"已应用标签超过 {MAX_APPLIED_TAGS} 个")
-    if len(highlighted) > MAX_APPLIED_TAGS:
-        errors.append(f"页面话题 token 超过 {MAX_APPLIED_TAGS} 个")
-
-    missing = [tag for tag in applied if tag not in highlighted]
-    unexpected = [tag for tag in highlighted if tag not in applied]
-    residues = [
-        tag
-        for tag in requested
-        if tag not in applied and tag not in base_compact and tag in final_compact
-    ]
+    if len(actual) != MAX_APPLIED_TAGS:
+        errors.append(f"页面 #话题必须恰好为 {MAX_APPLIED_TAGS} 个，实际为 {len(actual)} 个")
+    missing = [tag for tag in expected if tag not in actual]
+    unexpected = [tag for tag in actual if tag not in expected]
     if missing:
-        errors.append("已应用标签缺少页面 token：" + "、".join(missing))
+        errors.append("页面缺少计划话题：" + "、".join(missing))
     if unexpected:
-        errors.append("页面存在未记录话题 token：" + "、".join(unexpected))
-    if residues:
-        errors.append("失败候选标签残留在正文：" + "、".join(residues))
+        errors.append("页面存在计划外话题：" + "、".join(unexpected))
 
     return {
         "safe": not errors,
-        "highlighted_topics": highlighted,
+        "hashtags": actual,
         "missing_topics": missing,
         "unexpected_topics": unexpected,
-        "residual_candidates": residues,
         "errors": errors,
     }
 
 
-def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 10) -> dict[str, Any]:
+def verify_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 10) -> dict[str, Any]:
     from playwright.sync_api import sync_playwright
-
-    def body_text(page: Any) -> str:
-        try:
-            return page.locator("body").inner_text(timeout=3000)
-        except Exception:
-            return ""
-
-    def has_highlighted_topic(page: Any, tag: str) -> bool:
-        return bool(page.evaluate(
-            """(tag) => {
-              function visible(el) {
-                const s = getComputedStyle(el);
-                const r = el.getBoundingClientRect();
-                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 1 && r.height > 1;
-              }
-              const editor = Array.from(document.querySelectorAll(
-                '[contenteditable=true], .editor-kit-root-container, .editor-comp-publish-container-d4oeQI, .zone-container'
-              )).find(visible);
-              if (!editor) return false;
-              const target = '#' + tag;
-              return Array.from(editor.querySelectorAll('*')).some((el) => {
-                const text = (el.innerText || el.textContent || '').replace(/\\s+/g, '').trim();
-                const bg = getComputedStyle(el).backgroundColor;
-                return text === target && /rgba?\\(1,\\s*118,\\s*247/.test(bg);
-              });
-            }""",
-            tag,
-        ))
-
-    def capture_topic_state(page: Any) -> dict[str, Any]:
-        return page.evaluate(
-            """() => {
-              function visible(el) {
-                const s = getComputedStyle(el);
-                const r = el.getBoundingClientRect();
-                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 1 && r.height > 1;
-              }
-              const editor = Array.from(document.querySelectorAll(
-                '[contenteditable=true], .editor-kit-root-container, .editor-comp-publish-container-d4oeQI, .zone-container'
-              )).find(visible);
-              if (!editor) return {text: '', highlighted_topics: []};
-              const topics = Array.from(editor.querySelectorAll('*')).flatMap((el) => {
-                const text = (el.innerText || el.textContent || '').replace(/\\s+/g, '').trim();
-                const bg = getComputedStyle(el).backgroundColor;
-                return /^#[^#]+$/.test(text) && /rgba?\\(1,\\s*118,\\s*247/.test(bg) ? [text] : [];
-              });
-              return {
-                text: editor.innerText || editor.textContent || '',
-                highlighted_topics: Array.from(new Set(topics)),
-              };
-            }"""
-        )
-
-    def restore_topic_state(page: Any, before: dict[str, Any]) -> bool:
-        expected = re.sub(r"\s+", "", str(before.get("text") or ""))
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(200)
-        for _ in range(4):
-            current = capture_topic_state(page)
-            if re.sub(r"\s+", "", str(current.get("text") or "")) == expected:
-                return True
-            page.keyboard.press("Meta+z")
-            page.wait_for_timeout(250)
-        current = capture_topic_state(page)
-        return re.sub(r"\s+", "", str(current.get("text") or "")) == expected
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=timeout_sec * 1000)
         pages = [page for context in browser.contexts for page in context.pages]
-        page = next((item for item in pages if "creator.douyin.com/creator-micro/content/publish" in item.url), None)
+        page = next((item for item in pages if is_video_publish_page(item.url)), None)
         if page is None:
             page = next((item for item in pages if "creator.douyin.com" in item.url), None)
         if page is None:
@@ -449,52 +339,59 @@ def fill_tags_via_playwright(cdp_url: str, tags: list[str], timeout_sec: int = 1
             }
 
         page.bring_to_front()
-        base_state = capture_topic_state(page)
-
-        def attempt(tag: str) -> dict[str, Any]:
-            before = capture_topic_state(page)
-            try:
-                add_topic = page.get_by_text("#添加话题", exact=True).first
-                add_topic.click(timeout=timeout_sec * 1000)
-                page.wait_for_timeout(400)
-
-                page.keyboard.type(tag, delay=35)
-                page.wait_for_timeout(800)
-
-                suggestion = page.get_by_text(f"#{tag}", exact=True).first
-                if suggestion.count() == 0 or not suggestion.is_visible(timeout=2000):
-                    cleanup_ok = restore_topic_state(page, before)
-                    return {
-                        "ok": False,
-                        "cleanup_ok": cleanup_ok,
-                        "reason": "没有找到完整匹配的话题建议",
-                    }
-
-                suggestion.click(timeout=3000)
-
-                page.wait_for_timeout(700)
-                ok = has_highlighted_topic(page, tag)
-                cleanup_ok = True if ok else restore_topic_state(page, before)
-                return {"ok": ok, "cleanup_ok": cleanup_ok, "method": "topic-suggestion"}
-            except Exception as exc:
-                cleanup_ok = restore_topic_state(page, before)
-                return {"ok": False, "cleanup_ok": cleanup_ok, "reason": str(exc)}
-
-        result = apply_tag_candidates(tags, attempt)
-        final_state = capture_topic_state(page)
+        final_text = page.evaluate(
+            """() => {
+              function visible(el) {
+                const s = getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 1 && r.height > 1;
+              }
+              function labelText(el) {
+                return [el.placeholder, el.getAttribute('aria-label'), el.getAttribute('data-placeholder')].join(' ');
+              }
+              const fields = Array.from(document.querySelectorAll('textarea, [contenteditable=true]')).filter(visible);
+              const editor = fields.find((el) => /简介|描述|添加作品简介|说点什么/.test(labelText(el)))
+                || fields.find((el) => el.isContentEditable)
+                || fields[0];
+              return editor ? (editor.innerText || editor.textContent || editor.value || '') : '';
+            }"""
+        )
         validation = validate_topic_state(
-            base_text=str(base_state.get("text") or ""),
-            final_text=str(final_state.get("text") or ""),
-            requested_tags=tags,
-            applied_tags=result["applied_tags"],
-            highlighted_topics=list(final_state.get("highlighted_topics") or []),
+            final_text=str(final_text or ""),
+            applied_tags=tags,
         )
         return {
-            **result,
+            "ok": validation["safe"],
+            "filled": len(validation["hashtags"]),
+            "requested_tags": tags,
+            "applied_tags": validation["hashtags"],
             "safe": validation["safe"],
             "validation": validation,
-            "method": "playwright-topic-token",
+            "method": "raw-hashtag-text",
         }
+
+
+def fill_tags(tags: list[str]) -> dict[str, Any]:
+    clean_tags = normalize_tag_values(tags)[:MAX_APPLIED_TAGS]
+    if len(clean_tags) != MAX_APPLIED_TAGS:
+        return {
+            "ok": False,
+            "safe": False,
+            "filled": len(clean_tags),
+            "requested_tags": clean_tags,
+            "applied_tags": [],
+            "reason": f"抖音发布必须恰好提供 {MAX_APPLIED_TAGS} 个去重话题",
+        }
+    if not DOM_CDP_URL:
+        return {
+            "ok": False,
+            "safe": False,
+            "filled": 0,
+            "requested_tags": clean_tags,
+            "applied_tags": [],
+            "reason": "抖音话题回读只允许通过 CDP 执行",
+        }
+    return verify_tags_via_playwright(DOM_CDP_URL, clean_tags)
 
 
 def click_locator_center(page: Any, locator: Any, timeout_ms: int) -> dict[str, Any]:
@@ -1001,7 +898,7 @@ def main() -> int:
     parser.add_argument("video", help="待发布 MP4 路径")
     parser.add_argument("--title", required=True, help="作品标题")
     parser.add_argument("--description", default="", help="作品简介")
-    parser.add_argument("--tag", action="append", default=[], help="候选标签，可重复传入，最多尝试 8 个并应用 4 个完整匹配")
+    parser.add_argument("--tag", action="append", default=[], help="候选话题，可重复传入；去重后取前 4 个直接写入作品描述")
     parser.add_argument("--out-dir", default=None, help="报告输出目录，默认 TEMP/publish-runs/YYYYMMDD-HHMMSS")
     parser.add_argument("--upload-url", default=DEFAULT_UPLOAD_URL, help="抖音创作者中心上传页")
     parser.add_argument("--dry-run", action="store_true", help="只校验参数和报告输出，不接管 Chrome")
@@ -1029,6 +926,8 @@ def main() -> int:
         return fail(report, out_dir, f"视频文件不存在：{video}", 2)
     if not args.title.strip():
         return fail(report, out_dir, "标题不能为空", 2)
+    if len(tags) < MAX_APPLIED_TAGS:
+        return fail(report, out_dir, f"抖音发布至少需要 {MAX_APPLIED_TAGS} 个去重候选话题", 2)
 
     if args.dry_run:
         report["decision"] = "dry-run-pass"
@@ -1077,8 +976,10 @@ def main() -> int:
     if not cover_result.get("ok"):
         report["warnings"].append(f"封面帧未设置：{cover_result.get('reason') or cover_result.get('status')}")
 
-    copywriting = set_text_fields(args.title, args.description)
-    tag_result = fill_tags(tags)
+    published_description, selected_tags = build_description_with_tags(args.description, tags)
+    copywriting = set_text_fields(args.title, published_description)
+    tag_result = fill_tags(selected_tags)
+    report["published_description"] = published_description
     report["applied_tags"] = tag_result.get("applied_tags", tag_result.get("tags", []))
     report["steps"]["copywriting"].update({"status": "filled", "fields": copywriting, "tags": tag_result})
     if not copywriting.get("title"):
@@ -1086,8 +987,8 @@ def main() -> int:
     if tag_result.get("safe") is False:
         validation_errors = (tag_result.get("validation") or {}).get("errors") or [tag_result.get("reason")]
         return fail(report, out_dir, "标签写入校验失败：" + "；".join(filter(None, validation_errors)), 5)
-    if tags and not tag_result.get("ok"):
-        report["warnings"].append("候选标签已耗尽，未获得四个完整匹配；仅保留已回读确认的完整话题 token")
+    if not tag_result.get("ok"):
+        return fail(report, out_dir, f"抖音发布必须回读确认恰好 {MAX_APPLIED_TAGS} 个话题", 5)
 
     declaration = try_set_ai_declaration(args.declaration_timeout)
     report["steps"]["declaration"].update(declaration)

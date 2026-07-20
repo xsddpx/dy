@@ -124,47 +124,51 @@ class DouyinPublishHelperTest(unittest.TestCase):
         })
         self.assertEqual(status, "success")
 
-    def test_tag_candidates_fall_back_until_four_exact_matches(self):
-        requested = ["一", "二", "三", "四", "五", "六", "七"]
-        accepted = {"二", "三", "五", "六"}
-        result = MODULE.apply_tag_candidates(requested, lambda tag: {"ok": tag in accepted})
-        self.assertEqual(result["requested_tags"], requested)
-        self.assertEqual(result["applied_tags"], ["二", "三", "五", "六"])
-        self.assertEqual([item["tag"] for item in result["actions"]], requested[:6])
-        self.assertTrue(result["ok"])
+    def test_build_description_writes_first_four_raw_hashtags(self):
+        description, applied = MODULE.build_description_with_tags(
+            "简单记录今天的状态。 #旧话题",
+            ["轻熟穿搭", "修身穿搭", "日常穿搭", "穿搭分享", "氛围感"],
+        )
+        self.assertEqual(applied, ["轻熟穿搭", "修身穿搭", "日常穿搭", "穿搭分享"])
+        self.assertNotIn("#旧话题", description)
+        self.assertEqual(MODULE.extract_hashtags(description), applied)
 
-    def test_topic_state_accepts_fewer_than_four_exact_tokens(self):
+    def test_build_description_requires_four_unique_hashtags(self):
+        with self.assertRaises(ValueError):
+            MODULE.build_description_with_tags("正文", ["一", "二", "二", "三"])
+
+    def test_topic_state_rejects_fewer_than_four_raw_hashtags(self):
         result = MODULE.validate_topic_state(
-            base_text="简单记录今天的状态。",
             final_text="简单记录今天的状态。 #轻熟穿搭 #穿搭分享 #身材比例",
-            requested_tags=["轻熟穿搭", "修身穿搭", "穿搭分享", "身材比例"],
-            applied_tags=["轻熟穿搭", "穿搭分享", "身材比例"],
-            highlighted_topics=["#轻熟穿搭", "#穿搭分享", "#身材比例"],
+            applied_tags=["轻熟穿搭", "修身穿搭", "穿搭分享", "身材比例"],
+        )
+        self.assertFalse(result["safe"])
+        self.assertTrue(any("恰好为 4 个" in error for error in result["errors"]))
+
+    def test_topic_state_accepts_exactly_four_raw_hashtags(self):
+        result = MODULE.validate_topic_state(
+            final_text="简单记录今天的状态。 #轻熟穿搭 #修身穿搭 #日常穿搭 #穿搭分享",
+            applied_tags=["轻熟穿搭", "修身穿搭", "日常穿搭", "穿搭分享"],
         )
         self.assertTrue(result["safe"], result["errors"])
 
-    def test_topic_state_rejects_failed_candidate_residue(self):
+    def test_topic_state_rejects_unplanned_hashtag(self):
         result = MODULE.validate_topic_state(
-            base_text="简单记录今天的状态。",
-            final_text="简单记录今天的状态。 #轻熟穿搭 修身穿搭日常穿搭",
-            requested_tags=["轻熟穿搭", "修身穿搭", "日常穿搭"],
-            applied_tags=["轻熟穿搭"],
-            highlighted_topics=["#轻熟穿搭"],
+            final_text="正文 #一 #二 #三 #计划外",
+            applied_tags=["一", "二", "三", "四"],
         )
         self.assertFalse(result["safe"])
-        self.assertEqual(result["residual_candidates"], ["修身穿搭", "日常穿搭"])
+        self.assertEqual(result["missing_topics"], ["四"])
+        self.assertEqual(result["unexpected_topics"], ["计划外"])
 
-    def test_topic_state_rejects_more_than_four_tokens(self):
+    def test_topic_state_rejects_more_than_four_hashtags(self):
         tags = ["一", "二", "三", "四", "五"]
         result = MODULE.validate_topic_state(
-            base_text="正文",
             final_text="正文 " + " ".join(f"#{tag}" for tag in tags),
-            requested_tags=tags,
-            applied_tags=tags,
-            highlighted_topics=tags,
+            applied_tags=tags[:4],
         )
         self.assertFalse(result["safe"])
-        self.assertTrue(any("超过 4 个" in error for error in result["errors"]))
+        self.assertTrue(any("恰好为 4 个" in error for error in result["errors"]))
 
 
 if __name__ == "__main__":

@@ -31,12 +31,30 @@ class KuaishouPublishHelperTest(unittest.TestCase):
         caption = MODULE.build_caption("轻熟针织穿搭", "今天心情很轻松", ["穿搭"])
         self.assertEqual(caption.splitlines()[0], "轻熟针织穿搭")
 
-    def test_build_caption_applies_at_most_four_tags(self):
+    def test_build_caption_applies_exactly_first_four_tags(self):
         tags = ["一", "二", "三", "四", "五", "六"]
         caption = MODULE.build_caption("标题", "描述", tags)
         self.assertEqual([token for token in caption.split() if token.startswith("#")], ["#一", "#二", "#三", "#四"])
         self.assertEqual(MODULE.normalize_tags(tags), tags)
         self.assertEqual(MODULE.normalize_tags(tags, MODULE.MAX_APPLIED_TAGS), tags[:4])
+
+    def test_dry_run_rejects_fewer_than_four_tags(self):
+        with mock.patch.object(Path, "is_file", return_value=True):
+            code = MODULE.main([
+                "/tmp/demo.mp4",
+                "--title",
+                "标题",
+                "--tag",
+                "一",
+                "--tag",
+                "二",
+                "--tag",
+                "三",
+                "--dry-run",
+                "--out-dir",
+                "/tmp/kuaishou-tag-count-test",
+            ])
+        self.assertEqual(code, 2)
 
     def test_ai_declaration_detection(self):
         self.assertTrue(MODULE.ai_declaration_is_set("作品声明 内容由AI生成"))

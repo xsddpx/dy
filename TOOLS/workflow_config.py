@@ -98,9 +98,9 @@ def validate_workflow_config(config: dict[str, Any], root: Path = PROJECT_ROOT) 
         raise WorkflowConfigError("角色质检代理图最大宽度不得小于 480 像素")
     publish = config.get("publish") or {}
     if publish.get("tag_count") != 4:
-        raise WorkflowConfigError("发布环节实际应用标签数必须严格限制为 4")
+        raise WorkflowConfigError("发布环节实际应用标签数必须固定为 4")
     if int(publish.get("candidate_tag_count") or 0) < publish["tag_count"]:
-        raise WorkflowConfigError("候选标签池不能小于实际应用标签上限")
+        raise WorkflowConfigError("候选标签池不能小于固定应用标签数")
     assets = config.get("assets") or {}
     for key in ("role_image", "environment_directory", "wardrobe"):
         value = assets.get(key)

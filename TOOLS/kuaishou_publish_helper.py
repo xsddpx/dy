@@ -444,6 +444,13 @@ def main(argv: list[str] | None = None) -> int:
         return fail(report, out_dir, f"视频文件不存在：{video}", 2)
     if not args.title.strip():
         return fail(report, out_dir, "标题不能为空", 2)
+    if len(applied_tags) != MAX_APPLIED_TAGS:
+        return fail(
+            report,
+            out_dir,
+            f"快手发布必须恰好提供 {MAX_APPLIED_TAGS} 个话题，实际为 {len(applied_tags)} 个",
+            2,
+        )
     if args.dry_run:
         report["decision"] = "dry-run-pass"
         write_report(out_dir, report)

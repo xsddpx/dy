@@ -19,6 +19,7 @@ OUTFIT_PATTERN = re.compile(
     re.MULTILINE,
 )
 LOWER_BODY_TERMS = ("短裤", "长裤", "牛仔裤", "短裙", "连衣裙", "衬衫裙", "裙裤")
+SHORT_HEM_TERMS = ("短裤", "短裙", "连衣裙", "衬衫裙")
 LAYERING_TERMS = ("开衫", "西装外套", "外搭", "作为内搭", "外穿", "背带短裤")
 NECKLINE_TERMS = ("方领", "圆领", "U 形领", "小立领", "V 形领", "交叠领", "挂脖", "翻领", "船领", "Polo")
 AMBIGUOUS_OR_DRIFT_TERMS = ("或", "可选", "单侧", "另一侧", "自然敞开", "裙裤", "草帽", "发箍", "独立腰带")
@@ -86,6 +87,26 @@ class AnnaWardrobeTest(unittest.TestCase):
                 for term in AMBIGUOUS_OR_DRIFT_TERMS:
                     self.assertNotIn(term, prompt)
 
+    def test_short_hems_use_conservative_knee_up_length(self):
+        for identifier, _, prompt in self.outfits:
+            with self.subTest(identifier=identifier):
+                if any(term in prompt for term in SHORT_HEM_TERMS):
+                    self.assertIn("膝盖上方", prompt)
+
+    def test_open_necklines_are_explicitly_shallow_or_high(self):
+        neckline_boundaries = {
+            "方领": "浅方领",
+            "U 形领": "高位 U 形领",
+            "V 形领": "浅 V 形领",
+            "交叠领": "浅交叠领",
+            "船领": "高位船领",
+        }
+        for identifier, _, prompt in self.outfits:
+            with self.subTest(identifier=identifier):
+                for neckline, safe_variant in neckline_boundaries.items():
+                    if neckline in prompt:
+                        self.assertIn(safe_variant, prompt)
+
     def test_wardrobe_preserves_style_diversity(self):
         prompts = [prompt for _, _, prompt in self.outfits]
         self.assertGreaterEqual(sum("连衣裙" in prompt for prompt in prompts), 7)
@@ -120,6 +141,8 @@ class AnnaWardrobeTest(unittest.TestCase):
         self.assertIn("每套最多使用两层服装和一种图案", self.text)
         self.assertIn("人物身份与基础身材比例由固定角色图和人物段统一锚定", self.text)
         self.assertIn("不写鞋履", self.text)
+        self.assertIn("默认采用高位或浅口领型", self.text)
+        self.assertIn("裙裤下摆统一落在膝盖上方", self.text)
         self.assertIn("不在穿搭段重复扩写", self.module_text)
         self.assertIn("服装颜色、面料、领型、袖型、层次、腰线位置与下装版型全程一致", self.module_text)
         self.assertIn("人物身材体量与胸臀强化描述不在此段重复扩写", self.module_text)
